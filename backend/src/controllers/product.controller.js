@@ -1,7 +1,7 @@
 const prisma = require("../utils/prisma");
 
 async function listProducts(req, res) {
-  const { q, category, minPrice, maxPrice } = req.query;
+  const { q, category, minPrice, maxPrice, recommended, sort } = req.query;
 
   const where = {
     active: true,
@@ -22,11 +22,21 @@ async function listProducts(req, res) {
           },
         }
       : {}),
+    ...(recommended === "true" ? { recommended: true } : {}),
   };
+
+  const orderBy =
+    sort === "price_asc"
+      ? { price: "asc" }
+      : sort === "price_desc"
+        ? { price: "desc" }
+        : sort === "recommended"
+          ? [{ recommended: "desc" }, { createdAt: "desc" }]
+          : { createdAt: "desc" };
 
   const products = await prisma.product.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy,
   });
 
   return res.json({ products });

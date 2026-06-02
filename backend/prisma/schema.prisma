@@ -40,10 +40,57 @@ model Product {
   stock       Int         @default(0)
   imageUrl    String?
   category    String?
+  recommended Boolean     @default(false)
   active      Boolean     @default(true)
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  bannerImageUrl String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StoreSetting {
+  id              Int      @id
+  brandName       String
+  logoUrl         String?
+  promoVideoUrl   String?
+  promoVideoTitle String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Slide {
+  id          Int      @id @default(autoincrement())
+  title       String
+  subtitle    String?
+  imageUrl    String
+  ctaLabel    String?
+  ctaUrl      String?
+  displayOrder Int     @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Flyer {
+  id           Int      @id @default(autoincrement())
+  title        String
+  subtitle     String?
+  imageUrl     String
+  linkUrl      String?
+  displayOrder Int      @unique
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Order {

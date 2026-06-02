@@ -1,86 +1,1510 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const TOKEN_KEY = "admin_token";
+const USER_KEY = "admin_user";
+
+const initialForm = {
+  id: null,
+  name: "",
+  slug: "",
+  description: "",
+  bannerImageUrl: "",
+  active: true,
+};
+
+const initialSlideForm = {
+  id: null,
+  title: "",
+  subtitle: "",
+  imageUrl: "",
+  ctaLabel: "",
+  ctaUrl: "",
+  displayOrder: 1,
+  active: true,
+};
+
+const initialFlyerForm = {
+  id: null,
+  title: "",
+  subtitle: "",
+  imageUrl: "",
+  linkUrl: "",
+  displayOrder: 1,
+  active: true,
+};
+
+const initialSettingsForm = {
+  brandName: "Don Joyero",
+  logoUrl: "",
+  promoVideoUrl: "",
+  promoVideoTitle: "",
+};
+
+const initialProductForm = {
+  id: null,
+  name: "",
+  slug: "",
+  description: "",
+  price: "",
+  stock: "",
+  imageUrl: "",
+  category: "",
+  recommended: false,
+  active: true,
+};
+
+const initialUserForm = {
+  id: null,
+  name: "",
+  email: "",
+  password: "",
+  role: "CUSTOMER",
+};
+
+const MENU_BY_ROLE = {
+  ADMIN: [
+    { key: "dashboard", label: "Dashboard" },
+    { key: "users", label: "Usuarios" },
+    { key: "categories", label: "Categorias" },
+    { key: "products", label: "Productos" },
+    { key: "slides", label: "Slider" },
+    { key: "flyers", label: "Flyers" },
+    { key: "settings", label: "Branding" },
+  ],
+};
+
+function slugify(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
 
 export default function App() {
   const [token, setToken] = useState("");
-  const [orders, setOrders] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState("admin@joyeria.local");
+  const [password, setPassword] = useState("Admin12345");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
 
-  async function loadOrders() {
-    if (!token.trim()) {
-      setError("Pega un token admin para consultar pedidos.");
+  const [categories, setCategories] = useState([]);
+  const [dashboard, setDashboard] = useState({
+    stats: { users: 0, products: 0, categories: 0, orders: 0 },
+    recentOrders: [],
+    recentUsers: [],
+  });
+  const [users, setUsers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [slides, setSlides] = useState([]);
+  const [flyers, setFlyers] = useState([]);
+  const [settingsForm, setSettingsForm] = useState(initialSettingsForm);
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState("");
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  const [form, setForm] = useState(initialForm);
+  const [slideForm, setSlideForm] = useState(initialSlideForm);
+  const [flyerForm, setFlyerForm] = useState(initialFlyerForm);
+  const [productForm, setProductForm] = useState(initialProductForm);
+  const [userForm, setUserForm] = useState(initialUserForm);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const isEditing = useMemo(() => form.id !== null, [form.id]);
+  const isEditingSlide = useMemo(() => slideForm.id !== null, [slideForm.id]);
+  const isEditingFlyer = useMemo(() => flyerForm.id !== null, [flyerForm.id]);
+  const isEditingProduct = useMemo(() => productForm.id !== null, [productForm.id]);
+  const isEditingUser = useMemo(() => userForm.id !== null, [userForm.id]);
+  const role = user?.role || "ADMIN";
+  const roleMenu = useMemo(() => MENU_BY_ROLE[role] || [], [role]);
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    const storedUser = localStorage.getItem(USER_KEY);
+
+    if (storedToken) {
+      setToken(storedToken);
+    }
+
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem(USER_KEY);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setDashboard({
+        stats: { users: 0, products: 0, categories: 0, orders: 0 },
+        recentOrders: [],
+        recentUsers: [],
+      });
+      setUsers([]);
+      setCategories([]);
+      setProducts([]);
+      setSlides([]);
+      setFlyers([]);
       return;
     }
 
-    setLoading(true);
-    setError("");
+    loadData();
+  }, [token]);
+
+  useEffect(() => {
+    if (!roleMenu.length) {
+      return;
+    }
+
+    const hasAccess = roleMenu.some((item) => item.key === activeTab);
+    if (!hasAccess) {
+      setActiveTab(roleMenu[0].key);
+    }
+  }, [roleMenu, activeTab]);
+
+  async function request(path, options = {}) {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message || "Ocurrio un error inesperado");
+    }
+
+    return data;
+  }
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    setAuthLoading(true);
+    setAuthError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/admin/orders`, {
-        headers: {
-          Authorization: `Bearer ${token.trim()}`,
-        },
+      const data = await request("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error("No se pudieron cargar pedidos. Revisa el token.");
+      if (data.user?.role !== "ADMIN") {
+        throw new Error("Tu usuario no tiene permisos de administrador");
       }
 
-      const data = await response.json();
-      setOrders(data.orders || []);
-    } catch (err) {
-      setError(err.message || "Error inesperado");
-      setOrders([]);
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+      setPassword("");
+    } catch (error) {
+      setAuthError(error.message || "No se pudo iniciar sesion");
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   }
 
-  useEffect(() => {
-    setOrders([]);
-    setError("");
-  }, [token]);
+  function handleLogout() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    setToken("");
+    setUser(null);
+    setDashboard({
+      stats: { users: 0, products: 0, categories: 0, orders: 0 },
+      recentOrders: [],
+      recentUsers: [],
+    });
+    setUsers([]);
+    setCategories([]);
+    setProducts([]);
+    setFlyers([]);
+    setForm(initialForm);
+    setSlideForm(initialSlideForm);
+    setFlyerForm(initialFlyerForm);
+    setProductForm(initialProductForm);
+    setUserForm(initialUserForm);
+    setAuthError("");
+    setListError("");
+  }
+
+  async function loadData() {
+    setListLoading(true);
+    setListError("");
+
+    try {
+      const [dashboardData, usersData, categoriesData, productsData, slidesData, flyersData, settingsData] = await Promise.all([
+        request("/api/admin/dashboard"),
+        request("/api/admin/users"),
+        request("/api/admin/categories"),
+        request("/api/admin/products"),
+        request("/api/admin/slides"),
+        request("/api/admin/flyers"),
+        request("/api/admin/settings"),
+      ]);
+      setDashboard({
+        stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
+        recentOrders: dashboardData?.recentOrders || [],
+        recentUsers: dashboardData?.recentUsers || [],
+      });
+      setUsers(usersData.users || []);
+      setCategories(categoriesData.categories || []);
+      setProducts(productsData.products || []);
+      setSlides(slidesData.slides || []);
+      setFlyers(flyersData.flyers || []);
+      setSettingsForm({
+        brandName: settingsData?.settings?.brandName || "Don Joyero",
+        logoUrl: settingsData?.settings?.logoUrl || "",
+        promoVideoUrl: settingsData?.settings?.promoVideoUrl || "",
+        promoVideoTitle: settingsData?.settings?.promoVideoTitle || "",
+      });
+    } catch (error) {
+      setListError(error.message || "No se pudieron cargar datos del panel");
+    } finally {
+      setListLoading(false);
+    }
+  }
+
+  function resetForm() {
+    setForm(initialForm);
+  }
+
+  function resetSlideForm() {
+    setSlideForm(initialSlideForm);
+  }
+
+  function resetFlyerForm() {
+    setFlyerForm(initialFlyerForm);
+  }
+
+  function resetProductForm() {
+    setProductForm(initialProductForm);
+  }
+
+  function resetUserForm() {
+    setUserForm(initialUserForm);
+  }
+
+  function startEdit(category) {
+    setForm({
+      id: category.id,
+      name: category.name || "",
+      slug: category.slug || "",
+      description: category.description || "",
+      bannerImageUrl: category.bannerImageUrl || "",
+      active: Boolean(category.active),
+    });
+  }
+
+  function startEditSlide(slide) {
+    setSlideForm({
+      id: slide.id,
+      title: slide.title || "",
+      subtitle: slide.subtitle || "",
+      imageUrl: slide.imageUrl || "",
+      ctaLabel: slide.ctaLabel || "",
+      ctaUrl: slide.ctaUrl || "",
+      displayOrder: Number(slide.displayOrder || 1),
+      active: Boolean(slide.active),
+    });
+  }
+
+  function startEditFlyer(flyer) {
+    setFlyerForm({
+      id: flyer.id,
+      title: flyer.title || "",
+      subtitle: flyer.subtitle || "",
+      imageUrl: flyer.imageUrl || "",
+      linkUrl: flyer.linkUrl || "",
+      displayOrder: Number(flyer.displayOrder || 1),
+      active: Boolean(flyer.active),
+    });
+  }
+
+  function startEditProduct(product) {
+    setProductForm({
+      id: product.id,
+      name: product.name || "",
+      slug: product.slug || "",
+      description: product.description || "",
+      price: String(product.price ?? ""),
+      stock: String(product.stock ?? ""),
+      imageUrl: product.imageUrl || "",
+      category: product.category || "",
+      recommended: Boolean(product.recommended),
+      active: Boolean(product.active),
+    });
+  }
+
+  function startEditUser(nextUser) {
+    setUserForm({
+      id: nextUser.id,
+      name: nextUser.name || "",
+      email: nextUser.email || "",
+      password: "",
+      role: nextUser.role || "CUSTOMER",
+    });
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setListError("");
+
+    const payload = {
+      name: form.name.trim(),
+      slug: (form.slug || slugify(form.name)).trim(),
+      description: form.description.trim() || null,
+      bannerImageUrl: form.bannerImageUrl.trim() || null,
+      active: Boolean(form.active),
+    };
+
+    try {
+      if (!payload.name) {
+        throw new Error("El nombre es obligatorio");
+      }
+
+      if (!payload.slug) {
+        throw new Error("El slug es obligatorio");
+      }
+
+      if (isEditing) {
+        await request(`/api/admin/categories/${form.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await request("/api/admin/categories", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      resetForm();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar la categoria");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSlideSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setListError("");
+
+    const payload = {
+      title: slideForm.title.trim(),
+      subtitle: slideForm.subtitle.trim() || null,
+      imageUrl: slideForm.imageUrl.trim(),
+      ctaLabel: slideForm.ctaLabel.trim() || null,
+      ctaUrl: slideForm.ctaUrl.trim() || null,
+      displayOrder: Number(slideForm.displayOrder),
+      active: Boolean(slideForm.active),
+    };
+
+    try {
+      if (!payload.title || !payload.imageUrl || Number.isNaN(payload.displayOrder)) {
+        throw new Error("title, imageUrl y displayOrder son obligatorios");
+      }
+
+      if (isEditingSlide) {
+        await request(`/api/admin/slides/${slideForm.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await request("/api/admin/slides", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      resetSlideForm();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar el slide");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSettingsSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setListError("");
+
+    const payload = {
+      brandName: settingsForm.brandName.trim(),
+      logoUrl: settingsForm.logoUrl.trim() || null,
+      promoVideoUrl: settingsForm.promoVideoUrl.trim() || null,
+      promoVideoTitle: settingsForm.promoVideoTitle.trim() || null,
+    };
+
+    try {
+      if (!payload.brandName) {
+        throw new Error("El nombre de marca es obligatorio");
+      }
+
+      await request("/api/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar configuracion");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleFlyerSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setListError("");
+
+    const payload = {
+      title: flyerForm.title.trim(),
+      subtitle: flyerForm.subtitle.trim() || null,
+      imageUrl: flyerForm.imageUrl.trim(),
+      linkUrl: flyerForm.linkUrl.trim() || null,
+      displayOrder: Number(flyerForm.displayOrder),
+      active: Boolean(flyerForm.active),
+    };
+
+    try {
+      if (!payload.title || !payload.imageUrl || Number.isNaN(payload.displayOrder)) {
+        throw new Error("title, imageUrl y displayOrder son obligatorios");
+      }
+
+      if (isEditingFlyer) {
+        await request(`/api/admin/flyers/${flyerForm.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await request("/api/admin/flyers", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      resetFlyerForm();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar el flyer");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleProductSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setListError("");
+
+    const payload = {
+      name: productForm.name.trim(),
+      slug: (productForm.slug || slugify(productForm.name)).trim(),
+      description: productForm.description.trim(),
+      price: Number(productForm.price),
+      stock: Number(productForm.stock || 0),
+      imageUrl: productForm.imageUrl.trim(),
+      category: productForm.category || null,
+      recommended: Boolean(productForm.recommended),
+      active: Boolean(productForm.active),
+    };
+
+    try {
+      if (!payload.name || !payload.slug || Number.isNaN(payload.price) || !payload.imageUrl) {
+        throw new Error("name, slug, price e imageUrl son obligatorios");
+      }
+
+      if (isEditingProduct) {
+        await request(`/api/admin/products/${productForm.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await request("/api/admin/products", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      resetProductForm();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar el producto");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUserSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setListError("");
+
+    const payload = {
+      name: userForm.name.trim(),
+      email: userForm.email.trim(),
+      password: userForm.password,
+      role: userForm.role,
+    };
+
+    try {
+      if (!payload.name || !payload.email) {
+        throw new Error("name y email son obligatorios");
+      }
+
+      if (!isEditingUser && !payload.password) {
+        throw new Error("password es obligatorio para crear usuario");
+      }
+
+      if (isEditingUser) {
+        await request(`/api/admin/users/${userForm.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await request("/api/admin/users", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      resetUserForm();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar el usuario");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(category) {
+    const confirmed = window.confirm(`Eliminar categoria "${category.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(category.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/categories/${category.id}`, {
+        method: "DELETE",
+      });
+
+      if (form.id === category.id) {
+        resetForm();
+      }
+
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo eliminar la categoria");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleDeleteSlide(slide) {
+    const confirmed = window.confirm(`Eliminar slide "${slide.title}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(slide.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/slides/${slide.id}`, {
+        method: "DELETE",
+      });
+
+      if (slideForm.id === slide.id) {
+        resetSlideForm();
+      }
+
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo eliminar el slide");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleDeleteFlyer(flyer) {
+    const confirmed = window.confirm(`Eliminar flyer "${flyer.title}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(flyer.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/flyers/${flyer.id}`, {
+        method: "DELETE",
+      });
+
+      if (flyerForm.id === flyer.id) {
+        resetFlyerForm();
+      }
+
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo eliminar el flyer");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleDeleteProduct(product) {
+    const confirmed = window.confirm(`Desactivar producto "${product.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(product.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/products/${product.id}`, {
+        method: "DELETE",
+      });
+
+      if (productForm.id === product.id) {
+        resetProductForm();
+      }
+
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo desactivar el producto");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleDeleteUser(nextUser) {
+    const confirmed = window.confirm(`Eliminar usuario "${nextUser.email}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(nextUser.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/users/${nextUser.id}`, {
+        method: "DELETE",
+      });
+
+      if (userForm.id === nextUser.id) {
+        resetUserForm();
+      }
+
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo eliminar el usuario");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  if (!token) {
+    return (
+      <main className="authPage">
+        <section className="authCard">
+          <p className="eyebrow">Don Joyero</p>
+          <h1>Admin</h1>
+          <p>Inicia sesion para gestionar categorias del catalogo.</p>
+
+          <form onSubmit={handleLogin} className="authForm">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              required
+            />
+
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+
+            <button type="submit" disabled={authLoading}>
+              {authLoading ? "Ingresando..." : "Ingresar"}
+            </button>
+          </form>
+
+          {authError && <p className="error">{authError}</p>}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="page">
-      <section className="panel">
-        <h1>Joyeria Admin</h1>
-        <p>Panel inicial para consultar pedidos del backend.</p>
-
-        <label htmlFor="token">Token JWT de admin</label>
-        <textarea
-          id="token"
-          rows={4}
-          value={token}
-          onChange={(event) => setToken(event.target.value)}
-          placeholder="Pega aqui el token obtenido en /api/auth/login"
-        />
-
-        <button onClick={loadOrders} disabled={loading}>
-          {loading ? "Cargando..." : "Cargar pedidos"}
+      <header className="header">
+        <div>
+          <p className="eyebrow">Panel administrativo</p>
+          <h1>Ecommerce Admin</h1>
+          <p className="subtle">{user?.email || "admin"}</p>
+        </div>
+        <button className="ghost" onClick={handleLogout}>
+          Cerrar sesion
         </button>
+      </header>
 
-        {error && <p className="error">{error}</p>}
-      </section>
-
-      <section className="results">
-        <h2>Pedidos ({orders.length})</h2>
-        {orders.length === 0 ? (
-          <p>No hay pedidos para mostrar.</p>
-        ) : (
-          <div className="list">
-            {orders.map((order) => (
-              <article key={order.id} className="card">
-                <strong>Pedido #{order.id}</strong>
-                <span>Estado: {order.status}</span>
-                <span>Total: ${Number(order.total).toFixed(2)}</span>
-                <span>Cliente: {order.user?.email || "N/A"}</span>
-              </article>
+      <section className="layout">
+        <article className="panel">
+          <p className="eyebrow">Menu de mantenimiento</p>
+          <nav className="maintMenu" aria-label="Menu de mantenimiento">
+            {roleMenu.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={activeTab === item.key ? "menuEntry active" : "menuEntry"}
+                onClick={() => setActiveTab(item.key)}
+              >
+                {item.label}
+              </button>
             ))}
+          </nav>
+
+          {activeTab === "dashboard" ? (
+            <>
+              <h2>Dashboard</h2>
+              <div className="statsGrid">
+                <article className="statCard">
+                  <span className="eyebrow">Usuarios</span>
+                  <strong>{dashboard.stats.users}</strong>
+                </article>
+                <article className="statCard">
+                  <span className="eyebrow">Productos</span>
+                  <strong>{dashboard.stats.products}</strong>
+                </article>
+                <article className="statCard">
+                  <span className="eyebrow">Categorias</span>
+                  <strong>{dashboard.stats.categories}</strong>
+                </article>
+                <article className="statCard">
+                  <span className="eyebrow">Pedidos</span>
+                  <strong>{dashboard.stats.orders}</strong>
+                </article>
+              </div>
+
+              <div className="dashboardBlocks">
+                <section className="miniPanel">
+                  <h3>Usuarios recientes</h3>
+                  {dashboard.recentUsers.length === 0 ? (
+                    <p className="subtle">No hay usuarios recientes.</p>
+                  ) : (
+                    dashboard.recentUsers.map((recentUser) => (
+                      <div key={recentUser.id} className="miniRow">
+                        <strong>{recentUser.name}</strong>
+                        <small>{recentUser.email}</small>
+                      </div>
+                    ))
+                  )}
+                </section>
+
+                <section className="miniPanel">
+                  <h3>Pedidos recientes</h3>
+                  {dashboard.recentOrders.length === 0 ? (
+                    <p className="subtle">No hay pedidos registrados.</p>
+                  ) : (
+                    dashboard.recentOrders.map((order) => (
+                      <div key={order.id} className="miniRow">
+                        <strong>Pedido #{order.id}</strong>
+                        <small>
+                          {order.user?.name || order.user?.email || "Cliente"} | {order.status} | ${Number(order.total || 0).toFixed(2)}
+                        </small>
+                      </div>
+                    ))
+                  )}
+                </section>
+              </div>
+            </>
+          ) : activeTab === "users" ? (
+            <>
+              <h2>{isEditingUser ? "Editar usuario" : "Nuevo usuario"}</h2>
+              <form onSubmit={handleUserSubmit} className="categoryForm">
+                <label htmlFor="user-name">Nombre</label>
+                <input
+                  id="user-name"
+                  type="text"
+                  value={userForm.name}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, name: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="user-email">Email</label>
+                <input
+                  id="user-email"
+                  type="email"
+                  value={userForm.email}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, email: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="user-password">
+                  {isEditingUser ? "Nueva password (opcional)" : "Password"}
+                </label>
+                <input
+                  id="user-password"
+                  type="password"
+                  value={userForm.password}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
+                />
+
+                <label htmlFor="user-role">Rol</label>
+                <select
+                  id="user-role"
+                  value={userForm.role}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value }))}
+                >
+                  <option value="CUSTOMER">CUSTOMER</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+
+                <div className="actions">
+                  <button type="submit" disabled={saving}>
+                    {saving ? "Guardando..." : isEditingUser ? "Actualizar" : "Crear usuario"}
+                  </button>
+                  {isEditingUser && (
+                    <button type="button" className="ghost" onClick={resetUserForm}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </>
+          ) : activeTab === "categories" ? (
+            <>
+              <h2>{isEditing ? "Editar categoria" : "Nueva categoria"}</h2>
+              <form onSubmit={handleSubmit} className="categoryForm">
+                <label htmlFor="name">Nombre</label>
+                <input
+                  id="name"
+                  type="text"
+                  value={form.name}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      name: event.target.value,
+                      slug: prev.id ? prev.slug : slugify(event.target.value),
+                    }))
+                  }
+                  required
+                />
+
+                <label htmlFor="slug">Slug</label>
+                <input
+                  id="slug"
+                  type="text"
+                  value={form.slug}
+                  onChange={(event) => setForm((prev) => ({ ...prev, slug: slugify(event.target.value) }))}
+                  required
+                />
+
+                <label htmlFor="description">Descripcion</label>
+                <textarea
+                  id="description"
+                  rows={4}
+                  value={form.description}
+                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                />
+
+                <label htmlFor="bannerImageUrl">URL imagen categoria</label>
+                <input
+                  id="bannerImageUrl"
+                  type="url"
+                  value={form.bannerImageUrl}
+                  onChange={(event) => setForm((prev) => ({ ...prev, bannerImageUrl: event.target.value }))}
+                />
+
+                <label className="inlineCheck" htmlFor="active">
+                  <input
+                    id="active"
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(event) => setForm((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  Activa
+                </label>
+
+                <div className="actions">
+                  <button type="submit" disabled={saving}>
+                    {saving ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
+                  </button>
+                  {isEditing && (
+                    <button type="button" className="ghost" onClick={resetForm}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </>
+          ) : activeTab === "products" ? (
+            <>
+              <h2>{isEditingProduct ? "Editar producto" : "Nuevo producto"}</h2>
+              <form onSubmit={handleProductSubmit} className="categoryForm">
+                <label htmlFor="product-name">Nombre</label>
+                <input
+                  id="product-name"
+                  type="text"
+                  value={productForm.name}
+                  onChange={(event) =>
+                    setProductForm((prev) => ({
+                      ...prev,
+                      name: event.target.value,
+                      slug: prev.id ? prev.slug : slugify(event.target.value),
+                    }))
+                  }
+                  required
+                />
+
+                <label htmlFor="product-slug">Slug</label>
+                <input
+                  id="product-slug"
+                  type="text"
+                  value={productForm.slug}
+                  onChange={(event) =>
+                    setProductForm((prev) => ({ ...prev, slug: slugify(event.target.value) }))
+                  }
+                  required
+                />
+
+                <label htmlFor="product-description">Descripcion</label>
+                <textarea
+                  id="product-description"
+                  rows={4}
+                  value={productForm.description}
+                  onChange={(event) =>
+                    setProductForm((prev) => ({ ...prev, description: event.target.value }))
+                  }
+                />
+
+                <label htmlFor="product-image">URL imagen</label>
+                <input
+                  id="product-image"
+                  type="url"
+                  value={productForm.imageUrl}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="product-category">Categoria</label>
+                <select
+                  id="product-category"
+                  value={productForm.category}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, category: event.target.value }))}
+                >
+                  <option value="">Sin categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+
+                <label htmlFor="product-price">Precio</label>
+                <input
+                  id="product-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={productForm.price}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, price: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="product-stock">Stock</label>
+                <input
+                  id="product-stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={productForm.stock}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, stock: event.target.value }))}
+                />
+
+                <label className="inlineCheck" htmlFor="product-recommended">
+                  <input
+                    id="product-recommended"
+                    type="checkbox"
+                    checked={productForm.recommended}
+                    onChange={(event) =>
+                      setProductForm((prev) => ({ ...prev, recommended: event.target.checked }))
+                    }
+                  />
+                  Recomendado
+                </label>
+
+                <label className="inlineCheck" htmlFor="product-active">
+                  <input
+                    id="product-active"
+                    type="checkbox"
+                    checked={productForm.active}
+                    onChange={(event) => setProductForm((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  Activo
+                </label>
+
+                <div className="actions">
+                  <button type="submit" disabled={saving}>
+                    {saving ? "Guardando..." : isEditingProduct ? "Actualizar" : "Crear"}
+                  </button>
+                  {isEditingProduct && (
+                    <button type="button" className="ghost" onClick={resetProductForm}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </>
+          ) : activeTab === "slides" ? (
+            <>
+              <h2>{isEditingSlide ? "Editar slide" : "Nuevo slide"}</h2>
+              <form onSubmit={handleSlideSubmit} className="categoryForm">
+                <label htmlFor="slide-title">Titulo</label>
+                <input
+                  id="slide-title"
+                  type="text"
+                  value={slideForm.title}
+                  onChange={(event) => setSlideForm((prev) => ({ ...prev, title: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="slide-subtitle">Subtitulo</label>
+                <input
+                  id="slide-subtitle"
+                  type="text"
+                  value={slideForm.subtitle}
+                  onChange={(event) => setSlideForm((prev) => ({ ...prev, subtitle: event.target.value }))}
+                />
+
+                <label htmlFor="slide-image">URL imagen</label>
+                <input
+                  id="slide-image"
+                  type="url"
+                  value={slideForm.imageUrl}
+                  onChange={(event) => setSlideForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="slide-cta-label">Texto CTA</label>
+                <input
+                  id="slide-cta-label"
+                  type="text"
+                  value={slideForm.ctaLabel}
+                  onChange={(event) => setSlideForm((prev) => ({ ...prev, ctaLabel: event.target.value }))}
+                />
+
+                <label htmlFor="slide-cta-url">URL CTA</label>
+                <input
+                  id="slide-cta-url"
+                  type="text"
+                  value={slideForm.ctaUrl}
+                  onChange={(event) => setSlideForm((prev) => ({ ...prev, ctaUrl: event.target.value }))}
+                />
+
+                <label htmlFor="slide-order">Orden</label>
+                <input
+                  id="slide-order"
+                  type="number"
+                  min={1}
+                  value={slideForm.displayOrder}
+                  onChange={(event) =>
+                    setSlideForm((prev) => ({ ...prev, displayOrder: Number(event.target.value || 1) }))
+                  }
+                  required
+                />
+
+                <label className="inlineCheck" htmlFor="slide-active">
+                  <input
+                    id="slide-active"
+                    type="checkbox"
+                    checked={slideForm.active}
+                    onChange={(event) => setSlideForm((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  Activo
+                </label>
+
+                <div className="actions">
+                  <button type="submit" disabled={saving}>
+                    {saving ? "Guardando..." : isEditingSlide ? "Actualizar" : "Crear"}
+                  </button>
+                  {isEditingSlide && (
+                    <button type="button" className="ghost" onClick={resetSlideForm}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </>
+          ) : activeTab === "flyers" ? (
+            <>
+              <h2>{isEditingFlyer ? "Editar flyer horizontal" : "Nuevo flyer horizontal"}</h2>
+              <form onSubmit={handleFlyerSubmit} className="categoryForm">
+                <label htmlFor="flyer-title">Titulo</label>
+                <input
+                  id="flyer-title"
+                  type="text"
+                  value={flyerForm.title}
+                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, title: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="flyer-subtitle">Subtitulo</label>
+                <input
+                  id="flyer-subtitle"
+                  type="text"
+                  value={flyerForm.subtitle}
+                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, subtitle: event.target.value }))}
+                />
+
+                <label htmlFor="flyer-image">URL imagen horizontal</label>
+                <input
+                  id="flyer-image"
+                  type="url"
+                  value={flyerForm.imageUrl}
+                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="flyer-link">URL destino (opcional)</label>
+                <input
+                  id="flyer-link"
+                  type="text"
+                  value={flyerForm.linkUrl}
+                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, linkUrl: event.target.value }))}
+                />
+
+                <label htmlFor="flyer-order">Orden</label>
+                <input
+                  id="flyer-order"
+                  type="number"
+                  min={1}
+                  value={flyerForm.displayOrder}
+                  onChange={(event) =>
+                    setFlyerForm((prev) => ({ ...prev, displayOrder: Number(event.target.value || 1) }))
+                  }
+                  required
+                />
+
+                <label className="inlineCheck" htmlFor="flyer-active">
+                  <input
+                    id="flyer-active"
+                    type="checkbox"
+                    checked={flyerForm.active}
+                    onChange={(event) => setFlyerForm((prev) => ({ ...prev, active: event.target.checked }))}
+                  />
+                  Activo
+                </label>
+
+                <div className="actions">
+                  <button type="submit" disabled={saving}>
+                    {saving ? "Guardando..." : isEditingFlyer ? "Actualizar" : "Crear"}
+                  </button>
+                  {isEditingFlyer && (
+                    <button type="button" className="ghost" onClick={resetFlyerForm}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2>Branding y video</h2>
+              <form onSubmit={handleSettingsSubmit} className="categoryForm">
+                <label htmlFor="brandName">Nombre de marca</label>
+                <input
+                  id="brandName"
+                  type="text"
+                  value={settingsForm.brandName}
+                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, brandName: event.target.value }))}
+                  required
+                />
+
+                <label htmlFor="logoUrl">URL del logo</label>
+                <input
+                  id="logoUrl"
+                  type="url"
+                  value={settingsForm.logoUrl}
+                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, logoUrl: event.target.value }))}
+                />
+
+                <label htmlFor="promoVideoUrl">URL video promocional (YouTube/TikTok)</label>
+                <input
+                  id="promoVideoUrl"
+                  type="url"
+                  value={settingsForm.promoVideoUrl}
+                  onChange={(event) =>
+                    setSettingsForm((prev) => ({ ...prev, promoVideoUrl: event.target.value }))
+                  }
+                />
+
+                <label htmlFor="promoVideoTitle">Titulo del video</label>
+                <input
+                  id="promoVideoTitle"
+                  type="text"
+                  value={settingsForm.promoVideoTitle}
+                  onChange={(event) =>
+                    setSettingsForm((prev) => ({ ...prev, promoVideoTitle: event.target.value }))
+                  }
+                />
+
+                <div className="actions">
+                  <button type="submit" disabled={saving}>
+                    {saving ? "Guardando..." : "Guardar branding"}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </article>
+
+        <article className="panel">
+          <div className="listHeader">
+            <h2>
+              {activeTab === "dashboard"
+                ? "Resumen general"
+                : activeTab === "users"
+                  ? "Listado usuarios"
+                : activeTab === "categories"
+                ? "Listado categorias"
+                : activeTab === "products"
+                  ? "Listado productos"
+                : activeTab === "slides"
+                  ? "Listado slides"
+                : activeTab === "flyers"
+                  ? "Listado flyers"
+                  : "Preview branding"}
+            </h2>
+            <button className="ghost" onClick={loadData} disabled={listLoading}>
+              {listLoading ? "Actualizando..." : "Recargar"}
+            </button>
           </div>
-        )}
+
+          {listError && <p className="error">{listError}</p>}
+
+          <div className="list">
+            {activeTab === "dashboard"
+              ? [
+                  <article key="quick-actions" className="card">
+                    <strong>Accesos rapidos</strong>
+                    <small>Crea usuarios, organiza categorias y administra el catalogo desde este panel.</small>
+                    <div className="actions">
+                      <button type="button" className="ghost" onClick={() => setActiveTab("users")}>
+                        Gestionar usuarios
+                      </button>
+                      <button type="button" className="ghost" onClick={() => setActiveTab("products")}>
+                        Gestionar productos
+                      </button>
+                    </div>
+                  </article>,
+                ]
+              : activeTab === "users"
+                ? users.map((listedUser) => (
+                    <article key={listedUser.id} className="card">
+                      <div>
+                        <strong>{listedUser.name}</strong>
+                        <p>{listedUser.email}</p>
+                      </div>
+                      <span className={`badge ${listedUser.role === "ADMIN" ? "on" : "off"}`}>
+                        {listedUser.role}
+                      </span>
+                      <small>Creado: {new Date(listedUser.createdAt).toLocaleDateString()}</small>
+                      <div className="actions">
+                        <button type="button" className="ghost" onClick={() => startEditUser(listedUser)}>
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => handleDeleteUser(listedUser)}
+                          disabled={deletingId === listedUser.id}
+                        >
+                          {deletingId === listedUser.id ? "Eliminando..." : "Eliminar"}
+                        </button>
+                      </div>
+                    </article>
+                  ))
+              : activeTab === "categories"
+              ? categories.map((category) => (
+                  <article key={category.id} className="card">
+                    <div>
+                      <strong>{category.name}</strong>
+                      <p>/{category.slug}</p>
+                    </div>
+                    <span className={`badge ${category.active ? "on" : "off"}`}>
+                      {category.active ? "Activa" : "Inactiva"}
+                    </span>
+                    <small>{category.description || "Sin descripcion"}</small>
+                    {category.bannerImageUrl && (
+                      <a href={category.bannerImageUrl} target="_blank" rel="noreferrer" className="imageLink">
+                        Ver banner
+                      </a>
+                    )}
+                    <div className="actions">
+                      <button type="button" className="ghost" onClick={() => startEdit(category)}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => handleDelete(category)}
+                        disabled={deletingId === category.id}
+                      >
+                        {deletingId === category.id ? "Eliminando..." : "Eliminar"}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              : activeTab === "products"
+                ? products.map((product) => (
+                  <article key={product.id} className="card">
+                    <div>
+                      <strong>{product.name}</strong>
+                      <p>/{product.slug}</p>
+                    </div>
+                    <small>Categoria: {product.category || "Sin categoria"}</small>
+                    <small>
+                      ${Number(product.price || 0).toFixed(2)} | Stock: {product.stock}
+                    </small>
+                    <span className={`badge ${product.active ? "on" : "off"}`}>
+                      {product.active ? "Activo" : "Inactivo"}
+                    </span>
+                    {product.imageUrl && (
+                      <a href={product.imageUrl} target="_blank" rel="noreferrer" className="imageLink">
+                        Ver imagen
+                      </a>
+                    )}
+                    <div className="actions">
+                      <button type="button" className="ghost" onClick={() => startEditProduct(product)}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => handleDeleteProduct(product)}
+                        disabled={deletingId === product.id}
+                      >
+                        {deletingId === product.id ? "Desactivando..." : "Desactivar"}
+                      </button>
+                    </div>
+                  </article>
+                ))
+                : activeTab === "slides"
+                ? slides.map((slide) => (
+                  <article key={slide.id} className="card">
+                    <div>
+                      <strong>{slide.title}</strong>
+                      <p>Orden: {slide.displayOrder}</p>
+                    </div>
+                    <span className={`badge ${slide.active ? "on" : "off"}`}>
+                      {slide.active ? "Activo" : "Inactivo"}
+                    </span>
+                    <small>{slide.subtitle || "Sin subtitulo"}</small>
+                    <a href={slide.imageUrl} target="_blank" rel="noreferrer" className="imageLink">
+                      Ver imagen
+                    </a>
+                    <div className="actions">
+                      <button type="button" className="ghost" onClick={() => startEditSlide(slide)}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        onClick={() => handleDeleteSlide(slide)}
+                        disabled={deletingId === slide.id}
+                      >
+                        {deletingId === slide.id ? "Eliminando..." : "Eliminar"}
+                      </button>
+                    </div>
+                  </article>
+                ))
+                : activeTab === "flyers"
+                  ? flyers.map((flyer) => (
+                    <article key={flyer.id} className="card">
+                      <div>
+                        <strong>{flyer.title}</strong>
+                        <p>Orden: {flyer.displayOrder}</p>
+                      </div>
+                      <span className={`badge ${flyer.active ? "on" : "off"}`}>
+                        {flyer.active ? "Activo" : "Inactivo"}
+                      </span>
+                      <small>{flyer.subtitle || "Sin subtitulo"}</small>
+                      <a href={flyer.imageUrl} target="_blank" rel="noreferrer" className="imageLink">
+                        Ver imagen
+                      </a>
+                      {flyer.linkUrl && <small>Destino: {flyer.linkUrl}</small>}
+                      <div className="actions">
+                        <button type="button" className="ghost" onClick={() => startEditFlyer(flyer)}>
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => handleDeleteFlyer(flyer)}
+                          disabled={deletingId === flyer.id}
+                        >
+                          {deletingId === flyer.id ? "Eliminando..." : "Eliminar"}
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                : [
+                    <article key="settings-preview" className="card">
+                      <strong>{settingsForm.brandName || "Don Joyero"}</strong>
+                      <small>Logo: {settingsForm.logoUrl || "Sin logo"}</small>
+                      <small>Video: {settingsForm.promoVideoUrl || "Sin video"}</small>
+                      <small>Titulo video: {settingsForm.promoVideoTitle || "Sin titulo"}</small>
+                    </article>,
+                  ]}
+
+            {!listLoading && activeTab === "users" && users.length === 0 && <p>No hay usuarios creados.</p>}
+            {!listLoading && activeTab === "categories" && categories.length === 0 && (
+              <p>No hay categorias creadas.</p>
+            )}
+            {!listLoading && activeTab === "products" && products.length === 0 && <p>No hay productos creados.</p>}
+            {!listLoading && activeTab === "slides" && slides.length === 0 && <p>No hay slides creados.</p>}
+            {!listLoading && activeTab === "flyers" && flyers.length === 0 && <p>No hay flyers creados.</p>}
+            {!listLoading && activeTab === "settings" && <p>Actualiza marca, logo y video promocional.</p>}
+          </div>
+        </article>
       </section>
     </main>
   );
