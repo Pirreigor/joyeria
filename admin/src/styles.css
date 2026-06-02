@@ -1,0 +1,99 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+:root {
+  --bg: #f6f8ef;
+  --ink: #13221f;
+  --accent: #0a7d66;
+  --warm: #d48a36;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  background:
+    radial-gradient(circle at 20% 5%, rgba(10, 125, 102, 0.15), transparent 30%),
+    radial-gradient(circle at 85% 15%, rgba(212, 138, 54, 0.2), transparent 35%),
+    var(--bg);
+  color: var(--ink);
+}
+
+.page {
+  width: min(1100px, 92vw);
+  margin: 0 auto;
+  padding: 24px 0 40px;
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 16px;
+}
+
+.panel,
+.results {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(19, 34, 31, 0.16);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+label {
+  display: block;
+  font-size: 0.9rem;
+  margin: 12px 0 6px;
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid rgba(19, 34, 31, 0.25);
+  border-radius: 12px;
+  padding: 10px;
+  font: inherit;
+}
+
+button {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 700;
+  background: linear-gradient(100deg, var(--accent), #0f5c72);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.error {
+  color: #9b1c1c;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid rgba(19, 34, 31, 0.16);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+  background: #fff;
+}
+
+@media (max-width: 850px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+}
