@@ -25,6 +25,10 @@ body {
   min-height: 100vh;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 h1,
 h2,
 h3 {
@@ -66,27 +70,123 @@ h3 {
 }
 
 .page {
-  width: min(1180px, 94vw);
-  margin: 0 auto;
-  padding: 24px 0 46px;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
 }
 
-.header {
+.topBar {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin: 0;
+  padding: 12px 20px;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
 }
 
-.header h1 {
+.topBar h1 {
   font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
 }
 
-.layout {
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuToggle {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 380px) 1fr;
+  place-items: center;
+}
+
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(42, 106, 61, 0.24);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: #2a6a3d;
+  font-size: 0.88rem;
+  background: rgba(42, 106, 61, 0.08);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2a6a3d;
+}
+
+.userMeta {
+  display: grid;
+  gap: 0;
+  text-align: right;
+}
+
+.userMeta strong {
+  font-size: 0.92rem;
+}
+
+.userMeta small {
+  color: var(--muted);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 0;
+  min-height: 0;
+}
+
+.contentArea {
+  display: grid;
   gap: 14px;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+.workspace.menuCollapsed {
+  grid-template-columns: 94px 1fr;
+}
+
+.sidebarPanel {
+  transition: width 0.2s ease;
+  border-radius: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: rgba(246, 240, 233, 0.95);
+  min-height: 0;
+  overflow: auto;
+}
+
+.workspace.menuCollapsed .sidebarPanel {
+  padding: 14px 10px;
+}
+
+.workspace.menuCollapsed .eyebrow {
+  text-align: center;
 }
 
 .panel {
@@ -98,8 +198,31 @@ h3 {
 
 .maintMenu {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   margin: 8px 0 14px;
+}
+
+.menuGroup {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(30, 26, 23, 0.1);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.menuGroupTitle {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.submenuList {
+  display: grid;
+  gap: 6px;
 }
 
 .menuEntry {
@@ -109,6 +232,49 @@ h3 {
   border: 1px solid rgba(30, 26, 23, 0.2);
   color: var(--ink);
   font-weight: 600;
+  padding: 9px 12px;
+}
+
+.menuEntryContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menuIcon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuIcon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.menuEntryLabel {
+  display: inline-block;
+}
+
+.workspace.menuCollapsed .menuGroup {
+  padding: 8px;
+}
+
+.workspace.menuCollapsed .menuEntry {
+  text-align: center;
+  padding: 9px 6px;
+  font-size: 0.75rem;
+}
+
+.workspace.menuCollapsed .menuEntryContent {
+  justify-content: center;
+}
+
+.workspace.menuCollapsed .menuEntryLabel {
+  display: none;
 }
 
 .menuEntry.active {
@@ -301,12 +467,43 @@ button:disabled {
 }
 
 @media (max-width: 920px) {
-  .layout {
+  .workspace,
+  .workspace.menuCollapsed {
     grid-template-columns: 1fr;
   }
 
-  .header {
+  .topBar {
     align-items: start;
     flex-direction: column;
+  }
+
+  .topBarRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sidebarPanel {
+    order: -1;
+    border-right: 0;
+    border-left: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .workspace.menuCollapsed .menuGroupTitle {
+    display: block;
+  }
+
+  .workspace.menuCollapsed .menuEntry {
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 0.9rem;
+  }
+
+  .workspace.menuCollapsed .menuEntryLabel {
+    display: inline-block;
+  }
+
+  .contentArea {
+    padding: 12px;
   }
 }

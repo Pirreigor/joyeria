@@ -216,7 +216,7 @@ async function main() {
       stock: 18,
       category: "Anillos",
       imageUrl:
-        "https://images.unsplash.com/photo-1588444650733-d53f2f2f8b19?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=1200&q=80",
       recommended: false,
     },
     {
@@ -282,7 +282,7 @@ async function main() {
       stock: 19,
       category: "Pulseras",
       imageUrl:
-        "https://images.unsplash.com/photo-1617038260849-0f5d4cf2d80d?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1623680604940-848c86b7d589?auto=format&fit=crop&w=1200&q=80",
       recommended: false,
     },
   ];

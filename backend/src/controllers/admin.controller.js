@@ -183,17 +183,31 @@ async function updateSlide(req, res) {
     return res.status(404).json({ message: "Slide no encontrado" });
   }
 
-  const slide = await prisma.slide.update({
-    where: { id: Number(id) },
-    data: {
-      ...(title !== undefined ? { title: String(title).trim() } : {}),
-      ...(subtitle !== undefined ? { subtitle } : {}),
-      ...(imageUrl !== undefined ? { imageUrl: String(imageUrl).trim() } : {}),
-      ...(ctaLabel !== undefined ? { ctaLabel } : {}),
-      ...(ctaUrl !== undefined ? { ctaUrl } : {}),
-      ...(displayOrder !== undefined ? { displayOrder: Number(displayOrder) } : {}),
-      ...(active !== undefined ? { active: Boolean(active) } : {}),
-    },
+  const newOrder = displayOrder !== undefined ? Number(displayOrder) : undefined;
+
+  const slide = await prisma.$transaction(async (tx) => {
+    if (newOrder !== undefined && newOrder !== existing.displayOrder) {
+      const conflict = await tx.slide.findUnique({ where: { displayOrder: newOrder } });
+      if (conflict) {
+        await tx.slide.update({
+          where: { id: conflict.id },
+          data: { displayOrder: existing.displayOrder },
+        });
+      }
+    }
+
+    return tx.slide.update({
+      where: { id: Number(id) },
+      data: {
+        ...(title !== undefined ? { title: String(title).trim() } : {}),
+        ...(subtitle !== undefined ? { subtitle } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: String(imageUrl).trim() } : {}),
+        ...(ctaLabel !== undefined ? { ctaLabel } : {}),
+        ...(ctaUrl !== undefined ? { ctaUrl } : {}),
+        ...(newOrder !== undefined ? { displayOrder: newOrder } : {}),
+        ...(active !== undefined ? { active: Boolean(active) } : {}),
+      },
+    });
   });
 
   return res.json({ slide });
@@ -249,16 +263,30 @@ async function updateFlyer(req, res) {
     return res.status(404).json({ message: "Flyer no encontrado" });
   }
 
-  const flyer = await prisma.flyer.update({
-    where: { id: Number(id) },
-    data: {
-      ...(title !== undefined ? { title: String(title).trim() } : {}),
-      ...(subtitle !== undefined ? { subtitle } : {}),
-      ...(imageUrl !== undefined ? { imageUrl: String(imageUrl).trim() } : {}),
-      ...(linkUrl !== undefined ? { linkUrl } : {}),
-      ...(displayOrder !== undefined ? { displayOrder: Number(displayOrder) } : {}),
-      ...(active !== undefined ? { active: Boolean(active) } : {}),
-    },
+  const newOrder = displayOrder !== undefined ? Number(displayOrder) : undefined;
+
+  const flyer = await prisma.$transaction(async (tx) => {
+    if (newOrder !== undefined && newOrder !== existing.displayOrder) {
+      const conflict = await tx.flyer.findUnique({ where: { displayOrder: newOrder } });
+      if (conflict) {
+        await tx.flyer.update({
+          where: { id: conflict.id },
+          data: { displayOrder: existing.displayOrder },
+        });
+      }
+    }
+
+    return tx.flyer.update({
+      where: { id: Number(id) },
+      data: {
+        ...(title !== undefined ? { title: String(title).trim() } : {}),
+        ...(subtitle !== undefined ? { subtitle } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: String(imageUrl).trim() } : {}),
+        ...(linkUrl !== undefined ? { linkUrl } : {}),
+        ...(newOrder !== undefined ? { displayOrder: newOrder } : {}),
+        ...(active !== undefined ? { active: Boolean(active) } : {}),
+      },
+    });
   });
 
   return res.json({ flyer });

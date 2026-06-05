@@ -64,15 +64,103 @@ const initialUserForm = {
 
 const MENU_BY_ROLE = {
   ADMIN: [
-    { key: "dashboard", label: "Dashboard" },
-    { key: "users", label: "Usuarios" },
-    { key: "categories", label: "Categorias" },
-    { key: "products", label: "Productos" },
-    { key: "slides", label: "Slider" },
-    { key: "flyers", label: "Flyers" },
-    { key: "settings", label: "Branding" },
+    {
+      key: "operaciones",
+      label: "Operaciones",
+      items: [
+        { key: "dashboard", label: "Dashboard", short: "DB" },
+        { key: "users", label: "Usuarios", short: "US" },
+      ],
+    },
+    {
+      key: "catalogo",
+      label: "Catalogo",
+      items: [
+        { key: "categories", label: "Categorias", short: "CA" },
+        { key: "products", label: "Productos", short: "PR" },
+      ],
+    },
+    {
+      key: "contenido",
+      label: "Contenido",
+      items: [
+        { key: "slides", label: "Slider", short: "SL" },
+        { key: "flyers", label: "Flyers", short: "FL" },
+      ],
+    },
+    {
+      key: "sistema",
+      label: "Sistema",
+      items: [{ key: "settings", label: "Branding", short: "BR" }],
+    },
   ],
 };
+
+const TAB_LIST_TITLES = {
+  dashboard: "Resumen general",
+  users: "Listado usuarios",
+  categories: "Listado categorias",
+  products: "Listado productos",
+  slides: "Listado slides",
+  flyers: "Listado flyers",
+  settings: "Preview branding",
+};
+
+function MenuIcon({ tabKey }) {
+  if (tabKey === "dashboard") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 13h8V3H3v10zm10 8h8v-6h-8v6zM3 21h8v-6H3v6zm10-8h8V3h-8v10z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "users") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-8 2a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 2c-3 0-6 1.5-6 3.5V21h12v-2.5c0-2-3-3.5-6-3.5zm-8 0c-2.5 0-5 1.1-5 2.7V21h5v-2.5a4.6 4.6 0 0 1 1.7-3.4A8.5 8.5 0 0 0 8 15z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "categories") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 5h18v4H3V5zm0 5h18v4H3v-4zm0 5h18v4H3v-4z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "products") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 7l6-3 6 3v10l-6 3-6-3V7zm6-1.2L8.2 7.7 12 9.6l3.8-1.9L12 5.8z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "slides") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 5h18v14H3V5zm2 2v10h14V7H5zm2 1.5 3.5 4.2 2.5-2.8 4 5.1H7V8.5z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "flyers") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2 6h20v12H2V6zm2 2v8h16V8H4zm2 1h5v6H6V9zm6 0h6v2h-6V9zm0 3h6v2h-6v-2z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-2h2zm2.1-7.2-.9.9a3.1 3.1 0 0 0-1.2 2.3h-2a4.5 4.5 0 0 1 1.5-3.2l1.2-1.1a1.7 1.7 0 1 0-2.9-1.2H8.8a3.7 3.7 0 1 1 6.3 2.5z" />
+    </svg>
+  );
+}
 
 function slugify(value) {
   return String(value || "")
@@ -107,6 +195,7 @@ export default function App() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [menuCollapsed, setMenuCollapsed] = useState(false);
 
   const [form, setForm] = useState(initialForm);
   const [slideForm, setSlideForm] = useState(initialSlideForm);
@@ -122,7 +211,11 @@ export default function App() {
   const isEditingProduct = useMemo(() => productForm.id !== null, [productForm.id]);
   const isEditingUser = useMemo(() => userForm.id !== null, [userForm.id]);
   const role = user?.role || "ADMIN";
-  const roleMenu = useMemo(() => MENU_BY_ROLE[role] || [], [role]);
+  const roleMenuSections = useMemo(() => MENU_BY_ROLE[role] || [], [role]);
+  const roleMenu = useMemo(
+    () => roleMenuSections.flatMap((section) => section.items || []),
+    [roleMenuSections]
+  );
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -774,33 +867,72 @@ export default function App() {
 
   return (
     <main className="page">
-      <header className="header">
-        <div>
-          <p className="eyebrow">Panel administrativo</p>
-          <h1>Ecommerce Admin</h1>
-          <p className="subtle">{user?.email || "admin"}</p>
+      <header className="topBar panel">
+        <div className="topBarLeft">
+          <button
+            type="button"
+            className="ghost menuToggle"
+            onClick={() => setMenuCollapsed((prev) => !prev)}
+            aria-label={menuCollapsed ? "Expandir menu" : "Contraer menu"}
+            title={menuCollapsed ? "Expandir menu" : "Contraer menu"}
+          >
+            {menuCollapsed ? "☰" : "✕"}
+          </button>
+          <div>
+            <p className="eyebrow">Panel administrativo</p>
+            <h1>Ecommerce Admin</h1>
+          </div>
         </div>
-        <button className="ghost" onClick={handleLogout}>
-          Cerrar sesion
-        </button>
+
+        <div className="topBarRight">
+          <div className="statusBadge" aria-label="Estado conectado">
+            <span className="statusDot" />
+            Conectado
+          </div>
+          <div className="userMeta">
+            <strong>{user?.name || "Admin"}</strong>
+            <small>{user?.email || "admin"}</small>
+          </div>
+          <button className="ghost" onClick={handleLogout}>
+            Cerrar sesion
+          </button>
+        </div>
       </header>
 
-      <section className="layout">
-        <article className="panel">
+      <section className={menuCollapsed ? "workspace menuCollapsed" : "workspace"}>
+        <aside className="panel sidebarPanel">
           <p className="eyebrow">Menu de mantenimiento</p>
           <nav className="maintMenu" aria-label="Menu de mantenimiento">
-            {roleMenu.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={activeTab === item.key ? "menuEntry active" : "menuEntry"}
-                onClick={() => setActiveTab(item.key)}
-              >
-                {item.label}
-              </button>
+            {roleMenuSections.map((section) => (
+              <section key={section.key} className="menuGroup">
+                {!menuCollapsed && <p className="menuGroupTitle">{section.label}</p>}
+                <div className="submenuList">
+                  {section.items.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={activeTab === item.key ? "menuEntry active" : "menuEntry"}
+                      onClick={() => setActiveTab(item.key)}
+                      title={item.label}
+                    >
+                      <span className="menuEntryContent">
+                        <span className="menuIcon" aria-hidden="true">
+                          <MenuIcon tabKey={item.key} />
+                        </span>
+                        <span className="menuEntryLabel">
+                          {menuCollapsed ? item.short || item.label.slice(0, 2).toUpperCase() : item.label}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
             ))}
           </nav>
+        </aside>
 
+        <section className="contentArea">
+        <article className="panel">
           {activeTab === "dashboard" ? (
             <>
               <h2>Dashboard</h2>
@@ -1298,21 +1430,7 @@ export default function App() {
 
         <article className="panel">
           <div className="listHeader">
-            <h2>
-              {activeTab === "dashboard"
-                ? "Resumen general"
-                : activeTab === "users"
-                  ? "Listado usuarios"
-                : activeTab === "categories"
-                ? "Listado categorias"
-                : activeTab === "products"
-                  ? "Listado productos"
-                : activeTab === "slides"
-                  ? "Listado slides"
-                : activeTab === "flyers"
-                  ? "Listado flyers"
-                  : "Preview branding"}
-            </h2>
+            <h2>{TAB_LIST_TITLES[activeTab] || "Vista"}</h2>
             <button className="ghost" onClick={loadData} disabled={listLoading}>
               {listLoading ? "Actualizando..." : "Recargar"}
             </button>
@@ -1505,6 +1623,7 @@ export default function App() {
             {!listLoading && activeTab === "settings" && <p>Actualiza marca, logo y video promocional.</p>}
           </div>
         </article>
+        </section>
       </section>
     </main>
   );
