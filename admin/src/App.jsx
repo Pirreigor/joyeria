@@ -49,9 +49,14 @@ const initialProductForm = {
   price: "",
   stock: "",
   imageUrl: "",
+  imagenesRaw: "",
   category: "",
   recommended: false,
   active: true,
+  materiales: "",
+  dimensiones: "",
+  cuidados: "",
+  grabado: false,
 };
 
 const initialUserForm = {
@@ -59,20 +64,119 @@ const initialUserForm = {
   name: "",
   email: "",
   password: "",
-  role: "CUSTOMER",
+  rol: "CLIENTE",
+  permisos: [],
 };
 
+const ALL_PERMISSIONS = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "users", label: "Usuarios" },
+  { key: "categories", label: "Categorias" },
+  { key: "products", label: "Productos" },
+  { key: "slides", label: "Slides" },
+  { key: "flyers", label: "Flyers" },
+  { key: "settings", label: "Branding" },
+];
+
 const MENU_BY_ROLE = {
-  ADMIN: [
-    { key: "dashboard", label: "Dashboard" },
-    { key: "users", label: "Usuarios" },
-    { key: "categories", label: "Categorias" },
-    { key: "products", label: "Productos" },
-    { key: "slides", label: "Slider" },
-    { key: "flyers", label: "Flyers" },
-    { key: "settings", label: "Branding" },
+  ADMINISTRADOR: [
+    {
+      key: "operaciones",
+      label: "Operaciones",
+      items: [
+        { key: "dashboard", label: "Dashboard", short: "DB" },
+        { key: "users", label: "Usuarios", short: "US" },
+      ],
+    },
+    {
+      key: "catalogo",
+      label: "Catalogo",
+      items: [
+        { key: "categories", label: "Categorias", short: "CA" },
+        { key: "products", label: "Productos", short: "PR" },
+      ],
+    },
+    {
+      key: "contenido",
+      label: "Contenido",
+      items: [
+        { key: "slides", label: "Slider", short: "SL" },
+        { key: "flyers", label: "Flyers", short: "FL" },
+      ],
+    },
+    {
+      key: "sistema",
+      label: "Sistema",
+      items: [{ key: "settings", label: "Branding", short: "BR" }],
+    },
   ],
 };
+
+const TAB_LIST_TITLES = {
+  dashboard: "Resumen general",
+  users: "Listado usuarios",
+  categories: "Listado categorias",
+  products: "Listado productos",
+  slides: "Listado slides",
+  flyers: "Listado flyers",
+  settings: "Preview branding",
+};
+
+function MenuIcon({ tabKey }) {
+  if (tabKey === "dashboard") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 13h8V3H3v10zm10 8h8v-6h-8v6zM3 21h8v-6H3v6zm10-8h8V3h-8v10z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "users") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-8 2a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 2c-3 0-6 1.5-6 3.5V21h12v-2.5c0-2-3-3.5-6-3.5zm-8 0c-2.5 0-5 1.1-5 2.7V21h5v-2.5a4.6 4.6 0 0 1 1.7-3.4A8.5 8.5 0 0 0 8 15z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "categories") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 5h18v4H3V5zm0 5h18v4H3v-4zm0 5h18v4H3v-4z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "products") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 7l6-3 6 3v10l-6 3-6-3V7zm6-1.2L8.2 7.7 12 9.6l3.8-1.9L12 5.8z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "slides") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 5h18v14H3V5zm2 2v10h14V7H5zm2 1.5 3.5 4.2 2.5-2.8 4 5.1H7V8.5z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "flyers") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M2 6h20v12H2V6zm2 2v8h16V8H4zm2 1h5v6H6V9zm6 0h6v2h-6V9zm0 3h6v2h-6v-2z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-2h2zm2.1-7.2-.9.9a3.1 3.1 0 0 0-1.2 2.3h-2a4.5 4.5 0 0 1 1.5-3.2l1.2-1.1a1.7 1.7 0 1 0-2.9-1.2H8.8a3.7 3.7 0 1 1 6.3 2.5z" />
+    </svg>
+  );
+}
 
 function slugify(value) {
   return String(value || "")
@@ -107,6 +211,10 @@ export default function App() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [menuCollapsed, setMenuCollapsed] = useState(false);
+  const [openSections, setOpenSections] = useState(() =>
+    Object.fromEntries((MENU_BY_ROLE.ADMINISTRADOR || []).map((s) => [s.key, true]))
+  );
 
   const [form, setForm] = useState(initialForm);
   const [slideForm, setSlideForm] = useState(initialSlideForm);
@@ -121,8 +229,19 @@ export default function App() {
   const isEditingFlyer = useMemo(() => flyerForm.id !== null, [flyerForm.id]);
   const isEditingProduct = useMemo(() => productForm.id !== null, [productForm.id]);
   const isEditingUser = useMemo(() => userForm.id !== null, [userForm.id]);
-  const role = user?.role || "ADMIN";
-  const roleMenu = useMemo(() => MENU_BY_ROLE[role] || [], [role]);
+  const role = user?.rol || "ADMINISTRADOR";
+  const roleMenuSections = useMemo(() => {
+    const sections = MENU_BY_ROLE[role] || [];
+    const perms = user?.permisos || [];
+    if (!perms.length) return sections;
+    return sections
+      .map((s) => ({ ...s, items: s.items.filter((i) => perms.includes(i.key)) }))
+      .filter((s) => s.items.length > 0);
+  }, [role, user]);
+  const roleMenu = useMemo(
+    () => roleMenuSections.flatMap((section) => section.items || []),
+    [roleMenuSections]
+  );
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -206,7 +325,7 @@ export default function App() {
         }),
       });
 
-      if (data.user?.role !== "ADMIN") {
+      if (data.user?.rol !== "ADMINISTRADOR") {
         throw new Error("Tu usuario no tiene permisos de administrador");
       }
 
@@ -249,15 +368,18 @@ export default function App() {
     setListLoading(true);
     setListError("");
 
+    const perms = user?.permisos || [];
+    const can = (key) => perms.length === 0 || perms.includes(key);
+
     try {
       const [dashboardData, usersData, categoriesData, productsData, slidesData, flyersData, settingsData] = await Promise.all([
-        request("/api/admin/dashboard"),
-        request("/api/admin/users"),
-        request("/api/admin/categories"),
-        request("/api/admin/products"),
-        request("/api/admin/slides"),
-        request("/api/admin/flyers"),
-        request("/api/admin/settings"),
+        can("dashboard") ? request("/api/admin/dashboard") : Promise.resolve({ stats: { users: 0, products: 0, categories: 0, orders: 0 }, recentOrders: [], recentUsers: [] }),
+        can("users") ? request("/api/admin/users") : Promise.resolve({ users: [] }),
+        can("categories") ? request("/api/admin/categories") : Promise.resolve({ categories: [] }),
+        can("products") ? request("/api/admin/products") : Promise.resolve({ products: [] }),
+        can("slides") ? request("/api/admin/slides") : Promise.resolve({ slides: [] }),
+        can("flyers") ? request("/api/admin/flyers") : Promise.resolve({ flyers: [] }),
+        can("settings") ? request("/api/admin/settings") : Promise.resolve(null),
       ]);
       setDashboard({
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
@@ -347,9 +469,14 @@ export default function App() {
       price: String(product.price ?? ""),
       stock: String(product.stock ?? ""),
       imageUrl: product.imageUrl || "",
+      imagenesRaw: (product.imagenes || []).join(", "),
       category: product.category || "",
       recommended: Boolean(product.recommended),
       active: Boolean(product.active),
+      materiales: product.materiales || "",
+      dimensiones: product.dimensiones || "",
+      cuidados: product.cuidados || "",
+      grabado: Boolean(product.grabado),
     });
   }
 
@@ -359,7 +486,8 @@ export default function App() {
       name: nextUser.name || "",
       email: nextUser.email || "",
       password: "",
-      role: nextUser.role || "CUSTOMER",
+      rol: nextUser.rol || "CLIENTE",
+      permisos: nextUser.permisos || [],
     });
   }
 
@@ -522,6 +650,10 @@ export default function App() {
     setSaving(true);
     setListError("");
 
+    const imagenes = productForm.imagenesRaw
+      ? productForm.imagenesRaw.split(",").map((u) => u.trim()).filter(Boolean)
+      : [];
+
     const payload = {
       name: productForm.name.trim(),
       slug: (productForm.slug || slugify(productForm.name)).trim(),
@@ -529,9 +661,14 @@ export default function App() {
       price: Number(productForm.price),
       stock: Number(productForm.stock || 0),
       imageUrl: productForm.imageUrl.trim(),
+      imagenes,
       category: productForm.category || null,
       recommended: Boolean(productForm.recommended),
       active: Boolean(productForm.active),
+      materiales: productForm.materiales.trim() || null,
+      dimensiones: productForm.dimensiones.trim() || null,
+      cuidados: productForm.cuidados.trim() || null,
+      grabado: Boolean(productForm.grabado),
     };
 
     try {
@@ -569,7 +706,8 @@ export default function App() {
       name: userForm.name.trim(),
       email: userForm.email.trim(),
       password: userForm.password,
-      role: userForm.role,
+      role: userForm.rol,
+      permissions: userForm.rol === "ADMINISTRADOR" ? userForm.permisos : [],
     };
 
     try {
@@ -774,33 +912,87 @@ export default function App() {
 
   return (
     <main className="page">
-      <header className="header">
-        <div>
-          <p className="eyebrow">Panel administrativo</p>
-          <h1>Ecommerce Admin</h1>
-          <p className="subtle">{user?.email || "admin"}</p>
+      <header className="topBar panel">
+        <div className="topBarLeft">
+          <button
+            type="button"
+            className="ghost menuToggle"
+            onClick={() => setMenuCollapsed((prev) => !prev)}
+            aria-label={menuCollapsed ? "Expandir menu" : "Contraer menu"}
+            title={menuCollapsed ? "Expandir menu" : "Contraer menu"}
+          >
+            {menuCollapsed ? "☰" : "✕"}
+          </button>
+          <div>
+            <p className="eyebrow">Panel administrativo</p>
+            <h1>Ecommerce Admin</h1>
+          </div>
         </div>
-        <button className="ghost" onClick={handleLogout}>
-          Cerrar sesion
-        </button>
+
+        <div className="topBarRight">
+          <div className="statusBadge" aria-label="Estado conectado">
+            <span className="statusDot" />
+            Conectado
+          </div>
+          <div className="userMeta">
+            <strong>{user?.name || "Admin"}</strong>
+            <small>{user?.email || "admin"}</small>
+          </div>
+          <button className="ghost" onClick={handleLogout}>
+            Cerrar sesion
+          </button>
+        </div>
       </header>
 
-      <section className="layout">
-        <article className="panel">
-          <p className="eyebrow">Menu de mantenimiento</p>
+      <section className={menuCollapsed ? "workspace menuCollapsed" : "workspace"}>
+        <aside className="panel sidebarPanel">
+          <p className="eyebrow">Menu</p>
           <nav className="maintMenu" aria-label="Menu de mantenimiento">
-            {roleMenu.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={activeTab === item.key ? "menuEntry active" : "menuEntry"}
-                onClick={() => setActiveTab(item.key)}
-              >
-                {item.label}
-              </button>
-            ))}
+            {roleMenuSections.map((section) => {
+              const isOpen = openSections[section.key] ?? true;
+              return (
+                <section key={section.key} className="menuGroup">
+                  {!menuCollapsed && (
+                    <button
+                      type="button"
+                      className="menuGroupHeader"
+                      onClick={() => setOpenSections((prev) => ({ ...prev, [section.key]: !prev[section.key] }))}
+                      aria-expanded={isOpen}
+                    >
+                      <span className="menuGroupTitle">{section.label}</span>
+                      <span className={`sectionChevron ${isOpen ? "open" : ""}`} aria-hidden="true">›</span>
+                    </button>
+                  )}
+                  {(menuCollapsed || isOpen) && (
+                    <div className="submenuList">
+                      {section.items.map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={activeTab === item.key ? "menuEntry active" : "menuEntry"}
+                          onClick={() => setActiveTab(item.key)}
+                          title={item.label}
+                        >
+                          <span className="menuEntryContent">
+                            <span className="menuIcon" aria-hidden="true">
+                              <MenuIcon tabKey={item.key} />
+                            </span>
+                            <span className="menuEntryLabel">
+                              {menuCollapsed ? item.short || item.label.slice(0, 2).toUpperCase() : item.label}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </nav>
+        </aside>
 
+        <section className="contentArea">
+        <article className="panel">
           {activeTab === "dashboard" ? (
             <>
               <h2>Dashboard</h2>
@@ -890,12 +1082,38 @@ export default function App() {
                 <label htmlFor="user-role">Rol</label>
                 <select
                   id="user-role"
-                  value={userForm.role}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value }))}
+                  value={userForm.rol}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, rol: event.target.value }))}
                 >
-                  <option value="CUSTOMER">CUSTOMER</option>
-                  <option value="ADMIN">ADMIN</option>
+                  <option value="CLIENTE">Cliente</option>
+                  <option value="ADMINISTRADOR">Administrador</option>
                 </select>
+
+                {userForm.rol === "ADMINISTRADOR" && (
+                  <>
+                    <label>Permisos del admin (sin seleccion = acceso total)</label>
+                    <div className="permissionsGrid">
+                      {ALL_PERMISSIONS.map((perm) => (
+                        <label key={perm.key} className="inlineCheck">
+                          <input
+                            type="checkbox"
+                            checked={userForm.permisos.includes(perm.key)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setUserForm((prev) => ({
+                                ...prev,
+                                permisos: checked
+                                  ? [...prev.permisos, perm.key]
+                                  : prev.permisos.filter((p) => p !== perm.key),
+                              }));
+                            }}
+                          />
+                          {perm.label}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 <div className="actions">
                   <button type="submit" disabled={saving}>
@@ -1015,7 +1233,7 @@ export default function App() {
                   }
                 />
 
-                <label htmlFor="product-image">URL imagen</label>
+                <label htmlFor="product-image">URL imagen principal</label>
                 <input
                   id="product-image"
                   type="url"
@@ -1023,6 +1241,52 @@ export default function App() {
                   onChange={(event) => setProductForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
                   required
                 />
+
+                <label htmlFor="product-imagenes">Galeria (URLs separadas por coma)</label>
+                <textarea
+                  id="product-imagenes"
+                  rows={2}
+                  placeholder="https://..., https://..."
+                  value={productForm.imagenesRaw}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, imagenesRaw: event.target.value }))}
+                />
+
+                <label htmlFor="product-materiales">Materiales</label>
+                <input
+                  id="product-materiales"
+                  type="text"
+                  placeholder="Ej: Plata 925, bano dorado 18k"
+                  value={productForm.materiales}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, materiales: event.target.value }))}
+                />
+
+                <label htmlFor="product-dimensiones">Dimensiones</label>
+                <input
+                  id="product-dimensiones"
+                  type="text"
+                  placeholder="Ej: Largo 45 cm, diametro 1.2 cm"
+                  value={productForm.dimensiones}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, dimensiones: event.target.value }))}
+                />
+
+                <label htmlFor="product-cuidados">Instrucciones de cuidado</label>
+                <textarea
+                  id="product-cuidados"
+                  rows={3}
+                  placeholder="Ej: Evitar contacto con agua. Limpiar con pano suave."
+                  value={productForm.cuidados}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, cuidados: event.target.value }))}
+                />
+
+                <label className="inlineCheck" htmlFor="product-grabado">
+                  <input
+                    id="product-grabado"
+                    type="checkbox"
+                    checked={productForm.grabado}
+                    onChange={(event) => setProductForm((prev) => ({ ...prev, grabado: event.target.checked }))}
+                  />
+                  Admite grabado personalizado
+                </label>
 
                 <label htmlFor="product-category">Categoria</label>
                 <select
@@ -1298,21 +1562,7 @@ export default function App() {
 
         <article className="panel">
           <div className="listHeader">
-            <h2>
-              {activeTab === "dashboard"
-                ? "Resumen general"
-                : activeTab === "users"
-                  ? "Listado usuarios"
-                : activeTab === "categories"
-                ? "Listado categorias"
-                : activeTab === "products"
-                  ? "Listado productos"
-                : activeTab === "slides"
-                  ? "Listado slides"
-                : activeTab === "flyers"
-                  ? "Listado flyers"
-                  : "Preview branding"}
-            </h2>
+            <h2>{TAB_LIST_TITLES[activeTab] || "Vista"}</h2>
             <button className="ghost" onClick={loadData} disabled={listLoading}>
               {listLoading ? "Actualizando..." : "Recargar"}
             </button>
@@ -1343,9 +1593,17 @@ export default function App() {
                         <strong>{listedUser.name}</strong>
                         <p>{listedUser.email}</p>
                       </div>
-                      <span className={`badge ${listedUser.role === "ADMIN" ? "on" : "off"}`}>
-                        {listedUser.role}
+                      <span className={`badge ${listedUser.rol === "ADMINISTRADOR" ? "on" : "off"}`}>
+                        {listedUser.rol === "ADMINISTRADOR" ? "Administrador" : "Cliente"}
                       </span>
+                      {listedUser.rol === "ADMINISTRADOR" && (
+                        <small>
+                          Permisos:{" "}
+                          {listedUser.permisos && listedUser.permisos.length > 0
+                            ? listedUser.permisos.join(", ")
+                            : "Acceso total"}
+                        </small>
+                      )}
                       <small>Creado: {new Date(listedUser.createdAt).toLocaleDateString()}</small>
                       <div className="actions">
                         <button type="button" className="ghost" onClick={() => startEditUser(listedUser)}>
@@ -1505,6 +1763,7 @@ export default function App() {
             {!listLoading && activeTab === "settings" && <p>Actualiza marca, logo y video promocional.</p>}
           </div>
         </article>
+        </section>
       </section>
     </main>
   );

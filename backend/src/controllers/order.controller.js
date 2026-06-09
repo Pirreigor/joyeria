@@ -18,10 +18,10 @@ async function createOrder(req, res) {
 
   const order = await prisma.$transaction(async (tx) => {
     let total = 0;
-    const orderItemsData = [];
+    const itemsData = [];
 
     for (const item of normalizedItems) {
-      const product = await tx.product.findUnique({ where: { id: item.productId } });
+      const product = await tx.producto.findUnique({ where: { id: item.productId } });
 
       if (!product || !product.active) {
         const error = new Error(`Producto ${item.productId} no disponible`);
@@ -37,55 +37,45 @@ async function createOrder(req, res) {
 
       total += Number(product.price) * item.quantity;
 
-      orderItemsData.push({
-        productId: product.id,
+      itemsData.push({
+        productoId: product.id,
         quantity: item.quantity,
         unitPrice: product.price,
       });
 
-      await tx.product.update({
+      await tx.producto.update({
         where: { id: product.id },
-        data: {
-          stock: {
-            decrement: item.quantity,
-          },
-        },
+        data: { stock: { decrement: item.quantity } },
       });
     }
 
-    const createdOrder = await tx.order.create({
+    const pedido = await tx.pedido.create({
       data: {
-        userId: req.user.id,
+        usuarioId: req.user.id,
         total,
-        status: "NEW",
-        items: {
-          create: orderItemsData,
-        },
+        estado: "NUEVO",
+        items: { create: itemsData },
       },
       include: {
         items: {
-          include: {
-            product: true,
-          },
+          include: { producto: true },
         },
       },
     });
 
-    return createdOrder;
+    return pedido;
   });
 
   return res.status(201).json({ order });
 }
 
 async function listMyOrders(req, res) {
-  const orders = await prisma.order.findMany({
-    where: { userId: req.user.id },
+  const orders = await prisma.pedido.findMany({
+    where: { usuarioId: req.user.id },
     orderBy: { createdAt: "desc" },
     include: {
       items: {
-        include: {
-          product: true,
-        },
+        include: { producto: true },
       },
     },
   });

@@ -1,12 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap");
 
 :root {
-  --bg: #f4efe7;
+  --bg: #f4f6f9;
   --ink: #1e1a17;
   --muted: #7a7068;
   --gold: #a3753f;
-  --panel: rgba(255, 255, 255, 0.8);
-  --line: rgba(30, 26, 23, 0.15);
+  --panel: #ffffff;
+  --line: rgba(0, 0, 0, 0.1);
   --danger: #9a2c2c;
 }
 
@@ -18,10 +18,11 @@ body {
   margin: 0;
   font-family: "Plus Jakarta Sans", sans-serif;
   color: var(--ink);
-  background:
-    radial-gradient(circle at 18% 12%, rgba(163, 117, 63, 0.2), transparent 33%),
-    radial-gradient(circle at 84% 14%, rgba(30, 26, 23, 0.08), transparent 40%),
-    linear-gradient(140deg, #f8f3ec 0%, #efe7dc 100%);
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+#root {
   min-height: 100vh;
 }
 
@@ -45,8 +46,7 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 28px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 20px 50px rgba(40, 28, 16, 0.12);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
 
 .authCard h1 {
@@ -66,27 +66,126 @@ h3 {
 }
 
 .page {
-  width: min(1180px, 94vw);
-  margin: 0 auto;
-  padding: 24px 0 46px;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
 }
 
-.header {
+.topBar {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin: 0;
+  padding: 12px 20px;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: #ffffff;
+  border-bottom: 1px solid var(--line);
 }
 
-.header h1 {
+.topBar h1 {
   font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
 }
 
-.layout {
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuToggle {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 380px) 1fr;
+  place-items: center;
+}
+
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(42, 106, 61, 0.24);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: #2a6a3d;
+  font-size: 0.88rem;
+  background: rgba(42, 106, 61, 0.08);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2a6a3d;
+}
+
+.userMeta {
+  display: grid;
+  gap: 0;
+  text-align: right;
+}
+
+.userMeta strong {
+  font-size: 0.92rem;
+}
+
+.userMeta small {
+  color: var(--muted);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  min-height: 0;
+}
+
+.contentArea {
+  display: grid;
   gap: 14px;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+.workspace.menuCollapsed {
+  grid-template-columns: 80px 1fr;
+}
+
+.sidebarPanel {
+  transition: width 0.2s ease;
+  border-radius: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: #ffffff;
+  border-right: 1px solid var(--line);
+  min-height: 0;
+  overflow: auto;
+}
+
+.workspace.menuCollapsed .sidebarPanel {
+  padding: 14px 8px;
+}
+
+.workspace.menuCollapsed .eyebrow {
+  text-align: center;
 }
 
 .panel {
@@ -98,23 +197,133 @@ h3 {
 
 .maintMenu {
   display: grid;
-  gap: 8px;
+  gap: 4px;
   margin: 8px 0 14px;
+  padding: 0 12px;
+}
+
+.menuGroup {
+  display: grid;
+  gap: 2px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.menuGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 6px 8px;
+  width: 100%;
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+
+.menuGroupHeader:hover {
+  color: var(--ink);
+}
+
+.menuGroupTitle {
+  margin: 0;
+}
+
+.sectionChevron {
+  font-style: normal;
+  font-size: 0.9rem;
+  transition: transform 0.2s ease;
+  display: inline-block;
+  transform: rotate(90deg);
+}
+
+.sectionChevron.open {
+  transform: rotate(270deg);
+}
+
+.submenuList {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 4px;
 }
 
 .menuEntry {
   width: 100%;
   text-align: left;
-  background: rgba(255, 255, 255, 0.66);
-  border: 1px solid rgba(30, 26, 23, 0.2);
+  background: transparent;
+  border: none;
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.menuEntry:hover {
+  background: rgba(163, 117, 63, 0.08);
+}
+
+.menuEntryContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menuIcon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+
+.menuIcon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.menuEntryLabel {
+  display: inline-block;
+}
+
+.workspace.menuCollapsed .maintMenu {
+  padding: 0 4px;
+}
+
+.workspace.menuCollapsed .menuGroup {
+  gap: 2px;
+}
+
+.workspace.menuCollapsed .menuEntry {
+  text-align: center;
+  padding: 9px 4px;
+  font-size: 0.72rem;
+  border-radius: 8px;
+}
+
+.workspace.menuCollapsed .menuEntryContent {
+  justify-content: center;
+}
+
+.workspace.menuCollapsed .menuEntryLabel {
+  display: none;
 }
 
 .menuEntry.active {
   background: linear-gradient(100deg, #8f6230, var(--gold));
   color: #fff;
-  border-color: transparent;
+}
+
+.menuEntry.active .menuIcon {
+  opacity: 1;
 }
 
 .categoryForm {
@@ -134,7 +343,7 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.88);
+  background: #f8f9fa;
   display: grid;
   gap: 6px;
 }
@@ -153,7 +362,7 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  background: #f8f9fa;
 }
 
 .miniPanel h3 {
@@ -185,7 +394,7 @@ textarea {
   border-radius: 12px;
   padding: 10px 12px;
   font: inherit;
-  background: rgba(255, 255, 255, 0.82);
+  background: #ffffff;
 }
 
 .inlineCheck {
@@ -248,7 +457,7 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.86);
+  background: #f8f9fa;
   display: grid;
   gap: 8px;
 }
@@ -300,13 +509,54 @@ button:disabled {
   margin: 8px 0 0;
 }
 
+.permissionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8f9fa;
+}
+
 @media (max-width: 920px) {
-  .layout {
+  .workspace,
+  .workspace.menuCollapsed {
     grid-template-columns: 1fr;
   }
 
-  .header {
+  .topBar {
     align-items: start;
     flex-direction: column;
+  }
+
+  .topBarRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sidebarPanel {
+    order: -1;
+    border-right: 0;
+    border-left: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .workspace.menuCollapsed .menuGroupTitle {
+    display: block;
+  }
+
+  .workspace.menuCollapsed .menuEntry {
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 0.9rem;
+  }
+
+  .workspace.menuCollapsed .menuEntryLabel {
+    display: inline-block;
+  }
+
+  .contentArea {
+    padding: 12px;
   }
 }

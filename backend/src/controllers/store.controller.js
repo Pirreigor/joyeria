@@ -1,7 +1,7 @@
 const prisma = require("../utils/prisma");
 
 async function listStoreCategories(req, res) {
-  const categories = await prisma.category.findMany({
+  const categories = await prisma.categoria.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
     select: {
@@ -17,7 +17,7 @@ async function listStoreCategories(req, res) {
 }
 
 async function getStoreSettings(req, res) {
-  const settings = await prisma.storeSetting.findUnique({ where: { id: 1 } });
+  const settings = await prisma.configTienda.findUnique({ where: { id: 1 } });
 
   if (!settings) {
     return res.json({

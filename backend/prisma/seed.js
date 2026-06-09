@@ -35,7 +35,7 @@ async function main() {
   ];
 
   for (const category of categories) {
-    await prisma.category.upsert({
+    await prisma.categoria.upsert({
       where: { slug: category.slug },
       update: {
         name: category.name,
@@ -47,7 +47,7 @@ async function main() {
     });
   }
 
-  await prisma.storeSetting.upsert({
+  await prisma.configTienda.upsert({
     where: { id: 1 },
     update: {
       brandName: "Don Joyero",
@@ -174,14 +174,14 @@ async function main() {
     });
   }
 
-  await prisma.user.upsert({
+  await prisma.usuario.upsert({
     where: { email: adminEmail },
     update: {},
     create: {
       name: "Admin",
       email: adminEmail,
       passwordHash: adminPasswordHash,
-      role: "ADMIN",
+      rol: "ADMINISTRADOR",
     },
   });
 
@@ -216,7 +216,7 @@ async function main() {
       stock: 18,
       category: "Anillos",
       imageUrl:
-        "https://images.unsplash.com/photo-1588444650733-d53f2f2f8b19?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=1200&q=80",
       recommended: false,
     },
     {
@@ -282,13 +282,13 @@ async function main() {
       stock: 19,
       category: "Pulseras",
       imageUrl:
-        "https://images.unsplash.com/photo-1617038260849-0f5d4cf2d80d?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1623680604940-848c86b7d589?auto=format&fit=crop&w=1200&q=80",
       recommended: false,
     },
   ];
 
   for (const product of products) {
-    await prisma.product.upsert({
+    await prisma.producto.upsert({
       where: { slug: product.slug },
       update: {
         name: product.name,

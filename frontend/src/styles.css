@@ -258,7 +258,7 @@ h3 {
   position: relative;
   border-radius: 0;
   overflow: hidden;
-  min-height: 520px;
+  height: 520px;
   border-top: 1px solid rgba(34, 29, 25, 0.1);
   border-bottom: 1px solid rgba(34, 29, 25, 0.1);
   border-left: 0;
@@ -268,7 +268,7 @@ h3 {
 }
 
 .slider.homeHero {
-  min-height: 600px;
+  height: 600px;
 }
 
 .overlay.compact {
@@ -300,13 +300,13 @@ h3 {
 
 .slider img {
   width: 100%;
-  min-height: 520px;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
 
 .homeHero img {
-  min-height: 600px;
+  height: 100%;
 }
 
 .overlay {
@@ -471,17 +471,203 @@ h3 {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   padding: 0 24px;
 }
 
 .card {
-  background: var(--panel);
-  border: 1px solid rgba(34, 29, 25, 0.12);
-  border-radius: 18px;
-  padding: 12px;
+  background: #fff;
+  border: 1px solid rgba(34, 29, 25, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
   animation: reveal 500ms ease both;
+}
+
+/* Card image area */
+.cardImgWrap {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: #e8e2da;
+}
+
+.cardImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s ease;
+}
+
+.card:hover .cardImg {
+  transform: scale(1.05);
+}
+
+/* Hover overlay */
+.cardOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 7, 4, 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 0.25s ease;
+}
+
+.card:hover .cardOverlay {
+  background: rgba(10, 7, 4, 0.42);
+}
+
+.cardOverlay .ctaBtn,
+.cardOverlayGhost {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  min-width: 130px;
+  text-align: center;
+}
+
+.cardOverlay .ctaBtn {
+  padding: 9px 18px;
+  font-size: 0.88rem;
+}
+
+.cardOverlayGhost {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 9px 18px;
+  cursor: pointer;
+}
+
+.card:hover .cardOverlay .ctaBtn,
+.card:hover .cardOverlayGhost {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.card:hover .cardOverlayGhost {
+  transition-delay: 0.04s;
+}
+
+/* Recommended badge */
+.badgeRec {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: linear-gradient(100deg, #7f552f, #b98347);
+  color: #fff;
+  font-size: 0.68rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* Share button on card */
+.cardShareBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(159, 116, 66, 0.28);
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+  padding: 0;
+}
+
+.card:hover .cardShareBtn {
+  opacity: 1;
+}
+
+.cardShareBtn svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Card text body */
+.cardBody {
+  padding: 10px 12px 14px;
+  display: grid;
+  gap: 5px;
+}
+
+.cardName {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+
+.cardPrice {
+  font-size: 0.94rem;
+  color: #6a4726;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 22px 24px 6px;
+  flex-wrap: wrap;
+}
+
+.pagination button {
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  padding: 0 10px;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: rgba(159, 116, 66, 0.1);
+  border-color: var(--gold);
+}
+
+.pagination button.active {
+  background: linear-gradient(100deg, #7f552f, var(--gold));
+  color: #fff;
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.pagination button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.paginationEllipsis {
+  color: rgba(34, 29, 25, 0.45);
+  font-size: 0.9rem;
+  padding: 0 2px;
+  line-height: 36px;
 }
 
 .flyersSection {
@@ -636,59 +822,16 @@ h3 {
   resize: vertical;
 }
 
-.productImage {
-  width: 100%;
-  height: 190px;
-  border-radius: 12px;
-  object-fit: cover;
-  display: block;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-
-.cardTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
 .pill {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(159, 116, 66, 0.16);
+  background: rgba(159, 116, 66, 0.14);
   color: #6d4c2b;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
 }
 
-.card h3 {
-  font-size: 1rem;
-  margin: 12px 0 8px;
-}
-
-.card p {
-  margin: 0;
-  line-height: 1.45;
-  font-size: 0.94rem;
-  color: rgba(34, 29, 25, 0.86);
-}
-
-.cardFooter {
-  margin-top: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  color: rgba(34, 29, 25, 0.72);
-  font-size: 0.88rem;
-  flex-wrap: wrap;
-}
-
-.cardFooter > span {
-  margin-right: auto;
-}
-
+/* Share button in modal head */
 .shareBtn {
   display: inline-flex;
   align-items: center;
@@ -819,37 +962,161 @@ h3 {
 }
 
 .productModal {
-  width: min(720px, 94vw);
-  max-height: 90vh;
+  width: min(800px, 94vw);
+  max-height: 92vh;
   overflow: auto;
   border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.97);
-  padding: 16px;
+  padding: 18px;
+  display: grid;
+  gap: 0;
 }
 
 .productHead {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
-.productModalImage {
-  width: 100%;
-  max-height: 300px;
-  border-radius: 12px;
-  object-fit: cover;
+.productHead h3 {
   margin: 0;
-  display: block;
+  font-size: clamp(1.1rem, 3vw, 1.5rem);
+}
+
+/* Gallery */
+.modalGallery {
+  margin-bottom: 14px;
 }
 
 .modalMedia {
   position: relative;
-  margin: 10px 0;
   border-radius: 12px;
   overflow: hidden;
   background: #100e0d;
+}
+
+.productModalImage {
+  width: 100%;
+  max-height: 380px;
+  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbStrip {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.thumbBtn {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  background: none;
+}
+
+.thumbBtn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbBtn.active,
+.thumbBtn:hover {
+  border-color: var(--gold);
+}
+
+/* Modal info section */
+.modalInfo {
+  display: grid;
+  gap: 12px;
+}
+
+.modalMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modalPrice {
+  font-size: 1.2rem;
+  color: #6a4726;
+  font-family: "Cinzel", serif;
+}
+
+.grabadoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(159, 116, 66, 0.1);
+  border: 1px solid rgba(159, 116, 66, 0.38);
+  color: #6a4726;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.modalDescription {
+  margin: 0;
+  line-height: 1.55;
+  color: rgba(34, 29, 25, 0.86);
+}
+
+/* Detail fields (materiales, dimensiones, cuidados) */
+.productDetails {
+  margin: 0;
+  padding: 14px 16px;
+  background: rgba(159, 116, 66, 0.05);
+  border: 1px solid rgba(159, 116, 66, 0.14);
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.detailRow dt {
+  font-weight: 700;
+  color: rgba(34, 29, 25, 0.62);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  align-self: start;
+  padding-top: 2px;
+}
+
+.detailRow dd {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
 }
 
 .modalPlayOverlay {
@@ -966,6 +1233,12 @@ h3 {
   }
 }
 
+@media (max-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 860px) {
   .page {
     padding: 0 0 34px;
@@ -1005,7 +1278,13 @@ h3 {
   }
 
   .grid {
+    grid-template-columns: repeat(2, 1fr);
     padding: 0 14px;
+    gap: 12px;
+  }
+
+  .pagination {
+    padding: 18px 14px 4px;
   }
 
   .contactSection {
@@ -1015,22 +1294,29 @@ h3 {
 }
 
 @media (max-width: 640px) {
-  .slider,
-  .slider img {
-    min-height: 320px;
+  .slider {
+    height: 320px;
   }
 
-  .homeHero,
-  .homeHero img {
-    min-height: 380px;
+  .homeHero {
+    height: 380px;
   }
 
   .categoryScroll {
     justify-content: flex-start;
   }
 
-  .productImage {
-    height: 164px;
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .cardBody {
+    padding: 8px 10px 12px;
+  }
+
+  .cardName {
+    font-size: 0.82rem;
   }
 
   .flyerCard,
@@ -1044,5 +1330,19 @@ h3 {
   .flyerCard:nth-child(4) img {
     min-height: 180px;
     height: 180px;
+  }
+
+  .productModal {
+    padding: 14px;
+  }
+
+  .thumbBtn {
+    width: 52px;
+    height: 52px;
+  }
+
+  .detailRow {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 }

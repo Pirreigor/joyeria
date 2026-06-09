@@ -4,6 +4,8 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const CART_KEY = "shop_cart";
 const TOKEN_KEY = "shop_token";
 const USER_KEY = "shop_user";
+const PAGE_SIZE = 24;
+const PLACEHOLDER = "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=80";
 
 const initialAuthForm = { name: "", email: "", password: "" };
 
@@ -43,6 +45,8 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductVideo, setShowProductVideo] = useState(false);
   const [shareToast, setShareToast] = useState(false);
+  const [page, setPage] = useState(1);
+  const [modalGalleryIndex, setModalGalleryIndex] = useState(0);
 
   useEffect(() => {
     const savedCart = localStorage.getItem(CART_KEY);
@@ -157,6 +161,7 @@ export default function App() {
   function openProduct(product) {
     setSelectedProduct(product);
     setShowProductVideo(false);
+    setModalGalleryIndex(0);
     const url = new URL(window.location.href);
     url.searchParams.set("p", product.id);
     window.history.replaceState({}, "", url.toString());
@@ -225,6 +230,13 @@ export default function App() {
 
     return list;
   }, [products, query, selectedCategory, recommendedOnly, priceMin, priceMax, sortBy]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, selectedCategory, sortBy, recommendedOnly, priceMin, priceMax]);
+
+  const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
+  const pagedProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const cartCount = useMemo(
     () => cartItems.reduce((total, item) => total + item.quantity, 0),
@@ -604,44 +616,88 @@ export default function App() {
       {error && <p className="status error">{error}</p>}
 
       {!loading && !error && (
-        <section className="grid">
-          {filteredProducts.map((product, index) => (
-            <article className="card" key={product.id} style={{ animationDelay: `${index * 70}ms` }}>
-              <img
-                className="productImage"
-                src={product.imageUrl || "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=80"}
-                alt={product.name}
-                onClick={() => openProduct(product)}
-              />
-              <div className="cardTop">
-                <span className="pill">{product.category || "Joyeria"}</span>
-                <strong>${Number(product.price).toFixed(2)}</strong>
-              </div>
-              <h3>{product.name}</h3>
-              <p>{product.description || "Sin descripcion"}</p>
-              <div className="cardFooter">
-                <span>{product.recommended ? "Recomendado" : `Stock: ${product.stock}`}</span>
-                <button
-                  type="button"
-                  className="shareBtn"
-                  aria-label="Compartir producto"
-                  title="Compartir enlace"
-                  onClick={(e) => shareProduct(product, e)}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="18" cy="5" r="3"/>
-                    <circle cx="6" cy="12" r="3"/>
-                    <circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                  </svg>
-                </button>
-                <button type="button" onClick={() => openProduct(product)}>Ver</button>
-                <button type="button" onClick={() => addToCart(product)}>Agregar</button>
-              </div>
-            </article>
-          ))}
-        </section>
+        <>
+          <section className="grid">
+            {pagedProducts.map((product, index) => (
+              <article className="card" key={product.id} style={{ animationDelay: `${index * 50}ms` }}>
+                <div className="cardImgWrap">
+                  <img
+                    className="cardImg"
+                    src={product.imageUrl || PLACEHOLDER}
+                    alt={product.name}
+                    loading="lazy"
+                  />
+                  <div className="cardOverlay">
+                    <button type="button" className="ctaBtn" onClick={() => openProduct(product)}>
+                      Ver detalles
+                    </button>
+                    <button type="button" className="cardOverlayGhost" onClick={() => addToCart(product)}>
+                      + Carrito
+                    </button>
+                  </div>
+                  {product.recommended && <span className="badgeRec">Destacado</span>}
+                  <button
+                    type="button"
+                    className="cardShareBtn"
+                    aria-label="Compartir producto"
+                    onClick={(e) => shareProduct(product, e)}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="18" cy="5" r="3"/>
+                      <circle cx="6" cy="12" r="3"/>
+                      <circle cx="18" cy="19" r="3"/>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                    </svg>
+                  </button>
+                </div>
+                <div className="cardBody">
+                  <span className="pill">{product.category || "Joyeria"}</span>
+                  <h3 className="cardName">{product.name}</h3>
+                  <strong className="cardPrice">${Number(product.price).toFixed(2)}</strong>
+                </div>
+              </article>
+            ))}
+          </section>
+
+          {totalPages > 1 && (
+            <nav className="pagination" aria-label="Paginas del catalogo">
+              <button
+                type="button"
+                disabled={page === 1}
+                onClick={() => { setPage((p) => p - 1); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" }); }}
+                aria-label="Pagina anterior"
+              >
+                ‹
+              </button>
+
+              {buildPageNums(totalPages, page).map((item, i) =>
+                item === "…" ? (
+                  <span key={`ellipsis-${i}`} className="paginationEllipsis">…</span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    className={item === page ? "active" : ""}
+                    onClick={() => { setPage(item); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" }); }}
+                    aria-current={item === page ? "page" : undefined}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+
+              <button
+                type="button"
+                disabled={page === totalPages}
+                onClick={() => { setPage((p) => p + 1); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" }); }}
+                aria-label="Pagina siguiente"
+              >
+                ›
+              </button>
+            </nav>
+          )}
+        </>
       )}
 
       {flyers.length > 0 && (
@@ -698,93 +754,141 @@ export default function App() {
         </form>
       </section>
 
-      {selectedProduct && (
-        <div
-          className="modalBackdrop"
-          onClick={closeProduct}
-        >
-          <section className="productModal" onClick={(event) => event.stopPropagation()}>
-            <div className="productHead">
-              <h3>{selectedProduct.name}</h3>
-              <div className="productHeadActions">
-                <button
-                  type="button"
-                  className="shareBtn"
-                  aria-label="Compartir producto"
-                  title="Compartir enlace"
-                  onClick={(e) => shareProduct(selectedProduct, e)}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="18" cy="5" r="3"/>
-                    <circle cx="6" cy="12" r="3"/>
-                    <circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                  </svg>
-                  Compartir
-                </button>
-                <button
-                  type="button"
-                  className="ghostBtn"
-                  onClick={closeProduct}
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
+      {selectedProduct && (() => {
+        const galleryImages = [selectedProduct.imageUrl, ...(selectedProduct.imagenes || [])].filter(Boolean);
+        const currentImg = galleryImages[modalGalleryIndex] || galleryImages[0] || PLACEHOLDER;
+        const hasDetails = selectedProduct.materiales || selectedProduct.dimensiones || selectedProduct.cuidados;
 
-            <div className="modalMedia">
-              <img
-                className="productModalImage"
-                src={selectedProduct.imageUrl || "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=80"}
-                alt={selectedProduct.name}
-              />
-
-              {embedPromoVideoUrl && !showProductVideo && (
-                <button type="button" className="modalPlayOverlay" onClick={() => setShowProductVideo(true)}>
-                  <span className="playBadge" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" role="presentation">
-                      <circle cx="12" cy="12" r="11" />
-                      <polygon points="10,8.5 17,12 10,15.5" />
+        return (
+          <div className="modalBackdrop" onClick={closeProduct}>
+            <section className="productModal" onClick={(event) => event.stopPropagation()}>
+              <div className="productHead">
+                <h3>{selectedProduct.name}</h3>
+                <div className="productHeadActions">
+                  <button
+                    type="button"
+                    className="shareBtn"
+                    aria-label="Compartir producto"
+                    onClick={(e) => shareProduct(selectedProduct, e)}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="18" cy="5" r="3"/>
+                      <circle cx="6" cy="12" r="3"/>
+                      <circle cx="18" cy="19" r="3"/>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                     </svg>
-                  </span>
-                  <span>{settings.promoVideoTitle || "Ver video promocional"}</span>
-                </button>
-              )}
-
-              {embedPromoVideoUrl && showProductVideo && (
-                <div className="modalVideoOverlay">
-                  <iframe
-                    src={appendAutoplay(embedPromoVideoUrl)}
-                    title={settings.promoVideoTitle || "Video promocional"}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                    Compartir
+                  </button>
+                  <button type="button" className="ghostBtn" onClick={closeProduct}>
+                    Cerrar
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <p>{selectedProduct.description || "Sin descripcion"}</p>
+              <div className="modalGallery">
+                <div className="modalMedia">
+                  <img className="productModalImage" src={currentImg} alt={selectedProduct.name} />
 
-            {settings.promoVideoUrl && (
-              <div className="videoMeta">
-                <strong>{settings.promoVideoTitle || "Video promocional"}</strong>
-                {!embedPromoVideoUrl && (
-                  <a className="ctaBtn" href={settings.promoVideoUrl} target="_blank" rel="noreferrer">
-                    Ver video promocional
-                  </a>
+                  {embedPromoVideoUrl && !showProductVideo && (
+                    <button type="button" className="modalPlayOverlay" onClick={() => setShowProductVideo(true)}>
+                      <span className="playBadge" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" role="presentation">
+                          <circle cx="12" cy="12" r="11" />
+                          <polygon points="10,8.5 17,12 10,15.5" />
+                        </svg>
+                      </span>
+                      <span>{settings.promoVideoTitle || "Ver video promocional"}</span>
+                    </button>
+                  )}
+
+                  {embedPromoVideoUrl && showProductVideo && (
+                    <div className="modalVideoOverlay">
+                      <iframe
+                        src={appendAutoplay(embedPromoVideoUrl)}
+                        title={settings.promoVideoTitle || "Video promocional"}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {galleryImages.length > 1 && (
+                  <div className="thumbStrip">
+                    {galleryImages.map((img, i) => (
+                      <button
+                        key={img}
+                        type="button"
+                        className={`thumbBtn${i === modalGalleryIndex ? " active" : ""}`}
+                        onClick={() => { setModalGalleryIndex(i); setShowProductVideo(false); }}
+                        aria-label={`Imagen ${i + 1}`}
+                      >
+                        <img src={img} alt="" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-            )}
 
-            <div className="actions">
-              <button type="button" onClick={() => addToCart(selectedProduct)}>
-                Agregar al carrito
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+              <div className="modalInfo">
+                <div className="modalMeta">
+                  <span className="pill">{selectedProduct.category || "Joyeria"}</span>
+                  <strong className="modalPrice">${Number(selectedProduct.price).toFixed(2)}</strong>
+                  {selectedProduct.grabado && (
+                    <span className="grabadoBadge">
+                      <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      </svg>
+                      Grabado disponible
+                    </span>
+                  )}
+                </div>
+
+                <p className="modalDescription">{selectedProduct.description || "Sin descripcion"}</p>
+
+                {hasDetails && (
+                  <dl className="productDetails">
+                    {selectedProduct.materiales && (
+                      <div className="detailRow">
+                        <dt>Materiales</dt>
+                        <dd>{selectedProduct.materiales}</dd>
+                      </div>
+                    )}
+                    {selectedProduct.dimensiones && (
+                      <div className="detailRow">
+                        <dt>Dimensiones</dt>
+                        <dd>{selectedProduct.dimensiones}</dd>
+                      </div>
+                    )}
+                    {selectedProduct.cuidados && (
+                      <div className="detailRow">
+                        <dt>Cuidados</dt>
+                        <dd>{selectedProduct.cuidados}</dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+
+                {settings.promoVideoUrl && !embedPromoVideoUrl && (
+                  <div className="videoMeta">
+                    <strong>{settings.promoVideoTitle || "Video promocional"}</strong>
+                    <a className="ctaBtn" href={settings.promoVideoUrl} target="_blank" rel="noreferrer">
+                      Ver video
+                    </a>
+                  </div>
+                )}
+
+                <div className="modalActions">
+                  <button type="button" className="ctaBtn" onClick={() => addToCart(selectedProduct)}>
+                    Agregar al carrito
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
 
       {shareToast && (
         <div className="shareToast" role="status" aria-live="polite">
@@ -891,4 +995,16 @@ function appendAutoplay(url) {
   }
 
   return url.includes("?") ? `${url}&autoplay=1` : `${url}?autoplay=1`;
+}
+
+function buildPageNums(total, current) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set([1, total, current, current - 1, current + 1].filter((p) => p >= 1 && p <= total));
+  const sorted = [...set].sort((a, b) => a - b);
+  const result = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push("…");
+    result.push(sorted[i]);
+  }
+  return result;
 }

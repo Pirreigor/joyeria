@@ -9,31 +9,31 @@ async function register(req, res) {
     return res.status(400).json({ message: "name, email y password son obligatorios" });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.usuario.findUnique({ where: { email } });
   if (existing) {
     return res.status(409).json({ message: "El email ya esta en uso" });
   }
 
   const passwordHash = await hashPassword(password);
 
-  const user = await prisma.user.create({
+  const user = await prisma.usuario.create({
     data: {
       name,
       email,
       passwordHash,
-      role: "CUSTOMER",
+      rol: "CLIENTE",
     },
     select: {
       id: true,
       name: true,
       email: true,
-      role: true,
+      rol: true,
     },
   });
 
-  const token = signAccessToken({ id: user.id, role: user.role, email: user.email });
+  const token = signAccessToken({ id: user.id, rol: user.rol, email: user.email, permisos: [] });
 
-  return res.status(201).json({ user, token });
+  return res.status(201).json({ user: { ...user, permisos: [] }, token });
 }
 
 async function login(req, res) {
@@ -43,7 +43,7 @@ async function login(req, res) {
     return res.status(400).json({ message: "email y password son obligatorios" });
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.usuario.findUnique({ where: { email } });
   if (!user) {
     return res.status(401).json({ message: "Credenciales invalidas" });
   }
@@ -53,27 +53,29 @@ async function login(req, res) {
     return res.status(401).json({ message: "Credenciales invalidas" });
   }
 
-  const token = signAccessToken({ id: user.id, role: user.role, email: user.email });
+  const token = signAccessToken({ id: user.id, rol: user.rol, email: user.email, permisos: user.permisos });
 
   return res.json({
     user: {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      rol: user.rol,
+      permisos: user.permisos,
     },
     token,
   });
 }
 
 async function me(req, res) {
-  const user = await prisma.user.findUnique({
+  const user = await prisma.usuario.findUnique({
     where: { id: req.user.id },
     select: {
       id: true,
       name: true,
       email: true,
-      role: true,
+      rol: true,
+      permisos: true,
       createdAt: true,
     },
   });

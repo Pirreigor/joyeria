@@ -34,7 +34,7 @@ async function listProducts(req, res) {
           ? [{ recommended: "desc" }, { createdAt: "desc" }]
           : { createdAt: "desc" };
 
-  const products = await prisma.product.findMany({
+  const products = await prisma.producto.findMany({
     where,
     orderBy,
   });
@@ -45,7 +45,7 @@ async function listProducts(req, res) {
 async function getProductBySlug(req, res) {
   const { slug } = req.params;
 
-  const product = await prisma.product.findUnique({ where: { slug } });
+  const product = await prisma.producto.findUnique({ where: { slug } });
 
   if (!product || !product.active) {
     return res.status(404).json({ message: "Producto no encontrado" });
