@@ -35,7 +35,7 @@ async function main() {
   ];
 
   for (const category of categories) {
-    await prisma.category.upsert({
+    await prisma.categoria.upsert({
       where: { slug: category.slug },
       update: {
         name: category.name,
@@ -47,7 +47,7 @@ async function main() {
     });
   }
 
-  await prisma.storeSetting.upsert({
+  await prisma.configTienda.upsert({
     where: { id: 1 },
     update: {
       brandName: "Don Joyero",
@@ -174,14 +174,14 @@ async function main() {
     });
   }
 
-  await prisma.user.upsert({
+  await prisma.usuario.upsert({
     where: { email: adminEmail },
     update: {},
     create: {
       name: "Admin",
       email: adminEmail,
       passwordHash: adminPasswordHash,
-      role: "ADMIN",
+      rol: "ADMINISTRADOR",
     },
   });
 
@@ -288,7 +288,7 @@ async function main() {
   ];
 
   for (const product of products) {
-    await prisma.product.upsert({
+    await prisma.producto.upsert({
       where: { slug: product.slug },
       update: {
         name: product.name,

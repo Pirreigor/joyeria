@@ -28,42 +28,43 @@ const {
   updateOrderStatus,
 } = require("../controllers/admin.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
-const { requireRole } = require("../middleware/role.middleware");
+const { requireRole, requirePermission } = require("../middleware/role.middleware");
 
 const router = Router();
 
-router.use(requireAuth, requireRole("ADMIN"));
+router.use(requireAuth, requireRole("ADMINISTRADOR"));
 
-router.get("/dashboard", getDashboard);
+router.get("/dashboard", requirePermission("dashboard"), getDashboard);
 
-router.get("/users", listUsers);
-router.post("/users", createUser);
-router.patch("/users/:id", updateUser);
-router.delete("/users/:id", deleteUser);
+router.get("/users", requirePermission("users"), listUsers);
+router.post("/users", requirePermission("users"), createUser);
+router.patch("/users/:id", requirePermission("users"), updateUser);
+router.delete("/users/:id", requirePermission("users"), deleteUser);
 
-router.get("/settings", getStoreSettings);
-router.patch("/settings", updateStoreSettings);
+router.get("/settings", requirePermission("settings"), getStoreSettings);
+router.patch("/settings", requirePermission("settings"), updateStoreSettings);
 
-router.get("/categories", listCategories);
-router.post("/categories", createCategory);
-router.patch("/categories/:id", updateCategory);
-router.delete("/categories/:id", deleteCategory);
+router.get("/categories", requirePermission("categories"), listCategories);
+router.post("/categories", requirePermission("categories"), createCategory);
+router.patch("/categories/:id", requirePermission("categories"), updateCategory);
+router.delete("/categories/:id", requirePermission("categories"), deleteCategory);
 
-router.get("/slides", listSlides);
-router.post("/slides", createSlide);
-router.patch("/slides/:id", updateSlide);
-router.delete("/slides/:id", deleteSlide);
+router.get("/slides", requirePermission("slides"), listSlides);
+router.post("/slides", requirePermission("slides"), createSlide);
+router.patch("/slides/:id", requirePermission("slides"), updateSlide);
+router.delete("/slides/:id", requirePermission("slides"), deleteSlide);
 
-router.get("/flyers", listFlyers);
-router.post("/flyers", createFlyer);
-router.patch("/flyers/:id", updateFlyer);
-router.delete("/flyers/:id", deleteFlyer);
+router.get("/flyers", requirePermission("flyers"), listFlyers);
+router.post("/flyers", requirePermission("flyers"), createFlyer);
+router.patch("/flyers/:id", requirePermission("flyers"), updateFlyer);
+router.delete("/flyers/:id", requirePermission("flyers"), deleteFlyer);
 
-router.get("/products", listProducts);
-router.post("/products", createProduct);
-router.patch("/products/:id", updateProduct);
-router.delete("/products/:id", deleteProduct);
-router.get("/orders", listOrders);
-router.patch("/orders/:id/status", updateOrderStatus);
+router.get("/products", requirePermission("products"), listProducts);
+router.post("/products", requirePermission("products"), createProduct);
+router.patch("/products/:id", requirePermission("products"), updateProduct);
+router.delete("/products/:id", requirePermission("products"), deleteProduct);
+
+router.get("/orders", requirePermission("orders"), listOrders);
+router.patch("/orders/:id/status", requirePermission("orders"), updateOrderStatus);
 
 module.exports = router;

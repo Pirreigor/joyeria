@@ -7,58 +7,70 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  CUSTOMER
+enum Rol {
+  ADMINISTRADOR
+  CLIENTE
 }
 
-enum OrderStatus {
-  NEW
-  PAID
-  SHIPPED
-  DELIVERED
-  CANCELED
+enum EstadoPedido {
+  NUEVO
+  PAGADO
+  ENVIADO
+  ENTREGADO
+  CANCELADO
 }
 
-model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(CUSTOMER)
-  orders       Order[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model Usuario {
+  id            Int       @id @default(autoincrement())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  rol           Rol       @default(CLIENTE)
+  permisos      String[]  @default([])
+  pedidos       Pedido[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("usuarios")
 }
 
-model Product {
-  id          Int         @id @default(autoincrement())
-  name        String
-  slug        String      @unique
-  description String
-  price       Float
-  stock       Int         @default(0)
-  imageUrl    String?
-  category    String?
-  recommended Boolean     @default(false)
-  active      Boolean     @default(true)
-  items       OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+model Producto {
+  id            Int          @id @default(autoincrement())
+  name          String
+  slug          String       @unique
+  description   String
+  price         Float
+  stock         Int          @default(0)
+  imageUrl      String?
+  imagenes      String[]     @default([])
+  category      String?
+  recommended   Boolean      @default(false)
+  active        Boolean      @default(true)
+  materiales    String?
+  dimensiones   String?
+  cuidados      String?
+  grabado       Boolean      @default(false)
+  items         ItemPedido[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("productos")
 }
 
-model Category {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  slug        String   @unique
-  description String?
+model Categoria {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  slug           String   @unique
+  description    String?
   bannerImageUrl String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("categorias")
 }
 
-model StoreSetting {
+model ConfigTienda {
   id              Int      @id
   brandName       String
   logoUrl         String?
@@ -66,19 +78,23 @@ model StoreSetting {
   promoVideoTitle String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@map("config_tienda")
 }
 
 model Slide {
-  id          Int      @id @default(autoincrement())
-  title       String
-  subtitle    String?
-  imageUrl    String
-  ctaLabel    String?
-  ctaUrl      String?
-  displayOrder Int     @unique
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  title        String
+  subtitle     String?
+  imageUrl     String
+  ctaLabel     String?
+  ctaUrl       String?
+  displayOrder Int      @unique
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("slides")
 }
 
 model Flyer {
@@ -91,26 +107,32 @@ model Flyer {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@map("flyers")
 }
 
-model Order {
-  id        Int         @id @default(autoincrement())
-  userId    Int
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  total     Float
-  status    OrderStatus @default(NEW)
-  items     OrderItem[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+model Pedido {
+  id         Int          @id @default(autoincrement())
+  usuarioId  Int
+  usuario    Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  total      Float
+  estado     EstadoPedido @default(NUEVO)
+  items      ItemPedido[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@map("pedidos")
 }
 
-model OrderItem {
-  id        Int      @id @default(autoincrement())
-  orderId   Int
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId Int
-  product   Product  @relation(fields: [productId], references: [id])
-  quantity  Int
-  unitPrice Float
-  createdAt DateTime @default(now())
+model ItemPedido {
+  id         Int      @id @default(autoincrement())
+  pedidoId   Int
+  pedido     Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  productoId Int
+  producto   Producto @relation(fields: [productoId], references: [id])
+  quantity   Int
+  unitPrice  Float
+  createdAt  DateTime @default(now())
+
+  @@map("items_pedido")
 }

@@ -49,9 +49,14 @@ const initialProductForm = {
   price: "",
   stock: "",
   imageUrl: "",
+  imagenesRaw: "",
   category: "",
   recommended: false,
   active: true,
+  materiales: "",
+  dimensiones: "",
+  cuidados: "",
+  grabado: false,
 };
 
 const initialUserForm = {
@@ -59,11 +64,22 @@ const initialUserForm = {
   name: "",
   email: "",
   password: "",
-  role: "CUSTOMER",
+  rol: "CLIENTE",
+  permisos: [],
 };
 
+const ALL_PERMISSIONS = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "users", label: "Usuarios" },
+  { key: "categories", label: "Categorias" },
+  { key: "products", label: "Productos" },
+  { key: "slides", label: "Slides" },
+  { key: "flyers", label: "Flyers" },
+  { key: "settings", label: "Branding" },
+];
+
 const MENU_BY_ROLE = {
-  ADMIN: [
+  ADMINISTRADOR: [
     {
       key: "operaciones",
       label: "Operaciones",
@@ -196,6 +212,9 @@ export default function App() {
   const [listError, setListError] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
   const [menuCollapsed, setMenuCollapsed] = useState(false);
+  const [openSections, setOpenSections] = useState(() =>
+    Object.fromEntries((MENU_BY_ROLE.ADMINISTRADOR || []).map((s) => [s.key, true]))
+  );
 
   const [form, setForm] = useState(initialForm);
   const [slideForm, setSlideForm] = useState(initialSlideForm);
@@ -210,8 +229,15 @@ export default function App() {
   const isEditingFlyer = useMemo(() => flyerForm.id !== null, [flyerForm.id]);
   const isEditingProduct = useMemo(() => productForm.id !== null, [productForm.id]);
   const isEditingUser = useMemo(() => userForm.id !== null, [userForm.id]);
-  const role = user?.role || "ADMIN";
-  const roleMenuSections = useMemo(() => MENU_BY_ROLE[role] || [], [role]);
+  const role = user?.rol || "ADMINISTRADOR";
+  const roleMenuSections = useMemo(() => {
+    const sections = MENU_BY_ROLE[role] || [];
+    const perms = user?.permisos || [];
+    if (!perms.length) return sections;
+    return sections
+      .map((s) => ({ ...s, items: s.items.filter((i) => perms.includes(i.key)) }))
+      .filter((s) => s.items.length > 0);
+  }, [role, user]);
   const roleMenu = useMemo(
     () => roleMenuSections.flatMap((section) => section.items || []),
     [roleMenuSections]
@@ -299,7 +325,7 @@ export default function App() {
         }),
       });
 
-      if (data.user?.role !== "ADMIN") {
+      if (data.user?.rol !== "ADMINISTRADOR") {
         throw new Error("Tu usuario no tiene permisos de administrador");
       }
 
@@ -342,15 +368,18 @@ export default function App() {
     setListLoading(true);
     setListError("");
 
+    const perms = user?.permisos || [];
+    const can = (key) => perms.length === 0 || perms.includes(key);
+
     try {
       const [dashboardData, usersData, categoriesData, productsData, slidesData, flyersData, settingsData] = await Promise.all([
-        request("/api/admin/dashboard"),
-        request("/api/admin/users"),
-        request("/api/admin/categories"),
-        request("/api/admin/products"),
-        request("/api/admin/slides"),
-        request("/api/admin/flyers"),
-        request("/api/admin/settings"),
+        can("dashboard") ? request("/api/admin/dashboard") : Promise.resolve({ stats: { users: 0, products: 0, categories: 0, orders: 0 }, recentOrders: [], recentUsers: [] }),
+        can("users") ? request("/api/admin/users") : Promise.resolve({ users: [] }),
+        can("categories") ? request("/api/admin/categories") : Promise.resolve({ categories: [] }),
+        can("products") ? request("/api/admin/products") : Promise.resolve({ products: [] }),
+        can("slides") ? request("/api/admin/slides") : Promise.resolve({ slides: [] }),
+        can("flyers") ? request("/api/admin/flyers") : Promise.resolve({ flyers: [] }),
+        can("settings") ? request("/api/admin/settings") : Promise.resolve(null),
       ]);
       setDashboard({
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
@@ -440,9 +469,14 @@ export default function App() {
       price: String(product.price ?? ""),
       stock: String(product.stock ?? ""),
       imageUrl: product.imageUrl || "",
+      imagenesRaw: (product.imagenes || []).join(", "),
       category: product.category || "",
       recommended: Boolean(product.recommended),
       active: Boolean(product.active),
+      materiales: product.materiales || "",
+      dimensiones: product.dimensiones || "",
+      cuidados: product.cuidados || "",
+      grabado: Boolean(product.grabado),
     });
   }
 
@@ -452,7 +486,8 @@ export default function App() {
       name: nextUser.name || "",
       email: nextUser.email || "",
       password: "",
-      role: nextUser.role || "CUSTOMER",
+      rol: nextUser.rol || "CLIENTE",
+      permisos: nextUser.permisos || [],
     });
   }
 
@@ -615,6 +650,10 @@ export default function App() {
     setSaving(true);
     setListError("");
 
+    const imagenes = productForm.imagenesRaw
+      ? productForm.imagenesRaw.split(",").map((u) => u.trim()).filter(Boolean)
+      : [];
+
     const payload = {
       name: productForm.name.trim(),
       slug: (productForm.slug || slugify(productForm.name)).trim(),
@@ -622,9 +661,14 @@ export default function App() {
       price: Number(productForm.price),
       stock: Number(productForm.stock || 0),
       imageUrl: productForm.imageUrl.trim(),
+      imagenes,
       category: productForm.category || null,
       recommended: Boolean(productForm.recommended),
       active: Boolean(productForm.active),
+      materiales: productForm.materiales.trim() || null,
+      dimensiones: productForm.dimensiones.trim() || null,
+      cuidados: productForm.cuidados.trim() || null,
+      grabado: Boolean(productForm.grabado),
     };
 
     try {
@@ -662,7 +706,8 @@ export default function App() {
       name: userForm.name.trim(),
       email: userForm.email.trim(),
       password: userForm.password,
-      role: userForm.role,
+      role: userForm.rol,
+      permissions: userForm.rol === "ADMINISTRADOR" ? userForm.permisos : [],
     };
 
     try {
@@ -901,33 +946,48 @@ export default function App() {
 
       <section className={menuCollapsed ? "workspace menuCollapsed" : "workspace"}>
         <aside className="panel sidebarPanel">
-          <p className="eyebrow">Menu de mantenimiento</p>
+          <p className="eyebrow">Menu</p>
           <nav className="maintMenu" aria-label="Menu de mantenimiento">
-            {roleMenuSections.map((section) => (
-              <section key={section.key} className="menuGroup">
-                {!menuCollapsed && <p className="menuGroupTitle">{section.label}</p>}
-                <div className="submenuList">
-                  {section.items.map((item) => (
+            {roleMenuSections.map((section) => {
+              const isOpen = openSections[section.key] ?? true;
+              return (
+                <section key={section.key} className="menuGroup">
+                  {!menuCollapsed && (
                     <button
-                      key={item.key}
                       type="button"
-                      className={activeTab === item.key ? "menuEntry active" : "menuEntry"}
-                      onClick={() => setActiveTab(item.key)}
-                      title={item.label}
+                      className="menuGroupHeader"
+                      onClick={() => setOpenSections((prev) => ({ ...prev, [section.key]: !prev[section.key] }))}
+                      aria-expanded={isOpen}
                     >
-                      <span className="menuEntryContent">
-                        <span className="menuIcon" aria-hidden="true">
-                          <MenuIcon tabKey={item.key} />
-                        </span>
-                        <span className="menuEntryLabel">
-                          {menuCollapsed ? item.short || item.label.slice(0, 2).toUpperCase() : item.label}
-                        </span>
-                      </span>
+                      <span className="menuGroupTitle">{section.label}</span>
+                      <span className={`sectionChevron ${isOpen ? "open" : ""}`} aria-hidden="true">›</span>
                     </button>
-                  ))}
-                </div>
-              </section>
-            ))}
+                  )}
+                  {(menuCollapsed || isOpen) && (
+                    <div className="submenuList">
+                      {section.items.map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={activeTab === item.key ? "menuEntry active" : "menuEntry"}
+                          onClick={() => setActiveTab(item.key)}
+                          title={item.label}
+                        >
+                          <span className="menuEntryContent">
+                            <span className="menuIcon" aria-hidden="true">
+                              <MenuIcon tabKey={item.key} />
+                            </span>
+                            <span className="menuEntryLabel">
+                              {menuCollapsed ? item.short || item.label.slice(0, 2).toUpperCase() : item.label}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </nav>
         </aside>
 
@@ -1022,12 +1082,38 @@ export default function App() {
                 <label htmlFor="user-role">Rol</label>
                 <select
                   id="user-role"
-                  value={userForm.role}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value }))}
+                  value={userForm.rol}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, rol: event.target.value }))}
                 >
-                  <option value="CUSTOMER">CUSTOMER</option>
-                  <option value="ADMIN">ADMIN</option>
+                  <option value="CLIENTE">Cliente</option>
+                  <option value="ADMINISTRADOR">Administrador</option>
                 </select>
+
+                {userForm.rol === "ADMINISTRADOR" && (
+                  <>
+                    <label>Permisos del admin (sin seleccion = acceso total)</label>
+                    <div className="permissionsGrid">
+                      {ALL_PERMISSIONS.map((perm) => (
+                        <label key={perm.key} className="inlineCheck">
+                          <input
+                            type="checkbox"
+                            checked={userForm.permisos.includes(perm.key)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setUserForm((prev) => ({
+                                ...prev,
+                                permisos: checked
+                                  ? [...prev.permisos, perm.key]
+                                  : prev.permisos.filter((p) => p !== perm.key),
+                              }));
+                            }}
+                          />
+                          {perm.label}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 <div className="actions">
                   <button type="submit" disabled={saving}>
@@ -1147,7 +1233,7 @@ export default function App() {
                   }
                 />
 
-                <label htmlFor="product-image">URL imagen</label>
+                <label htmlFor="product-image">URL imagen principal</label>
                 <input
                   id="product-image"
                   type="url"
@@ -1155,6 +1241,52 @@ export default function App() {
                   onChange={(event) => setProductForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
                   required
                 />
+
+                <label htmlFor="product-imagenes">Galeria (URLs separadas por coma)</label>
+                <textarea
+                  id="product-imagenes"
+                  rows={2}
+                  placeholder="https://..., https://..."
+                  value={productForm.imagenesRaw}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, imagenesRaw: event.target.value }))}
+                />
+
+                <label htmlFor="product-materiales">Materiales</label>
+                <input
+                  id="product-materiales"
+                  type="text"
+                  placeholder="Ej: Plata 925, bano dorado 18k"
+                  value={productForm.materiales}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, materiales: event.target.value }))}
+                />
+
+                <label htmlFor="product-dimensiones">Dimensiones</label>
+                <input
+                  id="product-dimensiones"
+                  type="text"
+                  placeholder="Ej: Largo 45 cm, diametro 1.2 cm"
+                  value={productForm.dimensiones}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, dimensiones: event.target.value }))}
+                />
+
+                <label htmlFor="product-cuidados">Instrucciones de cuidado</label>
+                <textarea
+                  id="product-cuidados"
+                  rows={3}
+                  placeholder="Ej: Evitar contacto con agua. Limpiar con pano suave."
+                  value={productForm.cuidados}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, cuidados: event.target.value }))}
+                />
+
+                <label className="inlineCheck" htmlFor="product-grabado">
+                  <input
+                    id="product-grabado"
+                    type="checkbox"
+                    checked={productForm.grabado}
+                    onChange={(event) => setProductForm((prev) => ({ ...prev, grabado: event.target.checked }))}
+                  />
+                  Admite grabado personalizado
+                </label>
 
                 <label htmlFor="product-category">Categoria</label>
                 <select
@@ -1461,9 +1593,17 @@ export default function App() {
                         <strong>{listedUser.name}</strong>
                         <p>{listedUser.email}</p>
                       </div>
-                      <span className={`badge ${listedUser.role === "ADMIN" ? "on" : "off"}`}>
-                        {listedUser.role}
+                      <span className={`badge ${listedUser.rol === "ADMINISTRADOR" ? "on" : "off"}`}>
+                        {listedUser.rol === "ADMINISTRADOR" ? "Administrador" : "Cliente"}
                       </span>
+                      {listedUser.rol === "ADMINISTRADOR" && (
+                        <small>
+                          Permisos:{" "}
+                          {listedUser.permisos && listedUser.permisos.length > 0
+                            ? listedUser.permisos.join(", ")
+                            : "Acceso total"}
+                        </small>
+                      )}
                       <small>Creado: {new Date(listedUser.createdAt).toLocaleDateString()}</small>
                       <div className="actions">
                         <button type="button" className="ghost" onClick={() => startEditUser(listedUser)}>
