@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import joyeritoImg from "../asset/joyerito-sin fondo.png";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const CART_KEY = "shop_cart";
@@ -896,6 +897,16 @@ export default function App() {
           Enlace copiado al portapapeles
         </div>
       )}
+
+      <a
+        href="https://wa.me/51941445104"
+        target="_blank"
+        rel="noreferrer"
+        className="whatsappFloat"
+        aria-label="Contactar por WhatsApp"
+      >
+        <img src={joyeritoImg} alt="WhatsApp" />
+      </a>
 
       {authOpen && (
         <div className="modalBackdrop" onClick={() => setAuthOpen(false)}>
