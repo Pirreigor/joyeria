@@ -57,6 +57,7 @@ const initialProductForm = {
   dimensiones: "",
   cuidados: "",
   grabado: false,
+  videoUrl: "",
 };
 
 const initialUserForm = {
@@ -75,6 +76,8 @@ const ALL_PERMISSIONS = [
   { key: "products", label: "Productos" },
   { key: "slides", label: "Slides" },
   { key: "flyers", label: "Flyers" },
+  { key: "orders", label: "Pedidos" },
+  { key: "despacho", label: "Despacho" },
   { key: "settings", label: "Branding" },
 ];
 
@@ -105,6 +108,14 @@ const MENU_BY_ROLE = {
       ],
     },
     {
+      key: "ventas",
+      label: "Ventas",
+      items: [
+        { key: "orders", label: "Pedidos", short: "PE" },
+        { key: "despacho", label: "Despacho", short: "DE" },
+      ],
+    },
+    {
       key: "sistema",
       label: "Sistema",
       items: [{ key: "settings", label: "Branding", short: "BR" }],
@@ -119,6 +130,8 @@ const TAB_LIST_TITLES = {
   products: "Listado productos",
   slides: "Listado slides",
   flyers: "Listado flyers",
+  orders: "Listado pedidos",
+  despacho: "Pedidos listos para despacho",
   settings: "Preview branding",
 };
 
@@ -171,6 +184,22 @@ function MenuIcon({ tabKey }) {
     );
   }
 
+  if (tabKey === "orders") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 14-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "despacho") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9 1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-2h2zm2.1-7.2-.9.9a3.1 3.1 0 0 0-1.2 2.3h-2a4.5 4.5 0 0 1 1.5-3.2l1.2-1.1a1.7 1.7 0 1 0-2.9-1.2H8.8a3.7 3.7 0 1 1 6.3 2.5z" />
@@ -207,6 +236,16 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [slides, setSlides] = useState([]);
   const [flyers, setFlyers] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [ordersFilter, setOrdersFilter] = useState("todos");
+  const [manualOrderOpen, setManualOrderOpen] = useState(false);
+  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
+  const [manualOrderSaving, setManualOrderSaving] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const [productSearchCat, setProductSearchCat] = useState("todas");
+  const [paymentModal, setPaymentModal] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
+  const [paymentSaving, setPaymentSaving] = useState(false);
   const [settingsForm, setSettingsForm] = useState(initialSettingsForm);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState("");
@@ -355,6 +394,7 @@ export default function App() {
     setCategories([]);
     setProducts([]);
     setFlyers([]);
+    setOrders([]);
     setForm(initialForm);
     setSlideForm(initialSlideForm);
     setFlyerForm(initialFlyerForm);
@@ -372,13 +412,14 @@ export default function App() {
     const can = (key) => perms.length === 0 || perms.includes(key);
 
     try {
-      const [dashboardData, usersData, categoriesData, productsData, slidesData, flyersData, settingsData] = await Promise.all([
+      const [dashboardData, usersData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData] = await Promise.all([
         can("dashboard") ? request("/api/admin/dashboard") : Promise.resolve({ stats: { users: 0, products: 0, categories: 0, orders: 0 }, recentOrders: [], recentUsers: [] }),
         can("users") ? request("/api/admin/users") : Promise.resolve({ users: [] }),
         can("categories") ? request("/api/admin/categories") : Promise.resolve({ categories: [] }),
         can("products") ? request("/api/admin/products") : Promise.resolve({ products: [] }),
         can("slides") ? request("/api/admin/slides") : Promise.resolve({ slides: [] }),
         can("flyers") ? request("/api/admin/flyers") : Promise.resolve({ flyers: [] }),
+        (can("orders") || can("despacho")) ? request("/api/admin/orders") : Promise.resolve({ orders: [] }),
         can("settings") ? request("/api/admin/settings") : Promise.resolve(null),
       ]);
       setDashboard({
@@ -391,6 +432,7 @@ export default function App() {
       setProducts(productsData.products || []);
       setSlides(slidesData.slides || []);
       setFlyers(flyersData.flyers || []);
+      setOrders(ordersData.orders || []);
       setSettingsForm({
         brandName: settingsData?.settings?.brandName || "Don Joyero",
         logoUrl: settingsData?.settings?.logoUrl || "",
@@ -477,6 +519,7 @@ export default function App() {
       dimensiones: product.dimensiones || "",
       cuidados: product.cuidados || "",
       grabado: Boolean(product.grabado),
+      videoUrl: product.videoUrl || "",
     });
   }
 
@@ -669,6 +712,7 @@ export default function App() {
       dimensiones: productForm.dimensiones.trim() || null,
       cuidados: productForm.cuidados.trim() || null,
       grabado: Boolean(productForm.grabado),
+      videoUrl: productForm.videoUrl.trim() || null,
     };
 
     try {
@@ -841,6 +885,108 @@ export default function App() {
       setListError(error.message || "No se pudo desactivar el producto");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  function handleOrderStatusChange(orderId, newStatus) {
+    if (newStatus === "PAGADO") {
+      setPaymentModal(orderId);
+      setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
+      return;
+    }
+    handleUpdateOrderStatus(orderId, newStatus);
+  }
+
+  async function handleUpdateOrderStatus(orderId, newStatus) {
+    setListError("");
+    try {
+      await request(`/api/admin/orders/${orderId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo actualizar el estado del pedido");
+    }
+  }
+
+  async function handlePaymentSubmit(event) {
+    event.preventDefault();
+    setPaymentSaving(true);
+    setListError("");
+
+    try {
+      const fd = new FormData();
+      fd.append("metodoPago", paymentForm.metodoPago);
+      fd.append("numeroComprobante", paymentForm.numeroComprobante);
+      fd.append("direccionEnvio", paymentForm.direccionEnvio);
+      fd.append("comprobante", paymentForm.comprobante);
+
+      const response = await fetch(`${API_URL}/api/admin/orders/${paymentModal}/confirm-payment`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || "No se pudo confirmar el pago");
+      }
+
+      setPaymentModal(null);
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "Error al confirmar pago");
+    } finally {
+      setPaymentSaving(false);
+    }
+  }
+
+  function addManualOrderItem(productId) {
+    const product = products.find((p) => p.id === Number(productId));
+    if (!product) return;
+    setManualOrderForm((prev) => {
+      const existing = prev.items.find((i) => i.productId === product.id);
+      if (existing) {
+        return { ...prev, items: prev.items.map((i) => i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i) };
+      }
+      return { ...prev, items: [...prev.items, { productId: product.id, name: product.name, price: product.price, quantity: 1 }] };
+    });
+  }
+
+  function removeManualOrderItem(productId) {
+    setManualOrderForm((prev) => ({ ...prev, items: prev.items.filter((i) => i.productId !== productId) }));
+  }
+
+  async function handleManualOrderSubmit(event) {
+    event.preventDefault();
+    setManualOrderSaving(true);
+    setListError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/orders/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: manualOrderForm.nombre.trim(),
+          email: manualOrderForm.email.trim(),
+          telefono: manualOrderForm.telefono.trim(),
+          items: manualOrderForm.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || "No se pudo crear el pedido");
+      }
+
+      setManualOrderOpen(false);
+      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "Error al crear pedido manual");
+    } finally {
+      setManualOrderSaving(false);
     }
   }
 
@@ -1288,6 +1434,15 @@ export default function App() {
                   Admite grabado personalizado
                 </label>
 
+                <label htmlFor="product-videoUrl">Link de video (YouTube/TikTok)</label>
+                <input
+                  id="product-videoUrl"
+                  type="text"
+                  placeholder="https://youtube.com/watch?v=... o https://tiktok.com/..."
+                  value={productForm.videoUrl}
+                  onChange={(event) => setProductForm((prev) => ({ ...prev, videoUrl: event.target.value }))}
+                />
+
                 <label htmlFor="product-category">Categoria</label>
                 <select
                   id="product-category"
@@ -1509,6 +1664,120 @@ export default function App() {
                 </div>
               </form>
             </>
+          ) : activeTab === "orders" ? (
+            <>
+              <h2>{manualOrderOpen ? "Nuevo pedido manual" : "Pedidos"}</h2>
+              {!manualOrderOpen ? (
+                <>
+                  <p className="subtle">Los pedidos se crean desde la tienda o manualmente.</p>
+                  <button type="button" onClick={() => setManualOrderOpen(true)}>
+                    + Crear pedido manual
+                  </button>
+                </>
+              ) : (
+                <form onSubmit={handleManualOrderSubmit} className="categoryForm">
+                  <label htmlFor="mo-nombre">Nombre del cliente</label>
+                  <input
+                    id="mo-nombre"
+                    type="text"
+                    value={manualOrderForm.nombre}
+                    onChange={(e) => setManualOrderForm((p) => ({ ...p, nombre: e.target.value }))}
+                    required
+                  />
+
+                  <label htmlFor="mo-email">Email</label>
+                  <input
+                    id="mo-email"
+                    type="email"
+                    value={manualOrderForm.email}
+                    onChange={(e) => setManualOrderForm((p) => ({ ...p, email: e.target.value }))}
+                    required
+                  />
+
+                  <label htmlFor="mo-telefono">Telefono</label>
+                  <input
+                    id="mo-telefono"
+                    type="tel"
+                    value={manualOrderForm.telefono}
+                    onChange={(e) => setManualOrderForm((p) => ({ ...p, telefono: e.target.value }))}
+                    required
+                  />
+
+                  <label>Buscar producto</label>
+                  <div className="productPicker">
+                    <div className="productPickerFilters">
+                      <select
+                        value={productSearchCat}
+                        onChange={(e) => setProductSearchCat(e.target.value)}
+                      >
+                        <option value="todas">Todas las categorias</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                      />
+                    </div>
+                    {productSearch.length >= 2 || productSearchCat !== "todas" ? (
+                      <ul className="productPickerResults">
+                        {products
+                          .filter((p) => p.active)
+                          .filter((p) => productSearchCat === "todas" || p.category === productSearchCat)
+                          .filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase()))
+                          .slice(0, 20)
+                          .map((p) => (
+                            <li key={p.id}>
+                              <button type="button" onClick={() => { addManualOrderItem(p.id); setProductSearch(""); }}>
+                                <span>{p.name}</span>
+                                <small>{p.category || "Sin categoria"} — ${Number(p.price).toFixed(2)}</small>
+                              </button>
+                            </li>
+                          ))}
+                        {products
+                          .filter((p) => p.active)
+                          .filter((p) => productSearchCat === "todas" || p.category === productSearchCat)
+                          .filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase()))
+                          .length === 0 && <li className="noResults">Sin resultados</li>}
+                      </ul>
+                    ) : (
+                      <p className="subtle pickerHint">Escribe al menos 2 letras o selecciona una categoria</p>
+                    )}
+                  </div>
+
+                  {manualOrderForm.items.length > 0 && (
+                    <ul className="manualOrderItems">
+                      {manualOrderForm.items.map((item) => (
+                        <li key={item.productId}>
+                          <span>{item.quantity}x {item.name} — ${(item.price * item.quantity).toFixed(2)}</span>
+                          <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.productId)}>x</button>
+                        </li>
+                      ))}
+                      <li className="manualOrderTotal">
+                        <strong>Total: ${manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong>
+                      </li>
+                    </ul>
+                  )}
+
+                  <div className="actions">
+                    <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0}>
+                      {manualOrderSaving ? "Creando..." : "Crear pedido"}
+                    </button>
+                    <button type="button" className="ghost" onClick={() => { setManualOrderOpen(false); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
+          ) : activeTab === "despacho" ? (
+            <>
+              <h2>Despacho</h2>
+              <p className="subtle">Pedidos pagados pendientes de despacho. Cambia a "Listo para Envio" cuando esten preparados.</p>
+            </>
           ) : (
             <>
               <h2>Branding y video</h2>
@@ -1567,6 +1836,14 @@ export default function App() {
               {listLoading ? "Actualizando..." : "Recargar"}
             </button>
           </div>
+
+          {activeTab === "orders" && (
+            <div className="orderFilterBar">
+              <button type="button" className={ordersFilter === "todos" ? "filterBtn active" : "filterBtn"} onClick={() => setOrdersFilter("todos")}>Todos</button>
+              <button type="button" className={ordersFilter === "preparar" ? "filterBtn active" : "filterBtn"} onClick={() => setOrdersFilter("preparar")}>Preparar</button>
+              <button type="button" className={ordersFilter === "pagado" ? "filterBtn active" : "filterBtn"} onClick={() => setOrdersFilter("pagado")}>Pagados</button>
+            </div>
+          )}
 
           {listError && <p className="error">{listError}</p>}
 
@@ -1744,6 +2021,89 @@ export default function App() {
                       </div>
                     </article>
                   ))
+                : activeTab === "orders"
+                ? orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO").map((order) => (
+                    <article className="card" key={order.id}>
+                      <div className="orderHeader">
+                        <strong>Pedido #{order.id}</strong>
+                        <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                      </div>
+                      <small>
+                        {order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}
+                      </small>
+                      {order.clienteTelefono && <small>Tel: {order.clienteTelefono}</small>}
+                      <small>Total: ${Number(order.total || 0).toFixed(2)}</small>
+                      <small>Fecha: {new Date(order.createdAt).toLocaleString()}</small>
+                      {order.metodoPago && <small>Metodo de pago: {order.metodoPago}</small>}
+                      {order.numeroComprobante && <small>Comprobante #: {order.numeroComprobante}</small>}
+                      {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                      {order.comprobanteUrl && (
+                        <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">
+                          Ver comprobante
+                        </a>
+                      )}
+                      {order.items && order.items.length > 0 && (
+                        <ul className="orderItems">
+                          {order.items.map((item) => (
+                            <li key={item.id}>
+                              {item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="actions">
+                        <select
+                          value={order.estado}
+                          onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}
+                        >
+                          <option value="PREPARAR">Preparar</option>
+                          <option value="NUEVO">Nuevo</option>
+                          <option value="PAGADO">Pagado</option>
+                          <option value="LISTO_PARA_ENVIO">Listo para Envio</option>
+                          <option value="ENVIADO">Enviado</option>
+                          <option value="ENTREGADO">Entregado</option>
+                          <option value="CANCELADO">Cancelado</option>
+                        </select>
+                      </div>
+                    </article>
+                  ))
+                : activeTab === "despacho"
+                ? orders.filter((o) => o.estado === "PAGADO").map((order) => (
+                    <article className="card" key={order.id}>
+                      <div className="orderHeader">
+                        <strong>Pedido #{order.id}</strong>
+                        <span className="orderBadge pagado">PAGADO</span>
+                      </div>
+                      <small>
+                        {order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}
+                      </small>
+                      {order.clienteTelefono && <small>Tel: {order.clienteTelefono}</small>}
+                      <small>Total: ${Number(order.total || 0).toFixed(2)}</small>
+                      <small>Fecha: {new Date(order.createdAt).toLocaleString()}</small>
+                      {order.metodoPago && <small>Metodo: {order.metodoPago}</small>}
+                      {order.numeroComprobante && <small>Comprobante: {order.numeroComprobante}</small>}
+                      {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                      {order.comprobanteUrl && (
+                        <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">
+                          Ver comprobante
+                        </a>
+                      )}
+                      {order.items && order.items.length > 0 && (
+                        <ul className="orderItems">
+                          {order.items.map((item) => (
+                            <li key={item.id}>
+                              {item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="actions">
+                        <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>
+                          Marcar Listo para Envio
+                        </button>
+                      </div>
+                    </article>
+                  ))
                 : [
                     <article key="settings-preview" className="card">
                       <strong>{settingsForm.brandName || "Don Joyero"}</strong>
@@ -1760,11 +2120,74 @@ export default function App() {
             {!listLoading && activeTab === "products" && products.length === 0 && <p>No hay productos creados.</p>}
             {!listLoading && activeTab === "slides" && slides.length === 0 && <p>No hay slides creados.</p>}
             {!listLoading && activeTab === "flyers" && flyers.length === 0 && <p>No hay flyers creados.</p>}
+            {!listLoading && activeTab === "orders" && orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO").length === 0 && <p>No hay pedidos {ordersFilter === "todos" ? "registrados" : ordersFilter === "preparar" ? "para preparar" : "pagados"}.</p>}
+            {!listLoading && activeTab === "despacho" && orders.filter((o) => o.estado === "PAGADO").length === 0 && <p>No hay pedidos pagados pendientes de despacho.</p>}
             {!listLoading && activeTab === "settings" && <p>Actualiza marca, logo y video promocional.</p>}
           </div>
         </article>
         </section>
       </section>
+
+      {paymentModal !== null && (
+        <div className="modalOverlay" onClick={() => setPaymentModal(null)}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>Confirmar pago — Pedido #{paymentModal}</h2>
+            <form onSubmit={handlePaymentSubmit} className="categoryForm">
+              <label htmlFor="pm-metodo">Metodo de pago</label>
+              <select
+                id="pm-metodo"
+                value={paymentForm.metodoPago}
+                onChange={(e) => setPaymentForm((p) => ({ ...p, metodoPago: e.target.value }))}
+                required
+              >
+                <option value="">Seleccionar...</option>
+                <option value="Transferencia BCP">Transferencia BCP</option>
+                <option value="YAPE">YAPE</option>
+                <option value="Transferencia BN">Transferencia BN</option>
+                <option value="PLIN">PLIN</option>
+                <option value="BBVA">BBVA</option>
+                <option value="Interbank">Interbank</option>
+              </select>
+
+              <label htmlFor="pm-numero">Numero de comprobante</label>
+              <input
+                id="pm-numero"
+                type="text"
+                value={paymentForm.numeroComprobante}
+                onChange={(e) => setPaymentForm((p) => ({ ...p, numeroComprobante: e.target.value }))}
+                required
+              />
+
+              <label htmlFor="pm-comprobante">Comprobante de pago (imagen)</label>
+              <input
+                id="pm-comprobante"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => setPaymentForm((p) => ({ ...p, comprobante: e.target.files[0] || null }))}
+                required
+              />
+
+              <label htmlFor="pm-direccion">Direccion de envio</label>
+              <textarea
+                id="pm-direccion"
+                rows={3}
+                value={paymentForm.direccionEnvio}
+                onChange={(e) => setPaymentForm((p) => ({ ...p, direccionEnvio: e.target.value }))}
+                required
+              />
+
+              <div className="actions">
+                <button type="submit" disabled={paymentSaving}>
+                  {paymentSaving ? "Confirmando..." : "Confirmar pago"}
+                </button>
+                <button type="button" className="ghost" onClick={() => setPaymentModal(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

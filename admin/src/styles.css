@@ -560,3 +560,213 @@ button:disabled {
     padding: 12px;
   }
 }
+
+.orderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.orderBadge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--muted);
+}
+
+.orderBadge.preparar {
+  background: #d69e2e;
+}
+
+.orderBadge.nuevo {
+  background: #3182ce;
+}
+
+.orderBadge.pagado {
+  background: #38a169;
+}
+
+.orderBadge.enviado {
+  background: #805ad5;
+}
+
+.orderBadge.entregado {
+  background: #2f855a;
+}
+
+.orderBadge.cancelado {
+  background: var(--danger);
+}
+
+.orderBadge.listo_para_envio {
+  background: #dd6b20;
+}
+
+.orderItems {
+  margin: 4px 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.orderItems li {
+  margin-bottom: 2px;
+}
+
+.orderFilterBar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.filterBtn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.filterBtn.active {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+
+.manualOrderItems {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.manualOrderItems li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f8f9fa;
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+
+.manualOrderItems .ghost {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  min-width: auto;
+}
+
+.manualOrderTotal {
+  border: none;
+  background: none;
+  padding-top: 4px;
+}
+
+.productPicker {
+  display: grid;
+  gap: 6px;
+}
+
+.productPickerFilters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.productPickerFilters select,
+.productPickerFilters input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  background: #fff;
+}
+
+.productPickerResults {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.productPickerResults li button {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+
+.productPickerResults li:last-child button {
+  border-bottom: none;
+}
+
+.productPickerResults li button:hover {
+  background: rgba(163, 117, 63, 0.08);
+}
+
+.productPickerResults li button small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.productPickerResults .noResults {
+  padding: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.pickerHint {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 24px;
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.modalContent h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}

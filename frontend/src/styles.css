@@ -952,6 +952,56 @@ h3 {
   margin: 12px 0 0;
 }
 
+.checkoutBtn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  font-size: 1rem;
+}
+
+.checkoutForm {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.checkoutForm h4 {
+  margin: 0;
+  font-family: "Cinzel", serif;
+}
+
+.checkoutForm label {
+  font-size: 0.82rem;
+  color: rgba(34, 29, 25, 0.8);
+}
+
+.checkoutForm input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: inherit;
+  background: #fff;
+}
+
+.checkoutForm .error {
+  color: #c53030;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.checkoutForm .ctaBtn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+}
+
+.checkoutForm .ghostBtn {
+  width: 100%;
+  text-align: center;
+}
+
 .modalBackdrop {
   position: fixed;
   inset: 0;

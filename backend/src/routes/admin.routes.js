@@ -26,9 +26,11 @@ const {
   deleteUser,
   listOrders,
   updateOrderStatus,
+  confirmPayment,
 } = require("../controllers/admin.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { requireRole, requirePermission } = require("../middleware/role.middleware");
+const { uploadComprobante } = require("../middleware/upload.middleware");
 
 const router = Router();
 
@@ -65,6 +67,7 @@ router.patch("/products/:id", requirePermission("products"), updateProduct);
 router.delete("/products/:id", requirePermission("products"), deleteProduct);
 
 router.get("/orders", requirePermission("orders"), listOrders);
+router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
 router.patch("/orders/:id/status", requirePermission("orders"), updateOrderStatus);
 
 module.exports = router;

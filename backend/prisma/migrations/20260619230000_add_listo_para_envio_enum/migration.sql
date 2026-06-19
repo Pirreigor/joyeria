@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "EstadoPedido" ADD VALUE IF NOT EXISTS 'LISTO_PARA_ENVIO';

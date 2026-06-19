@@ -298,7 +298,7 @@ async function deleteFlyer(req, res) {
 }
 
 async function createProduct(req, res) {
-  const { name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active, materiales, dimensiones, cuidados, grabado } = req.body;
+  const { name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active, materiales, dimensiones, cuidados, grabado, videoUrl } = req.body;
 
   if (!name || !slug || price === undefined || !imageUrl) {
     return res.status(400).json({ message: "name, slug, price e imageUrl son obligatorios" });
@@ -332,6 +332,7 @@ async function createProduct(req, res) {
       dimensiones: dimensiones || null,
       cuidados: cuidados || null,
       grabado: Boolean(grabado),
+      videoUrl: videoUrl || null,
     },
   });
 
@@ -340,7 +341,7 @@ async function createProduct(req, res) {
 
 async function updateProduct(req, res) {
   const { id } = req.params;
-  const { name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active, materiales, dimensiones, cuidados, grabado } = req.body;
+  const { name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active, materiales, dimensiones, cuidados, grabado, videoUrl } = req.body;
 
   const existing = await prisma.producto.findUnique({ where: { id: Number(id) } });
   if (!existing) {
@@ -376,6 +377,7 @@ async function updateProduct(req, res) {
       ...(dimensiones !== undefined ? { dimensiones: dimensiones || null } : {}),
       ...(cuidados !== undefined ? { cuidados: cuidados || null } : {}),
       ...(grabado !== undefined ? { grabado: Boolean(grabado) } : {}),
+      ...(videoUrl !== undefined ? { videoUrl: videoUrl || null } : {}),
     },
   });
 
@@ -610,9 +612,13 @@ async function updateOrderStatus(req, res) {
   const { id } = req.params;
   const { status } = req.body;
 
-  const ESTADOS_VALIDOS = ["NUEVO", "PAGADO", "ENVIADO", "ENTREGADO", "CANCELADO"];
+  const ESTADOS_VALIDOS = ["PREPARAR", "NUEVO", "PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
   if (!ESTADOS_VALIDOS.includes(status)) {
     return res.status(400).json({ message: "Estado invalido" });
+  }
+
+  if (status === "PAGADO") {
+    return res.status(400).json({ message: "Para marcar como PAGADO use el endpoint de confirmacion de pago" });
   }
 
   const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
@@ -623,6 +629,44 @@ async function updateOrderStatus(req, res) {
   const order = await prisma.pedido.update({
     where: { id: Number(id) },
     data: { estado: status },
+  });
+
+  return res.json({ order });
+}
+
+async function confirmPayment(req, res) {
+  const { id } = req.params;
+  const { metodoPago, numeroComprobante, direccionEnvio } = req.body;
+
+  if (!metodoPago || !numeroComprobante || !direccionEnvio) {
+    return res.status(400).json({ message: "metodoPago, numeroComprobante y direccionEnvio son obligatorios" });
+  }
+
+  const METODOS_VALIDOS = ["Transferencia BCP", "YAPE", "Transferencia BN", "PLIN", "BBVA", "Interbank"];
+  if (!METODOS_VALIDOS.includes(metodoPago)) {
+    return res.status(400).json({ message: "Metodo de pago invalido" });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ message: "El comprobante de pago (imagen) es obligatorio" });
+  }
+
+  const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
+  if (!existing) {
+    return res.status(404).json({ message: "Pedido no encontrado" });
+  }
+
+  const comprobanteUrl = `/uploads/comprobantes/${req.file.filename}`;
+
+  const order = await prisma.pedido.update({
+    where: { id: Number(id) },
+    data: {
+      estado: "PAGADO",
+      metodoPago: String(metodoPago).trim(),
+      numeroComprobante: String(numeroComprobante).trim(),
+      comprobanteUrl,
+      direccionEnvio: String(direccionEnvio).trim(),
+    },
   });
 
   return res.json({ order });
@@ -654,4 +698,5 @@ module.exports = {
   deleteUser,
   listOrders,
   updateOrderStatus,
+  confirmPayment,
 };

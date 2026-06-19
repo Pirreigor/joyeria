@@ -49,6 +49,11 @@ export default function App() {
   const [page, setPage] = useState(1);
   const [modalGalleryIndex, setModalGalleryIndex] = useState(0);
 
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState({ nombre: "", email: "", telefono: "" });
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+
   useEffect(() => {
     const savedCart = localStorage.getItem(CART_KEY);
     const savedToken = localStorage.getItem(TOKEN_KEY);
@@ -387,6 +392,46 @@ export default function App() {
     });
   }
 
+  async function handleCheckout(event) {
+    event.preventDefault();
+    setCheckoutLoading(true);
+    setCheckoutError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/orders/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: checkoutForm.nombre.trim(),
+          email: checkoutForm.email.trim(),
+          telefono: checkoutForm.telefono.trim(),
+          items: cartItems.map((item) => ({ productId: item.id, quantity: item.quantity })),
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || "No se pudo crear el pedido");
+      }
+
+      const orderId = data.order?.id;
+      const resumen = cartItems.map((item) => `${item.quantity}x ${item.name}`).join(", ");
+      const mensaje = `Hola! Soy ${checkoutForm.nombre.trim()}. Acabo de realizar el pedido #${orderId} por $${cartTotal.toFixed(2)}. Detalle: ${resumen}. Mi telefono: ${checkoutForm.telefono.trim()}`;
+      const whatsappUrl = `https://wa.me/51941445104?text=${encodeURIComponent(mensaje)}`;
+
+      setCartItems([]);
+      setCheckoutOpen(false);
+      setCheckoutForm({ nombre: "", email: "", telefono: "" });
+      setCartOpen(false);
+
+      window.open(whatsappUrl, "_blank");
+    } catch (requestError) {
+      setCheckoutError(requestError.message || "Error al procesar el pedido");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
   return (
     <div className="page">
       <header className="topHeader">
@@ -500,6 +545,57 @@ export default function App() {
           )}
 
           <p className="cartTotal">Total: ${cartTotal.toFixed(2)}</p>
+
+          {cartItems.length > 0 && !checkoutOpen && (
+            <button type="button" className="ctaBtn checkoutBtn" onClick={() => { setCheckoutOpen(true); setCheckoutError(""); }}>
+              Pagar pedido
+            </button>
+          )}
+
+          {checkoutOpen && (
+            <form className="checkoutForm" onSubmit={handleCheckout}>
+              <h4>Datos para tu pedido</h4>
+
+              <label htmlFor="checkout-nombre">Nombre completo</label>
+              <input
+                id="checkout-nombre"
+                type="text"
+                placeholder="Tu nombre"
+                value={checkoutForm.nombre}
+                onChange={(e) => setCheckoutForm((prev) => ({ ...prev, nombre: e.target.value }))}
+                required
+              />
+
+              <label htmlFor="checkout-email">Correo electronico</label>
+              <input
+                id="checkout-email"
+                type="email"
+                placeholder="tu@email.com"
+                value={checkoutForm.email}
+                onChange={(e) => setCheckoutForm((prev) => ({ ...prev, email: e.target.value }))}
+                required
+              />
+
+              <label htmlFor="checkout-telefono">Telefono / WhatsApp</label>
+              <input
+                id="checkout-telefono"
+                type="tel"
+                placeholder="+51 999 999 999"
+                value={checkoutForm.telefono}
+                onChange={(e) => setCheckoutForm((prev) => ({ ...prev, telefono: e.target.value }))}
+                required
+              />
+
+              {checkoutError && <p className="error">{checkoutError}</p>}
+
+              <button type="submit" className="ctaBtn" disabled={checkoutLoading}>
+                {checkoutLoading ? "Procesando..." : "Confirmar y enviar por WhatsApp"}
+              </button>
+              <button type="button" className="ghostBtn" onClick={() => setCheckoutOpen(false)}>
+                Cancelar
+              </button>
+            </form>
+          )}
         </aside>
       )}
 
@@ -759,6 +855,7 @@ export default function App() {
         const galleryImages = [selectedProduct.imageUrl, ...(selectedProduct.imagenes || [])].filter(Boolean);
         const currentImg = galleryImages[modalGalleryIndex] || galleryImages[0] || PLACEHOLDER;
         const hasDetails = selectedProduct.materiales || selectedProduct.dimensiones || selectedProduct.cuidados;
+        const productVideoUrl = getEmbedVideoUrl(selectedProduct.videoUrl || "") || embedPromoVideoUrl;
 
         return (
           <div className="modalBackdrop" onClick={closeProduct}>
@@ -791,7 +888,7 @@ export default function App() {
                 <div className="modalMedia">
                   <img className="productModalImage" src={currentImg} alt={selectedProduct.name} />
 
-                  {embedPromoVideoUrl && !showProductVideo && (
+                  {productVideoUrl && !showProductVideo && (
                     <button type="button" className="modalPlayOverlay" onClick={() => setShowProductVideo(true)}>
                       <span className="playBadge" aria-hidden="true">
                         <svg viewBox="0 0 24 24" role="presentation">
@@ -799,15 +896,15 @@ export default function App() {
                           <polygon points="10,8.5 17,12 10,15.5" />
                         </svg>
                       </span>
-                      <span>{settings.promoVideoTitle || "Ver video promocional"}</span>
+                      <span>{selectedProduct.videoUrl ? "Ver video del producto" : (settings.promoVideoTitle || "Ver video promocional")}</span>
                     </button>
                   )}
 
-                  {embedPromoVideoUrl && showProductVideo && (
+                  {productVideoUrl && showProductVideo && (
                     <div className="modalVideoOverlay">
                       <iframe
-                        src={appendAutoplay(embedPromoVideoUrl)}
-                        title={settings.promoVideoTitle || "Video promocional"}
+                        src={appendAutoplay(productVideoUrl)}
+                        title={selectedProduct.videoUrl ? "Video del producto" : (settings.promoVideoTitle || "Video promocional")}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
@@ -871,10 +968,10 @@ export default function App() {
                   </dl>
                 )}
 
-                {settings.promoVideoUrl && !embedPromoVideoUrl && (
+                {(selectedProduct.videoUrl || settings.promoVideoUrl) && !productVideoUrl && (
                   <div className="videoMeta">
-                    <strong>{settings.promoVideoTitle || "Video promocional"}</strong>
-                    <a className="ctaBtn" href={settings.promoVideoUrl} target="_blank" rel="noreferrer">
+                    <strong>{selectedProduct.videoUrl ? "Video del producto" : (settings.promoVideoTitle || "Video promocional")}</strong>
+                    <a className="ctaBtn" href={selectedProduct.videoUrl || settings.promoVideoUrl} target="_blank" rel="noreferrer">
                       Ver video
                     </a>
                   </div>

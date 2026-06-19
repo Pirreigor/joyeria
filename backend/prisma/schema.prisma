@@ -13,8 +13,10 @@ enum Rol {
 }
 
 enum EstadoPedido {
+  PREPARAR
   NUEVO
   PAGADO
+  LISTO_PARA_ENVIO
   ENVIADO
   ENTREGADO
   CANCELADO
@@ -50,6 +52,7 @@ model Producto {
   dimensiones   String?
   cuidados      String?
   grabado       Boolean      @default(false)
+  videoUrl      String?
   items         ItemPedido[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -112,14 +115,21 @@ model Flyer {
 }
 
 model Pedido {
-  id         Int          @id @default(autoincrement())
-  usuarioId  Int
-  usuario    Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  total      Float
-  estado     EstadoPedido @default(NUEVO)
-  items      ItemPedido[]
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id               Int          @id @default(autoincrement())
+  usuarioId        Int?
+  usuario          Usuario?     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  clienteNombre    String?
+  clienteEmail     String?
+  clienteTelefono  String?
+  total            Float
+  estado             EstadoPedido @default(PREPARAR)
+  metodoPago         String?
+  numeroComprobante  String?
+  comprobanteUrl     String?
+  direccionEnvio     String?
+  items              ItemPedido[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@map("pedidos")
 }
