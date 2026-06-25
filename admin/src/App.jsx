@@ -11,6 +11,8 @@ const initialForm = {
   description: "",
   bannerImageUrl: "",
   active: true,
+  showInMenu: true,
+  parentId: "",
 };
 
 const initialSlideForm = {
@@ -262,6 +264,11 @@ export default function App() {
   const [userForm, setUserForm] = useState(initialUserForm);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importImages, setImportImages] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   const isEditing = useMemo(() => form.id !== null, [form.id]);
   const isEditingSlide = useMemo(() => slideForm.id !== null, [slideForm.id]);
@@ -474,6 +481,8 @@ export default function App() {
       description: category.description || "",
       bannerImageUrl: category.bannerImageUrl || "",
       active: Boolean(category.active),
+      showInMenu: category.showInMenu === undefined ? true : Boolean(category.showInMenu),
+      parentId: category.parentId ? String(category.parentId) : "",
     });
   }
 
@@ -545,6 +554,8 @@ export default function App() {
       description: form.description.trim() || null,
       bannerImageUrl: form.bannerImageUrl.trim() || null,
       active: Boolean(form.active),
+      showInMenu: Boolean(form.showInMenu),
+      parentId: form.parentId ? Number(form.parentId) : null,
     };
 
     try {
@@ -885,6 +896,83 @@ export default function App() {
       setListError(error.message || "No se pudo desactivar el producto");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleImageUpload(event, target = "imageUrl") {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      if (productForm.category) formData.append("category", productForm.category);
+      const response = await fetch(`${API_URL}/api/admin/upload-image`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Error al subir imagen");
+      if (target === "imageUrl") {
+        setProductForm((prev) => ({ ...prev, imageUrl: data.url }));
+      } else if (target === "gallery") {
+        setProductForm((prev) => ({
+          ...prev,
+          imagenesRaw: prev.imagenesRaw ? prev.imagenesRaw + ", " + data.url : data.url,
+        }));
+      }
+    } catch (error) {
+      setListError(error.message || "Error al subir imagen");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function handleDownloadTemplate() {
+    try {
+      const response = await fetch(`${API_URL}/api/admin/products/export-template`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error("Error al descargar plantilla");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "plantilla_productos.xlsx";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setListError(error.message);
+    }
+  }
+
+  async function handleImportProducts() {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+    setListError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      for (const img of importImages) {
+        formData.append("images", img);
+      }
+      const response = await fetch(`${API_URL}/api/admin/products/import`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Error al importar");
+      setImportResult(data);
+      setImportFile(null);
+      setImportImages([]);
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "Error al importar productos");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -1317,6 +1405,20 @@ export default function App() {
                   onChange={(event) => setForm((prev) => ({ ...prev, bannerImageUrl: event.target.value }))}
                 />
 
+                <label htmlFor="parentId">Categoria padre</label>
+                <select
+                  id="parentId"
+                  value={form.parentId}
+                  onChange={(event) => setForm((prev) => ({ ...prev, parentId: event.target.value }))}
+                >
+                  <option value="">Ninguna (categoria principal)</option>
+                  {categories
+                    .filter((c) => !c.parentId && c.id !== form.id)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </select>
+
                 <label className="inlineCheck" htmlFor="active">
                   <input
                     id="active"
@@ -1325,6 +1427,16 @@ export default function App() {
                     onChange={(event) => setForm((prev) => ({ ...prev, active: event.target.checked }))}
                   />
                   Activa
+                </label>
+
+                <label className="inlineCheck" htmlFor="showInMenu">
+                  <input
+                    id="showInMenu"
+                    type="checkbox"
+                    checked={form.showInMenu}
+                    onChange={(event) => setForm((prev) => ({ ...prev, showInMenu: event.target.checked }))}
+                  />
+                  Mostrar en menu de la tienda
                 </label>
 
                 <div className="actions">
@@ -1379,23 +1491,59 @@ export default function App() {
                   }
                 />
 
-                <label htmlFor="product-image">URL imagen principal</label>
-                <input
-                  id="product-image"
-                  type="url"
-                  value={productForm.imageUrl}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
-                  required
-                />
+                <label htmlFor="product-image">Imagen principal</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    id="product-image"
+                    type="url"
+                    placeholder="URL o sube una imagen"
+                    value={productForm.imageUrl}
+                    onChange={(event) => setProductForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
+                    style={{ flex: 1 }}
+                    required
+                  />
+                  <label
+                    className="ghost"
+                    style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap" }}
+                  >
+                    {uploadingImage ? "Subiendo..." : "Subir"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: "none" }}
+                      onChange={(e) => handleImageUpload(e, "imageUrl")}
+                      disabled={uploadingImage}
+                    />
+                  </label>
+                </div>
+                {productForm.imageUrl && (
+                  <img src={productForm.imageUrl} alt="preview" style={{ maxHeight: 80, marginTop: 4, borderRadius: 6, objectFit: "cover" }} />
+                )}
 
-                <label htmlFor="product-imagenes">Galeria (URLs separadas por coma)</label>
-                <textarea
-                  id="product-imagenes"
-                  rows={2}
-                  placeholder="https://..., https://..."
-                  value={productForm.imagenesRaw}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, imagenesRaw: event.target.value }))}
-                />
+                <label htmlFor="product-imagenes">Galeria</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <textarea
+                    id="product-imagenes"
+                    rows={2}
+                    placeholder="URLs separadas por coma, o sube imagenes"
+                    value={productForm.imagenesRaw}
+                    onChange={(event) => setProductForm((prev) => ({ ...prev, imagenesRaw: event.target.value }))}
+                    style={{ flex: 1 }}
+                  />
+                  <label
+                    className="ghost"
+                    style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap", alignSelf: "flex-start", marginTop: 4 }}
+                  >
+                    {uploadingImage ? "Subiendo..." : "+ Imagen"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: "none" }}
+                      onChange={(e) => handleImageUpload(e, "gallery")}
+                      disabled={uploadingImage}
+                    />
+                  </label>
+                </div>
 
                 <label htmlFor="product-materiales">Materiales</label>
                 <input
@@ -1511,6 +1659,68 @@ export default function App() {
                   )}
                 </div>
               </form>
+
+              <div style={{ marginTop: 32, padding: 20, background: "#f8f9fa", borderRadius: 10, border: "1px dashed #ccc" }}>
+                <h3 style={{ marginTop: 0 }}>Importacion masiva desde Excel</h3>
+                <p style={{ fontSize: 13, color: "#666", margin: "4px 0 16px" }}>
+                  Descarga la plantilla, llena los datos de tus productos, y sube el Excel junto con las imagenes.
+                  En la columna "imagen_archivo" pon el nombre exacto del archivo de imagen (ej: anillo.jpg).
+                </p>
+
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+                  <button type="button" className="ghost" onClick={handleDownloadTemplate}>
+                    Descargar plantilla Excel
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600 }}>
+                    Archivo Excel (.xlsx)
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      style={{ display: "block", marginTop: 4 }}
+                      onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); }}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: 13, fontWeight: 600 }}>
+                    Imagenes de productos (opcional, selecciona varias)
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      style={{ display: "block", marginTop: 4 }}
+                      onChange={(e) => setImportImages(Array.from(e.target.files || []))}
+                    />
+                  </label>
+                  {importImages.length > 0 && (
+                    <small style={{ color: "#666" }}>{importImages.length} imagen(es) seleccionada(s): {importImages.map((f) => f.name).join(", ")}</small>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleImportProducts}
+                    disabled={!importFile || importing}
+                    style={{ alignSelf: "flex-start", marginTop: 8 }}
+                  >
+                    {importing ? "Importando..." : "Importar productos"}
+                  </button>
+
+                  {importResult && (
+                    <div style={{ padding: 12, borderRadius: 8, background: importResult.errors?.length ? "#fff3cd" : "#d4edda", fontSize: 13 }}>
+                      <strong>{importResult.message}</strong>
+                      {importResult.errors?.length > 0 && (
+                        <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+                          {importResult.errors.map((err, i) => (
+                            <li key={i}>Fila {err.row}: {err.error}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </>
           ) : activeTab === "slides" ? (
             <>
@@ -1898,36 +2108,72 @@ export default function App() {
                     </article>
                   ))
               : activeTab === "categories"
-              ? categories.map((category) => (
-                  <article key={category.id} className="card">
-                    <div>
-                      <strong>{category.name}</strong>
-                      <p>/{category.slug}</p>
-                    </div>
-                    <span className={`badge ${category.active ? "on" : "off"}`}>
-                      {category.active ? "Activa" : "Inactiva"}
-                    </span>
-                    <small>{category.description || "Sin descripcion"}</small>
-                    {category.bannerImageUrl && (
-                      <a href={category.bannerImageUrl} target="_blank" rel="noreferrer" className="imageLink">
-                        Ver banner
-                      </a>
-                    )}
-                    <div className="actions">
-                      <button type="button" className="ghost" onClick={() => startEdit(category)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="danger"
-                        onClick={() => handleDelete(category)}
-                        disabled={deletingId === category.id}
-                      >
-                        {deletingId === category.id ? "Eliminando..." : "Eliminar"}
-                      </button>
-                    </div>
-                  </article>
-                ))
+              ? categories
+                  .filter((c) => !c.parentId)
+                  .flatMap((category) => [
+                    <article key={category.id} className="card">
+                      <div>
+                        <strong>{category.name}</strong>
+                        <p>/{category.slug}</p>
+                      </div>
+                      <span className={`badge ${category.active ? "on" : "off"}`}>
+                        {category.active ? "Activa" : "Inactiva"}
+                      </span>
+                      <span className={`badge ${category.showInMenu ? "on" : "off"}`}>
+                        {category.showInMenu ? "Visible en menu" : "Oculta en menu"}
+                      </span>
+                      <small>{category.description || "Sin descripcion"}</small>
+                      {category.bannerImageUrl && (
+                        <a href={category.bannerImageUrl} target="_blank" rel="noreferrer" className="imageLink">
+                          Ver banner
+                        </a>
+                      )}
+                      {category.children && category.children.length > 0 && (
+                        <small>Subcategorias: {category.children.map((c) => c.name).join(", ")}</small>
+                      )}
+                      <div className="actions">
+                        <button type="button" className="ghost" onClick={() => startEdit(category)}>
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => handleDelete(category)}
+                          disabled={deletingId === category.id}
+                        >
+                          {deletingId === category.id ? "Eliminando..." : "Eliminar"}
+                        </button>
+                      </div>
+                    </article>,
+                    ...(category.children || []).map((sub) => (
+                      <article key={sub.id} className="card" style={{ marginLeft: "1.5rem", borderLeft: "3px solid var(--accent, #b08d57)" }}>
+                        <div>
+                          <strong>↳ {sub.name}</strong>
+                          <p>/{sub.slug}</p>
+                        </div>
+                        <span className={`badge ${sub.active ? "on" : "off"}`}>
+                          {sub.active ? "Activa" : "Inactiva"}
+                        </span>
+                        <span className={`badge ${sub.showInMenu ? "on" : "off"}`}>
+                          {sub.showInMenu ? "Visible" : "Oculta"}
+                        </span>
+                        <small>Padre: {category.name}</small>
+                        <div className="actions">
+                          <button type="button" className="ghost" onClick={() => startEdit(sub)}>
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => handleDelete(sub)}
+                            disabled={deletingId === sub.id}
+                          >
+                            {deletingId === sub.id ? "Eliminando..." : "Eliminar"}
+                          </button>
+                        </div>
+                      </article>
+                    )),
+                  ])
               : activeTab === "products"
                 ? products.map((product) => (
                   <article key={product.id} className="card">

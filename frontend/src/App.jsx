@@ -209,6 +209,16 @@ export default function App() {
     }
   }
 
+  const categorySlugsForFilter = useMemo(() => {
+    if (selectedCategory === "todas") return null;
+    const slugs = [selectedCategory];
+    const parent = menuTree.find((c) => c.slug === selectedCategory);
+    if (parent && parent.subcategories) {
+      parent.subcategories.forEach((sub) => slugs.push(sub.slug));
+    }
+    return slugs;
+  }, [selectedCategory, menuTree]);
+
   const filteredProducts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const min = priceMin ? Number(priceMin) : null;
@@ -216,7 +226,7 @@ export default function App() {
 
     let list = products.filter((product) => {
       const categorySlug = slugify(product.category || "sin-categoria");
-      const matchCategory = selectedCategory === "todas" || selectedCategory === categorySlug;
+      const matchCategory = !categorySlugsForFilter || categorySlugsForFilter.includes(categorySlug);
       const haystack = `${product.name} ${product.description || ""} ${product.category || ""}`.toLowerCase();
       const matchSearch = !normalized || haystack.includes(normalized);
       const matchRecommended = !recommendedOnly || Boolean(product.recommended);
@@ -251,18 +261,11 @@ export default function App() {
 
   const menuTree = useMemo(
     () =>
-      categories.map((category) => {
-        const subcategories = products
-          .filter((product) => slugify(product.category || "") === category.slug)
-          .map((product) => product.name)
-          .slice(0, 4);
-
-        return {
-          ...category,
-          subcategories,
-        };
-      }),
-    [categories, products]
+      categories.map((category) => ({
+        ...category,
+        subcategories: category.children || [],
+      })),
+    [categories]
   );
 
   const activeSubcategories = useMemo(() => {
@@ -279,12 +282,25 @@ export default function App() {
       return null;
     }
 
-    return categories.find((category) => category.slug === selectedCategory) || null;
+    const parent = categories.find((category) => category.slug === selectedCategory);
+    if (parent) return parent;
+
+    for (const cat of categories) {
+      const sub = (cat.children || []).find((child) => child.slug === selectedCategory);
+      if (sub) return sub;
+    }
+
+    return null;
   }, [categories, selectedCategory]);
 
   const categoryHighlights = useMemo(() => {
     if (!selectedCategoryData) {
       return [];
+    }
+
+    const subs = selectedCategoryData.children || [];
+    if (subs.length > 0) {
+      return subs.map((sub) => sub.name);
     }
 
     return products
@@ -506,7 +522,17 @@ export default function App() {
           {activeSubcategories.length > 0 && (
             <div className="subcategoryRow">
               {activeSubcategories.map((sub) => (
-                <span key={`sub-${sub}`}>{sub}</span>
+                <button
+                  type="button"
+                  key={`sub-${sub.slug || sub}`}
+                  className={selectedCategory === (sub.slug || sub) ? "subItem active" : "subItem"}
+                  onClick={() => {
+                    setSelectedCategory(sub.slug || sub);
+                    document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  {sub.name || sub}
+                </button>
               ))}
             </div>
           )}

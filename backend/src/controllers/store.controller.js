@@ -2,7 +2,7 @@ const prisma = require("../utils/prisma");
 
 async function listStoreCategories(req, res) {
   const categories = await prisma.categoria.findMany({
-    where: { active: true },
+    where: { active: true, showInMenu: true, parentId: null },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -10,6 +10,17 @@ async function listStoreCategories(req, res) {
       slug: true,
       description: true,
       bannerImageUrl: true,
+      children: {
+        where: { active: true, showInMenu: true },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          bannerImageUrl: true,
+        },
+      },
     },
   });
 

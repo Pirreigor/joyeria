@@ -17,13 +17,14 @@ function slugify(value) {
 async function listCategories(req, res) {
   const categories = await prisma.categoria.findMany({
     orderBy: { name: "asc" },
+    include: { children: { orderBy: { name: "asc" } } },
   });
 
   return res.json({ categories });
 }
 
 async function createCategory(req, res) {
-  const { name, slug, description, bannerImageUrl, active } = req.body;
+  const { name, slug, description, bannerImageUrl, active, showInMenu, parentId } = req.body;
 
   if (!name) {
     return res.status(400).json({ message: "name es obligatorio" });
@@ -34,6 +35,13 @@ async function createCategory(req, res) {
     return res.status(400).json({ message: "slug invalido" });
   }
 
+  if (parentId !== undefined && parentId !== null) {
+    const parentExists = await prisma.categoria.findUnique({ where: { id: Number(parentId) } });
+    if (!parentExists) {
+      return res.status(400).json({ message: "Categoria padre no encontrada" });
+    }
+  }
+
   const category = await prisma.categoria.create({
     data: {
       name: String(name).trim(),
@@ -41,7 +49,10 @@ async function createCategory(req, res) {
       description: description || null,
       bannerImageUrl: bannerImageUrl || null,
       active: active === undefined ? true : Boolean(active),
+      showInMenu: showInMenu === undefined ? true : Boolean(showInMenu),
+      parentId: parentId ? Number(parentId) : null,
     },
+    include: { children: true },
   });
 
   return res.status(201).json({ category });
@@ -49,7 +60,7 @@ async function createCategory(req, res) {
 
 async function updateCategory(req, res) {
   const { id } = req.params;
-  const { name, slug, description, bannerImageUrl, active } = req.body;
+  const { name, slug, description, bannerImageUrl, active, showInMenu, parentId } = req.body;
 
   const existing = await prisma.categoria.findUnique({ where: { id: Number(id) } });
   if (!existing) {
@@ -61,6 +72,16 @@ async function updateCategory(req, res) {
     return res.status(400).json({ message: "slug invalido" });
   }
 
+  if (parentId !== undefined && parentId !== null) {
+    if (Number(parentId) === Number(id)) {
+      return res.status(400).json({ message: "Una categoria no puede ser su propia padre" });
+    }
+    const parentExists = await prisma.categoria.findUnique({ where: { id: Number(parentId) } });
+    if (!parentExists) {
+      return res.status(400).json({ message: "Categoria padre no encontrada" });
+    }
+  }
+
   const category = await prisma.categoria.update({
     where: { id: Number(id) },
     data: {
@@ -69,7 +90,10 @@ async function updateCategory(req, res) {
       ...(description !== undefined ? { description } : {}),
       ...(bannerImageUrl !== undefined ? { bannerImageUrl } : {}),
       ...(active !== undefined ? { active: Boolean(active) } : {}),
+      ...(showInMenu !== undefined ? { showInMenu: Boolean(showInMenu) } : {}),
+      ...(parentId !== undefined ? { parentId: parentId ? Number(parentId) : null } : {}),
     },
+    include: { children: true },
   });
 
   return res.json({ category });
@@ -78,9 +102,18 @@ async function updateCategory(req, res) {
 async function deleteCategory(req, res) {
   const { id } = req.params;
 
-  const existing = await prisma.categoria.findUnique({ where: { id: Number(id) } });
+  const existing = await prisma.categoria.findUnique({
+    where: { id: Number(id) },
+    include: { children: true },
+  });
   if (!existing) {
     return res.status(404).json({ message: "Categoria no encontrada" });
+  }
+
+  if (existing.children.length > 0) {
+    return res.status(409).json({
+      message: "No se puede eliminar una categoria que tiene subcategorias",
+    });
   }
 
   const productsUsingCategory = await prisma.producto.count({

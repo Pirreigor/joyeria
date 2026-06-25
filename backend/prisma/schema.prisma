@@ -61,14 +61,18 @@ model Producto {
 }
 
 model Categoria {
-  id             Int      @id @default(autoincrement())
-  name           String   @unique
-  slug           String   @unique
+  id             Int         @id @default(autoincrement())
+  name           String      @unique
+  slug           String      @unique
   description    String?
   bannerImageUrl String?
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  active         Boolean     @default(true)
+  showInMenu     Boolean     @default(true)
+  parentId       Int?
+  parent         Categoria?  @relation("SubCategorias", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Categoria[] @relation("SubCategorias")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@map("categorias")
 }

@@ -28,9 +28,11 @@ const {
   updateOrderStatus,
   confirmPayment,
 } = require("../controllers/admin.controller");
+const { uploadImage, exportTemplate, importProducts } = require("../controllers/import.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { requireRole, requirePermission } = require("../middleware/role.middleware");
 const { uploadComprobante } = require("../middleware/upload.middleware");
+const { uploadImage: uploadImageMiddleware, uploadImportFiles } = require("../middleware/uploadImage.middleware");
 
 const router = Router();
 
@@ -65,6 +67,10 @@ router.get("/products", requirePermission("products"), listProducts);
 router.post("/products", requirePermission("products"), createProduct);
 router.patch("/products/:id", requirePermission("products"), updateProduct);
 router.delete("/products/:id", requirePermission("products"), deleteProduct);
+
+router.post("/upload-image", requirePermission("products"), uploadImageMiddleware, uploadImage);
+router.get("/products/export-template", requirePermission("products"), exportTemplate);
+router.post("/products/import", requirePermission("products"), uploadImportFiles, importProducts);
 
 router.get("/orders", requirePermission("orders"), listOrders);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
