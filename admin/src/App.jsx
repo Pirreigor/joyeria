@@ -2076,32 +2076,25 @@ export default function App() {
               : activeTab === "users"
                 ? users.map((listedUser) => (
                     <article key={listedUser.id} className="card">
-                      <div>
+                      <div className="card-info">
                         <strong>{listedUser.name}</strong>
-                        <p>{listedUser.email}</p>
+                        <small>{listedUser.email} — Creado: {new Date(listedUser.createdAt).toLocaleDateString()}</small>
+                        {listedUser.rol === "ADMINISTRADOR" && (
+                          <small>
+                            {listedUser.permisos?.length > 0
+                              ? `Permisos: ${listedUser.permisos.join(", ")}`
+                              : "Acceso total"}
+                          </small>
+                        )}
                       </div>
-                      <span className={`badge ${listedUser.rol === "ADMINISTRADOR" ? "on" : "off"}`}>
-                        {listedUser.rol === "ADMINISTRADOR" ? "Administrador" : "Cliente"}
-                      </span>
-                      {listedUser.rol === "ADMINISTRADOR" && (
-                        <small>
-                          Permisos:{" "}
-                          {listedUser.permisos && listedUser.permisos.length > 0
-                            ? listedUser.permisos.join(", ")
-                            : "Acceso total"}
-                        </small>
-                      )}
-                      <small>Creado: {new Date(listedUser.createdAt).toLocaleDateString()}</small>
+                      <div className="card-badges">
+                        <span className={`badge ${listedUser.rol === "ADMINISTRADOR" ? "on" : "off"}`}>
+                          {listedUser.rol === "ADMINISTRADOR" ? "Admin" : "Cliente"}
+                        </span>
+                      </div>
                       <div className="actions">
-                        <button type="button" className="ghost" onClick={() => startEditUser(listedUser)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => handleDeleteUser(listedUser)}
-                          disabled={deletingId === listedUser.id}
-                        >
+                        <button type="button" className="ghost" onClick={() => startEditUser(listedUser)}>Editar</button>
+                        <button type="button" className="danger" onClick={() => handleDeleteUser(listedUser)} disabled={deletingId === listedUser.id}>
                           {deletingId === listedUser.id ? "Eliminando..." : "Eliminar"}
                         </button>
                       </div>
@@ -2112,62 +2105,37 @@ export default function App() {
                   .filter((c) => !c.parentId)
                   .flatMap((category) => [
                     <article key={category.id} className="card">
-                      <div>
+                      <div className="card-info">
                         <strong>{category.name}</strong>
-                        <p>/{category.slug}</p>
+                        <small>/{category.slug} {category.description ? `— ${category.description}` : ""}</small>
+                        {category.children?.length > 0 && (
+                          <small>Subcategorias: {category.children.map((c) => c.name).join(", ")}</small>
+                        )}
                       </div>
-                      <span className={`badge ${category.active ? "on" : "off"}`}>
-                        {category.active ? "Activa" : "Inactiva"}
-                      </span>
-                      <span className={`badge ${category.showInMenu ? "on" : "off"}`}>
-                        {category.showInMenu ? "Visible en menu" : "Oculta en menu"}
-                      </span>
-                      <small>{category.description || "Sin descripcion"}</small>
-                      {category.bannerImageUrl && (
-                        <a href={category.bannerImageUrl} target="_blank" rel="noreferrer" className="imageLink">
-                          Ver banner
-                        </a>
-                      )}
-                      {category.children && category.children.length > 0 && (
-                        <small>Subcategorias: {category.children.map((c) => c.name).join(", ")}</small>
-                      )}
+                      <div className="card-badges">
+                        <span className={`badge ${category.active ? "on" : "off"}`}>{category.active ? "Activa" : "Inactiva"}</span>
+                        <span className={`badge ${category.showInMenu ? "on" : "off"}`}>{category.showInMenu ? "Menu" : "Oculta"}</span>
+                      </div>
                       <div className="actions">
-                        <button type="button" className="ghost" onClick={() => startEdit(category)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => handleDelete(category)}
-                          disabled={deletingId === category.id}
-                        >
+                        <button type="button" className="ghost" onClick={() => startEdit(category)}>Editar</button>
+                        <button type="button" className="danger" onClick={() => handleDelete(category)} disabled={deletingId === category.id}>
                           {deletingId === category.id ? "Eliminando..." : "Eliminar"}
                         </button>
                       </div>
                     </article>,
                     ...(category.children || []).map((sub) => (
-                      <article key={sub.id} className="card" style={{ marginLeft: "1.5rem", borderLeft: "3px solid var(--accent, #b08d57)" }}>
-                        <div>
+                      <article key={sub.id} className="card card-sub">
+                        <div className="card-info">
                           <strong>↳ {sub.name}</strong>
-                          <p>/{sub.slug}</p>
+                          <small>/{sub.slug} — Padre: {category.name}</small>
                         </div>
-                        <span className={`badge ${sub.active ? "on" : "off"}`}>
-                          {sub.active ? "Activa" : "Inactiva"}
-                        </span>
-                        <span className={`badge ${sub.showInMenu ? "on" : "off"}`}>
-                          {sub.showInMenu ? "Visible" : "Oculta"}
-                        </span>
-                        <small>Padre: {category.name}</small>
+                        <div className="card-badges">
+                          <span className={`badge ${sub.active ? "on" : "off"}`}>{sub.active ? "Activa" : "Inactiva"}</span>
+                          <span className={`badge ${sub.showInMenu ? "on" : "off"}`}>{sub.showInMenu ? "Visible" : "Oculta"}</span>
+                        </div>
                         <div className="actions">
-                          <button type="button" className="ghost" onClick={() => startEdit(sub)}>
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => handleDelete(sub)}
-                            disabled={deletingId === sub.id}
-                          >
+                          <button type="button" className="ghost" onClick={() => startEdit(sub)}>Editar</button>
+                          <button type="button" className="danger" onClick={() => handleDelete(sub)} disabled={deletingId === sub.id}>
                             {deletingId === sub.id ? "Eliminando..." : "Eliminar"}
                           </button>
                         </div>
@@ -2177,32 +2145,18 @@ export default function App() {
               : activeTab === "products"
                 ? products.map((product) => (
                   <article key={product.id} className="card">
-                    <div>
+                    {product.imageUrl && <img className="card-thumb" src={product.imageUrl} alt="" />}
+                    <div className="card-info">
                       <strong>{product.name}</strong>
-                      <p>/{product.slug}</p>
+                      <small>{product.category || "Sin categoria"} — ${Number(product.price || 0).toFixed(2)} — Stock: {product.stock}</small>
                     </div>
-                    <small>Categoria: {product.category || "Sin categoria"}</small>
-                    <small>
-                      ${Number(product.price || 0).toFixed(2)} | Stock: {product.stock}
-                    </small>
-                    <span className={`badge ${product.active ? "on" : "off"}`}>
-                      {product.active ? "Activo" : "Inactivo"}
-                    </span>
-                    {product.imageUrl && (
-                      <a href={product.imageUrl} target="_blank" rel="noreferrer" className="imageLink">
-                        Ver imagen
-                      </a>
-                    )}
+                    <div className="card-badges">
+                      <span className={`badge ${product.active ? "on" : "off"}`}>{product.active ? "Activo" : "Inactivo"}</span>
+                      {product.recommended && <span className="badge on">Destacado</span>}
+                    </div>
                     <div className="actions">
-                      <button type="button" className="ghost" onClick={() => startEditProduct(product)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="danger"
-                        onClick={() => handleDeleteProduct(product)}
-                        disabled={deletingId === product.id}
-                      >
+                      <button type="button" className="ghost" onClick={() => startEditProduct(product)}>Editar</button>
+                      <button type="button" className="danger" onClick={() => handleDeleteProduct(product)} disabled={deletingId === product.id}>
                         {deletingId === product.id ? "Desactivando..." : "Desactivar"}
                       </button>
                     </div>
@@ -2211,27 +2165,17 @@ export default function App() {
                 : activeTab === "slides"
                 ? slides.map((slide) => (
                   <article key={slide.id} className="card">
-                    <div>
+                    <img className="card-thumb" src={slide.imageUrl} alt="" />
+                    <div className="card-info">
                       <strong>{slide.title}</strong>
-                      <p>Orden: {slide.displayOrder}</p>
+                      <small>{slide.subtitle || "Sin subtitulo"} — Orden: {slide.displayOrder}</small>
                     </div>
-                    <span className={`badge ${slide.active ? "on" : "off"}`}>
-                      {slide.active ? "Activo" : "Inactivo"}
-                    </span>
-                    <small>{slide.subtitle || "Sin subtitulo"}</small>
-                    <a href={slide.imageUrl} target="_blank" rel="noreferrer" className="imageLink">
-                      Ver imagen
-                    </a>
+                    <div className="card-badges">
+                      <span className={`badge ${slide.active ? "on" : "off"}`}>{slide.active ? "Activo" : "Inactivo"}</span>
+                    </div>
                     <div className="actions">
-                      <button type="button" className="ghost" onClick={() => startEditSlide(slide)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="danger"
-                        onClick={() => handleDeleteSlide(slide)}
-                        disabled={deletingId === slide.id}
-                      >
+                      <button type="button" className="ghost" onClick={() => startEditSlide(slide)}>Editar</button>
+                      <button type="button" className="danger" onClick={() => handleDeleteSlide(slide)} disabled={deletingId === slide.id}>
                         {deletingId === slide.id ? "Eliminando..." : "Eliminar"}
                       </button>
                     </div>
@@ -2240,28 +2184,18 @@ export default function App() {
                 : activeTab === "flyers"
                   ? flyers.map((flyer) => (
                     <article key={flyer.id} className="card">
-                      <div>
+                      <img className="card-thumb" src={flyer.imageUrl} alt="" />
+                      <div className="card-info">
                         <strong>{flyer.title}</strong>
-                        <p>Orden: {flyer.displayOrder}</p>
+                        <small>{flyer.subtitle || "Sin subtitulo"} — Orden: {flyer.displayOrder}</small>
+                        {flyer.linkUrl && <small>Destino: {flyer.linkUrl}</small>}
                       </div>
-                      <span className={`badge ${flyer.active ? "on" : "off"}`}>
-                        {flyer.active ? "Activo" : "Inactivo"}
-                      </span>
-                      <small>{flyer.subtitle || "Sin subtitulo"}</small>
-                      <a href={flyer.imageUrl} target="_blank" rel="noreferrer" className="imageLink">
-                        Ver imagen
-                      </a>
-                      {flyer.linkUrl && <small>Destino: {flyer.linkUrl}</small>}
+                      <div className="card-badges">
+                        <span className={`badge ${flyer.active ? "on" : "off"}`}>{flyer.active ? "Activo" : "Inactivo"}</span>
+                      </div>
                       <div className="actions">
-                        <button type="button" className="ghost" onClick={() => startEditFlyer(flyer)}>
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => handleDeleteFlyer(flyer)}
-                          disabled={deletingId === flyer.id}
-                        >
+                        <button type="button" className="ghost" onClick={() => startEditFlyer(flyer)}>Editar</button>
+                        <button type="button" className="danger" onClick={() => handleDeleteFlyer(flyer)} disabled={deletingId === flyer.id}>
                           {deletingId === flyer.id ? "Eliminando..." : "Eliminar"}
                         </button>
                       </div>
@@ -2269,39 +2203,29 @@ export default function App() {
                   ))
                 : activeTab === "orders"
                 ? orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO").map((order) => (
-                    <article className="card" key={order.id}>
-                      <div className="orderHeader">
-                        <strong>Pedido #{order.id}</strong>
-                        <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                    <article className="card card-vertical" key={order.id}>
+                      <div className="card-info">
+                        <div className="orderHeader">
+                          <strong>Pedido #{order.id}</strong>
+                          <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                        </div>
+                        <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
+                        <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
+                        {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
+                        {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                        {order.comprobanteUrl && (
+                          <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>
+                        )}
                       </div>
-                      <small>
-                        {order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}
-                      </small>
-                      {order.clienteTelefono && <small>Tel: {order.clienteTelefono}</small>}
-                      <small>Total: ${Number(order.total || 0).toFixed(2)}</small>
-                      <small>Fecha: {new Date(order.createdAt).toLocaleString()}</small>
-                      {order.metodoPago && <small>Metodo de pago: {order.metodoPago}</small>}
-                      {order.numeroComprobante && <small>Comprobante #: {order.numeroComprobante}</small>}
-                      {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
-                      {order.comprobanteUrl && (
-                        <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">
-                          Ver comprobante
-                        </a>
-                      )}
-                      {order.items && order.items.length > 0 && (
+                      {order.items?.length > 0 && (
                         <ul className="orderItems">
                           {order.items.map((item) => (
-                            <li key={item.id}>
-                              {item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}
-                            </li>
+                            <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>
                           ))}
                         </ul>
                       )}
                       <div className="actions">
-                        <select
-                          value={order.estado}
-                          onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}
-                        >
+                        <select value={order.estado} onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}>
                           <option value="PREPARAR">Preparar</option>
                           <option value="NUEVO">Nuevo</option>
                           <option value="PAGADO">Pagado</option>
@@ -2315,47 +2239,39 @@ export default function App() {
                   ))
                 : activeTab === "despacho"
                 ? orders.filter((o) => o.estado === "PAGADO").map((order) => (
-                    <article className="card" key={order.id}>
-                      <div className="orderHeader">
-                        <strong>Pedido #{order.id}</strong>
-                        <span className="orderBadge pagado">PAGADO</span>
+                    <article className="card card-vertical" key={order.id}>
+                      <div className="card-info">
+                        <div className="orderHeader">
+                          <strong>Pedido #{order.id}</strong>
+                          <span className="orderBadge pagado">PAGADO</span>
+                        </div>
+                        <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
+                        <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
+                        {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
+                        {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                        {order.comprobanteUrl && (
+                          <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>
+                        )}
                       </div>
-                      <small>
-                        {order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}
-                      </small>
-                      {order.clienteTelefono && <small>Tel: {order.clienteTelefono}</small>}
-                      <small>Total: ${Number(order.total || 0).toFixed(2)}</small>
-                      <small>Fecha: {new Date(order.createdAt).toLocaleString()}</small>
-                      {order.metodoPago && <small>Metodo: {order.metodoPago}</small>}
-                      {order.numeroComprobante && <small>Comprobante: {order.numeroComprobante}</small>}
-                      {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
-                      {order.comprobanteUrl && (
-                        <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">
-                          Ver comprobante
-                        </a>
-                      )}
-                      {order.items && order.items.length > 0 && (
+                      {order.items?.length > 0 && (
                         <ul className="orderItems">
                           {order.items.map((item) => (
-                            <li key={item.id}>
-                              {item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}
-                            </li>
+                            <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>
                           ))}
                         </ul>
                       )}
                       <div className="actions">
-                        <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>
-                          Marcar Listo para Envio
-                        </button>
+                        <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
                       </div>
                     </article>
                   ))
                 : [
                     <article key="settings-preview" className="card">
-                      <strong>{settingsForm.brandName || "Don Joyero"}</strong>
-                      <small>Logo: {settingsForm.logoUrl || "Sin logo"}</small>
-                      <small>Video: {settingsForm.promoVideoUrl || "Sin video"}</small>
-                      <small>Titulo video: {settingsForm.promoVideoTitle || "Sin titulo"}</small>
+                      <div className="card-info">
+                        <strong>{settingsForm.brandName || "Don Joyero"}</strong>
+                        <small>Logo: {settingsForm.logoUrl || "Sin logo"} — Video: {settingsForm.promoVideoUrl || "Sin video"}</small>
+                        <small>Titulo video: {settingsForm.promoVideoTitle || "Sin titulo"}</small>
+                      </div>
                     </article>,
                   ]}
 
