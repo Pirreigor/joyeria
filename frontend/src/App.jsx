@@ -209,6 +209,15 @@ export default function App() {
     }
   }
 
+  const menuTree = useMemo(
+    () =>
+      categories.map((category) => ({
+        ...category,
+        subcategories: category.children || [],
+      })),
+    [categories]
+  );
+
   const categorySlugsForFilter = useMemo(() => {
     if (selectedCategory === "todas") return null;
     const slugs = [selectedCategory];
@@ -257,15 +266,6 @@ export default function App() {
   const cartCount = useMemo(
     () => cartItems.reduce((total, item) => total + item.quantity, 0),
     [cartItems]
-  );
-
-  const menuTree = useMemo(
-    () =>
-      categories.map((category) => ({
-        ...category,
-        subcategories: category.children || [],
-      })),
-    [categories]
   );
 
   const activeSubcategories = useMemo(() => {
