@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const TOKEN_KEY = "admin_token";
 const USER_KEY = "admin_user";
+const LIST_PAGE_SIZE = 12;
 
 const initialForm = {
   id: null,
@@ -270,6 +271,9 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [formModal, setFormModal] = useState("");
+  const [listSearch, setListSearch] = useState("");
+  const [listSort, setListSort] = useState("newest");
+  const [listPage, setListPage] = useState(1);
 
   const isEditing = useMemo(() => form.id !== null, [form.id]);
   const isEditingSlide = useMemo(() => slideForm.id !== null, [slideForm.id]);
@@ -289,6 +293,54 @@ export default function App() {
     () => roleMenuSections.flatMap((section) => section.items || []),
     [roleMenuSections]
   );
+
+  const filteredList = useMemo(() => {
+    const q = listSearch.trim().toLowerCase();
+    let items = [];
+
+    if (activeTab === "users") {
+      items = users.filter((u) => !q || `${u.name} ${u.email} ${u.rol}`.toLowerCase().includes(q));
+      if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      else if (listSort === "name_asc") items.sort((a, b) => a.name.localeCompare(b.name));
+      else if (listSort === "name_desc") items.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (activeTab === "categories") {
+      let flat = categories.filter((c) => !c.parentId).flatMap((c) => [c, ...(c.children || []).map((s) => ({ ...s, _parent: c.name }))]);
+      items = flat.filter((c) => !q || `${c.name} ${c.slug} ${c.description || ""}`.toLowerCase().includes(q));
+      if (listSort === "name_asc") items.sort((a, b) => a.name.localeCompare(b.name));
+      else if (listSort === "name_desc") items.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (activeTab === "products") {
+      items = products.filter((p) => !q || `${p.name} ${p.category || ""} ${p.slug}`.toLowerCase().includes(q));
+      if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      else if (listSort === "name_asc") items.sort((a, b) => a.name.localeCompare(b.name));
+      else if (listSort === "name_desc") items.sort((a, b) => b.name.localeCompare(a.name));
+      else if (listSort === "price_asc") items.sort((a, b) => a.price - b.price);
+      else if (listSort === "price_desc") items.sort((a, b) => b.price - a.price);
+      else if (listSort === "stock_asc") items.sort((a, b) => a.stock - b.stock);
+    } else if (activeTab === "slides") {
+      items = slides.filter((s) => !q || `${s.title} ${s.subtitle || ""}`.toLowerCase().includes(q));
+      if (listSort === "order") items.sort((a, b) => a.displayOrder - b.displayOrder);
+      else if (listSort === "name_asc") items.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (activeTab === "flyers") {
+      items = flyers.filter((f) => !q || `${f.title} ${f.subtitle || ""}`.toLowerCase().includes(q));
+      if (listSort === "order") items.sort((a, b) => a.displayOrder - b.displayOrder);
+      else if (listSort === "name_asc") items.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (activeTab === "orders" || activeTab === "despacho") {
+      let base = activeTab === "despacho" ? orders.filter((o) => o.estado === "PAGADO")
+        : orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO");
+      items = base.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
+      if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
+      else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
+    }
+
+    return items;
+  }, [activeTab, users, categories, products, slides, flyers, orders, ordersFilter, listSearch, listSort]);
+
+  const listTotalPages = Math.ceil(filteredList.length / LIST_PAGE_SIZE);
+  const pagedList = filteredList.slice((listPage - 1) * LIST_PAGE_SIZE, listPage * LIST_PAGE_SIZE);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -335,6 +387,12 @@ export default function App() {
       setActiveTab(roleMenu[0].key);
     }
   }, [roleMenu, activeTab]);
+
+  useEffect(() => {
+    setListSearch("");
+    setListSort("newest");
+    setListPage(1);
+  }, [activeTab]);
 
   async function request(path, options = {}) {
     const response = await fetch(`${API_URL}${path}`, {
@@ -1333,243 +1391,201 @@ export default function App() {
 
           {activeTab === "orders" && (
             <div className="orderFilterBar">
-              <button type="button" className={ordersFilter === "todos" ? "filterBtn active" : "filterBtn"} onClick={() => setOrdersFilter("todos")}>Todos</button>
-              <button type="button" className={ordersFilter === "preparar" ? "filterBtn active" : "filterBtn"} onClick={() => setOrdersFilter("preparar")}>Preparar</button>
-              <button type="button" className={ordersFilter === "pagado" ? "filterBtn active" : "filterBtn"} onClick={() => setOrdersFilter("pagado")}>Pagados</button>
+              <button type="button" className={ordersFilter === "todos" ? "filterBtn active" : "filterBtn"} onClick={() => { setOrdersFilter("todos"); setListPage(1); }}>Todos</button>
+              <button type="button" className={ordersFilter === "preparar" ? "filterBtn active" : "filterBtn"} onClick={() => { setOrdersFilter("preparar"); setListPage(1); }}>Preparar</button>
+              <button type="button" className={ordersFilter === "pagado" ? "filterBtn active" : "filterBtn"} onClick={() => { setOrdersFilter("pagado"); setListPage(1); }}>Pagados</button>
+            </div>
+          )}
+
+          {!["dashboard", "settings"].includes(activeTab) && (
+            <div className="listToolbar">
+              <input
+                type="text"
+                className="listSearchInput"
+                placeholder="Buscar..."
+                value={listSearch}
+                onChange={(e) => { setListSearch(e.target.value); setListPage(1); }}
+              />
+              <select className="listSortSelect" value={listSort} onChange={(e) => { setListSort(e.target.value); setListPage(1); }}>
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho") && <option value="newest">Mas recientes</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho") && <option value="oldest">Mas antiguos</option>}
+                {(activeTab === "users" || activeTab === "categories" || activeTab === "products") && <option value="name_asc">Nombre A-Z</option>}
+                {(activeTab === "users" || activeTab === "categories" || activeTab === "products") && <option value="name_desc">Nombre Z-A</option>}
+                {activeTab === "products" && <option value="price_asc">Precio menor</option>}
+                {activeTab === "products" && <option value="price_desc">Precio mayor</option>}
+                {activeTab === "products" && <option value="stock_asc">Menor stock</option>}
+                {(activeTab === "slides" || activeTab === "flyers") && <option value="order">Por orden</option>}
+                {(activeTab === "slides" || activeTab === "flyers") && <option value="name_asc">Nombre A-Z</option>}
+                {(activeTab === "orders" || activeTab === "despacho") && <option value="total_desc">Mayor total</option>}
+                {(activeTab === "orders" || activeTab === "despacho") && <option value="total_asc">Menor total</option>}
+              </select>
+              <span className="listCount">{filteredList.length} resultado{filteredList.length !== 1 ? "s" : ""}</span>
             </div>
           )}
 
           {listError && <p className="error">{listError}</p>}
 
           <div className="list">
-            {activeTab === "dashboard"
-              ? [
-                  <article key="quick-actions" className="card">
-                    <strong>Accesos rapidos</strong>
-                    <small>Crea usuarios, organiza categorias y administra el catalogo desde este panel.</small>
-                    <div className="actions">
-                      <button type="button" className="ghost" onClick={() => setActiveTab("users")}>
-                        Gestionar usuarios
-                      </button>
-                      <button type="button" className="ghost" onClick={() => setActiveTab("products")}>
-                        Gestionar productos
-                      </button>
-                    </div>
-                  </article>,
-                ]
-              : activeTab === "users"
-                ? users.map((listedUser) => (
-                    <article key={listedUser.id} className="card">
-                      <div className="card-info">
-                        <strong>{listedUser.name}</strong>
-                        <small>{listedUser.email} — Creado: {new Date(listedUser.createdAt).toLocaleDateString()}</small>
-                        {listedUser.rol === "ADMINISTRADOR" && (
-                          <small>
-                            {listedUser.permisos?.length > 0
-                              ? `Permisos: ${listedUser.permisos.join(", ")}`
-                              : "Acceso total"}
-                          </small>
-                        )}
-                      </div>
-                      <div className="card-badges">
-                        <span className={`badge ${listedUser.rol === "ADMINISTRADOR" ? "on" : "off"}`}>
-                          {listedUser.rol === "ADMINISTRADOR" ? "Admin" : "Cliente"}
-                        </span>
-                      </div>
-                      <div className="actions">
-                        <button type="button" className="ghost" onClick={() => startEditUser(listedUser)}>Editar</button>
-                        <button type="button" className="danger" onClick={() => handleDeleteUser(listedUser)} disabled={deletingId === listedUser.id}>
-                          {deletingId === listedUser.id ? "Eliminando..." : "Eliminar"}
-                        </button>
-                      </div>
-                    </article>
-                  ))
-              : activeTab === "categories"
-              ? categories
-                  .filter((c) => !c.parentId)
-                  .flatMap((category) => [
-                    <article key={category.id} className="card">
-                      <div className="card-info">
-                        <strong>{category.name}</strong>
-                        <small>/{category.slug} {category.description ? `— ${category.description}` : ""}</small>
-                        {category.children?.length > 0 && (
-                          <small>Subcategorias: {category.children.map((c) => c.name).join(", ")}</small>
-                        )}
-                      </div>
-                      <div className="card-badges">
-                        <span className={`badge ${category.active ? "on" : "off"}`}>{category.active ? "Activa" : "Inactiva"}</span>
-                        <span className={`badge ${category.showInMenu ? "on" : "off"}`}>{category.showInMenu ? "Menu" : "Oculta"}</span>
-                      </div>
-                      <div className="actions">
-                        <button type="button" className="ghost" onClick={() => startEdit(category)}>Editar</button>
-                        <button type="button" className="danger" onClick={() => handleDelete(category)} disabled={deletingId === category.id}>
-                          {deletingId === category.id ? "Eliminando..." : "Eliminar"}
-                        </button>
-                      </div>
-                    </article>,
-                    ...(category.children || []).map((sub) => (
-                      <article key={sub.id} className="card card-sub">
-                        <div className="card-info">
-                          <strong>↳ {sub.name}</strong>
-                          <small>/{sub.slug} — Padre: {category.name}</small>
-                        </div>
-                        <div className="card-badges">
-                          <span className={`badge ${sub.active ? "on" : "off"}`}>{sub.active ? "Activa" : "Inactiva"}</span>
-                          <span className={`badge ${sub.showInMenu ? "on" : "off"}`}>{sub.showInMenu ? "Visible" : "Oculta"}</span>
-                        </div>
-                        <div className="actions">
-                          <button type="button" className="ghost" onClick={() => startEdit(sub)}>Editar</button>
-                          <button type="button" className="danger" onClick={() => handleDelete(sub)} disabled={deletingId === sub.id}>
-                            {deletingId === sub.id ? "Eliminando..." : "Eliminar"}
-                          </button>
-                        </div>
-                      </article>
-                    )),
-                  ])
-              : activeTab === "products"
-                ? products.map((product) => (
-                  <article key={product.id} className="card">
-                    {product.imageUrl && <img className="card-thumb" src={product.imageUrl} alt="" />}
-                    <div className="card-info">
-                      <strong>{product.name}</strong>
-                      <small>{product.category || "Sin categoria"} — ${Number(product.price || 0).toFixed(2)} — Stock: {product.stock}</small>
-                    </div>
-                    <div className="card-badges">
-                      <span className={`badge ${product.active ? "on" : "off"}`}>{product.active ? "Activo" : "Inactivo"}</span>
-                      {product.recommended && <span className="badge on">Destacado</span>}
-                    </div>
-                    <div className="actions">
-                      <button type="button" className="ghost" onClick={() => startEditProduct(product)}>Editar</button>
-                      <button type="button" className="danger" onClick={() => handleDeleteProduct(product)} disabled={deletingId === product.id}>
-                        {deletingId === product.id ? "Desactivando..." : "Desactivar"}
-                      </button>
-                    </div>
-                  </article>
-                ))
-                : activeTab === "slides"
-                ? slides.map((slide) => (
-                  <article key={slide.id} className="card">
-                    <img className="card-thumb" src={slide.imageUrl} alt="" />
-                    <div className="card-info">
-                      <strong>{slide.title}</strong>
-                      <small>{slide.subtitle || "Sin subtitulo"} — Orden: {slide.displayOrder}</small>
-                    </div>
-                    <div className="card-badges">
-                      <span className={`badge ${slide.active ? "on" : "off"}`}>{slide.active ? "Activo" : "Inactivo"}</span>
-                    </div>
-                    <div className="actions">
-                      <button type="button" className="ghost" onClick={() => startEditSlide(slide)}>Editar</button>
-                      <button type="button" className="danger" onClick={() => handleDeleteSlide(slide)} disabled={deletingId === slide.id}>
-                        {deletingId === slide.id ? "Eliminando..." : "Eliminar"}
-                      </button>
-                    </div>
-                  </article>
-                ))
-                : activeTab === "flyers"
-                  ? flyers.map((flyer) => (
-                    <article key={flyer.id} className="card">
-                      <img className="card-thumb" src={flyer.imageUrl} alt="" />
-                      <div className="card-info">
-                        <strong>{flyer.title}</strong>
-                        <small>{flyer.subtitle || "Sin subtitulo"} — Orden: {flyer.displayOrder}</small>
-                        {flyer.linkUrl && <small>Destino: {flyer.linkUrl}</small>}
-                      </div>
-                      <div className="card-badges">
-                        <span className={`badge ${flyer.active ? "on" : "off"}`}>{flyer.active ? "Activo" : "Inactivo"}</span>
-                      </div>
-                      <div className="actions">
-                        <button type="button" className="ghost" onClick={() => startEditFlyer(flyer)}>Editar</button>
-                        <button type="button" className="danger" onClick={() => handleDeleteFlyer(flyer)} disabled={deletingId === flyer.id}>
-                          {deletingId === flyer.id ? "Eliminando..." : "Eliminar"}
-                        </button>
-                      </div>
-                    </article>
-                  ))
-                : activeTab === "orders"
-                ? orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO").map((order) => (
-                    <article className="card card-vertical" key={order.id}>
-                      <div className="card-info">
-                        <div className="orderHeader">
-                          <strong>Pedido #{order.id}</strong>
-                          <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
-                        </div>
-                        <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
-                        <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
-                        {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
-                        {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
-                        {order.comprobanteUrl && (
-                          <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>
-                        )}
-                      </div>
-                      {order.items?.length > 0 && (
-                        <ul className="orderItems">
-                          {order.items.map((item) => (
-                            <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="actions">
-                        <select value={order.estado} onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}>
-                          <option value="PREPARAR">Preparar</option>
-                          <option value="NUEVO">Nuevo</option>
-                          <option value="PAGADO">Pagado</option>
-                          <option value="LISTO_PARA_ENVIO">Listo para Envio</option>
-                          <option value="ENVIADO">Enviado</option>
-                          <option value="ENTREGADO">Entregado</option>
-                          <option value="CANCELADO">Cancelado</option>
-                        </select>
-                      </div>
-                    </article>
-                  ))
-                : activeTab === "despacho"
-                ? orders.filter((o) => o.estado === "PAGADO").map((order) => (
-                    <article className="card card-vertical" key={order.id}>
-                      <div className="card-info">
-                        <div className="orderHeader">
-                          <strong>Pedido #{order.id}</strong>
-                          <span className="orderBadge pagado">PAGADO</span>
-                        </div>
-                        <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
-                        <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
-                        {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
-                        {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
-                        {order.comprobanteUrl && (
-                          <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>
-                        )}
-                      </div>
-                      {order.items?.length > 0 && (
-                        <ul className="orderItems">
-                          {order.items.map((item) => (
-                            <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="actions">
-                        <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
-                      </div>
-                    </article>
-                  ))
-                : [
-                    <article key="settings-preview" className="card">
-                      <div className="card-info">
-                        <strong>{settingsForm.brandName || "Don Joyero"}</strong>
-                        <small>Logo: {settingsForm.logoUrl || "Sin logo"} — Video: {settingsForm.promoVideoUrl || "Sin video"}</small>
-                        <small>Titulo video: {settingsForm.promoVideoTitle || "Sin titulo"}</small>
-                      </div>
-                    </article>,
-                  ]}
-
-            {!listLoading && activeTab === "users" && users.length === 0 && <p>No hay usuarios creados.</p>}
-            {!listLoading && activeTab === "categories" && categories.length === 0 && (
-              <p>No hay categorias creadas.</p>
+            {activeTab === "dashboard" && (
+              <article className="card">
+                <div className="card-info">
+                  <strong>Accesos rapidos</strong>
+                  <small>Crea usuarios, organiza categorias y administra el catalogo.</small>
+                </div>
+                <div className="actions">
+                  <button type="button" className="ghost" onClick={() => setActiveTab("users")}>Usuarios</button>
+                  <button type="button" className="ghost" onClick={() => setActiveTab("products")}>Productos</button>
+                </div>
+              </article>
             )}
-            {!listLoading && activeTab === "products" && products.length === 0 && <p>No hay productos creados.</p>}
-            {!listLoading && activeTab === "slides" && slides.length === 0 && <p>No hay slides creados.</p>}
-            {!listLoading && activeTab === "flyers" && flyers.length === 0 && <p>No hay flyers creados.</p>}
-            {!listLoading && activeTab === "orders" && orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO").length === 0 && <p>No hay pedidos {ordersFilter === "todos" ? "registrados" : ordersFilter === "preparar" ? "para preparar" : "pagados"}.</p>}
-            {!listLoading && activeTab === "despacho" && orders.filter((o) => o.estado === "PAGADO").length === 0 && <p>No hay pedidos pagados pendientes de despacho.</p>}
-            {!listLoading && activeTab === "settings" && <p>Actualiza marca, logo y video promocional.</p>}
+
+            {activeTab === "settings" && (
+              <article className="card">
+                <div className="card-info">
+                  <strong>{settingsForm.brandName || "Don Joyero"}</strong>
+                  <small>Logo: {settingsForm.logoUrl || "Sin logo"} — Video: {settingsForm.promoVideoUrl || "Sin video"}</small>
+                </div>
+              </article>
+            )}
+
+            {activeTab === "users" && pagedList.map((u) => (
+              <article key={u.id} className="card">
+                <div className="card-info">
+                  <strong>{u.name}</strong>
+                  <small>{u.email} — Creado: {new Date(u.createdAt).toLocaleDateString()}</small>
+                  {u.rol === "ADMINISTRADOR" && <small>{u.permisos?.length > 0 ? `Permisos: ${u.permisos.join(", ")}` : "Acceso total"}</small>}
+                </div>
+                <div className="card-badges">
+                  <span className={`badge ${u.rol === "ADMINISTRADOR" ? "on" : "off"}`}>{u.rol === "ADMINISTRADOR" ? "Admin" : "Cliente"}</span>
+                </div>
+                <div className="actions">
+                  <button type="button" className="ghost" onClick={() => startEditUser(u)}>Editar</button>
+                  <button type="button" className="danger" onClick={() => handleDeleteUser(u)} disabled={deletingId === u.id}>{deletingId === u.id ? "..." : "Eliminar"}</button>
+                </div>
+              </article>
+            ))}
+
+            {activeTab === "categories" && pagedList.map((c) => (
+              <article key={c.id} className={c._parent ? "card card-sub" : "card"}>
+                <div className="card-info">
+                  <strong>{c._parent ? `↳ ${c.name}` : c.name}</strong>
+                  <small>/{c.slug} {c._parent ? `— Padre: ${c._parent}` : c.description ? `— ${c.description}` : ""}</small>
+                  {!c._parent && c.children?.length > 0 && <small>Subcategorias: {c.children.map((s) => s.name).join(", ")}</small>}
+                </div>
+                <div className="card-badges">
+                  <span className={`badge ${c.active ? "on" : "off"}`}>{c.active ? "Activa" : "Inactiva"}</span>
+                  <span className={`badge ${c.showInMenu ? "on" : "off"}`}>{c.showInMenu ? "Menu" : "Oculta"}</span>
+                </div>
+                <div className="actions">
+                  <button type="button" className="ghost" onClick={() => startEdit(c)}>Editar</button>
+                  <button type="button" className="danger" onClick={() => handleDelete(c)} disabled={deletingId === c.id}>{deletingId === c.id ? "..." : "Eliminar"}</button>
+                </div>
+              </article>
+            ))}
+
+            {activeTab === "products" && pagedList.map((p) => (
+              <article key={p.id} className="card">
+                {p.imageUrl && <img className="card-thumb" src={p.imageUrl} alt="" />}
+                <div className="card-info">
+                  <strong>{p.name}</strong>
+                  <small>{p.category || "Sin categoria"} — ${Number(p.price || 0).toFixed(2)} — Stock: {p.stock}</small>
+                </div>
+                <div className="card-badges">
+                  <span className={`badge ${p.active ? "on" : "off"}`}>{p.active ? "Activo" : "Inactivo"}</span>
+                  {p.recommended && <span className="badge on">Destacado</span>}
+                </div>
+                <div className="actions">
+                  <button type="button" className="ghost" onClick={() => startEditProduct(p)}>Editar</button>
+                  <button type="button" className="danger" onClick={() => handleDeleteProduct(p)} disabled={deletingId === p.id}>{deletingId === p.id ? "..." : "Desactivar"}</button>
+                </div>
+              </article>
+            ))}
+
+            {activeTab === "slides" && pagedList.map((s) => (
+              <article key={s.id} className="card">
+                <img className="card-thumb" src={s.imageUrl} alt="" />
+                <div className="card-info">
+                  <strong>{s.title}</strong>
+                  <small>{s.subtitle || "Sin subtitulo"} — Orden: {s.displayOrder}</small>
+                </div>
+                <div className="card-badges">
+                  <span className={`badge ${s.active ? "on" : "off"}`}>{s.active ? "Activo" : "Inactivo"}</span>
+                </div>
+                <div className="actions">
+                  <button type="button" className="ghost" onClick={() => startEditSlide(s)}>Editar</button>
+                  <button type="button" className="danger" onClick={() => handleDeleteSlide(s)} disabled={deletingId === s.id}>{deletingId === s.id ? "..." : "Eliminar"}</button>
+                </div>
+              </article>
+            ))}
+
+            {activeTab === "flyers" && pagedList.map((f) => (
+              <article key={f.id} className="card">
+                <img className="card-thumb" src={f.imageUrl} alt="" />
+                <div className="card-info">
+                  <strong>{f.title}</strong>
+                  <small>{f.subtitle || "Sin subtitulo"} — Orden: {f.displayOrder}</small>
+                  {f.linkUrl && <small>Destino: {f.linkUrl}</small>}
+                </div>
+                <div className="card-badges">
+                  <span className={`badge ${f.active ? "on" : "off"}`}>{f.active ? "Activo" : "Inactivo"}</span>
+                </div>
+                <div className="actions">
+                  <button type="button" className="ghost" onClick={() => startEditFlyer(f)}>Editar</button>
+                  <button type="button" className="danger" onClick={() => handleDeleteFlyer(f)} disabled={deletingId === f.id}>{deletingId === f.id ? "..." : "Eliminar"}</button>
+                </div>
+              </article>
+            ))}
+
+            {(activeTab === "orders" || activeTab === "despacho") && pagedList.map((order) => (
+              <article className="card card-vertical" key={order.id}>
+                <div className="card-info">
+                  <div className="orderHeader">
+                    <strong>Pedido #{order.id}</strong>
+                    <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                  </div>
+                  <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
+                  <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
+                  {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
+                  {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                  {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
+                </div>
+                {order.items?.length > 0 && (
+                  <ul className="orderItems">
+                    {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>)}
+                  </ul>
+                )}
+                <div className="actions">
+                  {activeTab === "despacho" ? (
+                    <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
+                  ) : (
+                    <select value={order.estado} onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}>
+                      <option value="PREPARAR">Preparar</option>
+                      <option value="NUEVO">Nuevo</option>
+                      <option value="PAGADO">Pagado</option>
+                      <option value="LISTO_PARA_ENVIO">Listo para Envio</option>
+                      <option value="ENVIADO">Enviado</option>
+                      <option value="ENTREGADO">Entregado</option>
+                      <option value="CANCELADO">Cancelado</option>
+                    </select>
+                  )}
+                </div>
+              </article>
+            ))}
+
+            {!listLoading && filteredList.length === 0 && !["dashboard", "settings"].includes(activeTab) && (
+              <p style={{ padding: "16px", textAlign: "center", color: "var(--muted)" }}>
+                {listSearch ? "Sin resultados para la busqueda." : "No hay elementos."}
+              </p>
+            )}
           </div>
+
+          {listTotalPages > 1 && (
+            <nav className="listPagination">
+              <button type="button" className="ghost" disabled={listPage === 1} onClick={() => setListPage((p) => p - 1)}>‹ Anterior</button>
+              <span className="listPageInfo">Pagina {listPage} de {listTotalPages}</span>
+              <button type="button" className="ghost" disabled={listPage === listTotalPages} onClick={() => setListPage((p) => p + 1)}>Siguiente ›</button>
+            </nav>
+          )}
         </article>
         </section>
       </section>
