@@ -269,6 +269,7 @@ export default function App() {
   const [importImages, setImportImages] = useState([]);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [formModal, setFormModal] = useState("");
 
   const isEditing = useMemo(() => form.id !== null, [form.id]);
   const isEditingSlide = useMemo(() => slideForm.id !== null, [slideForm.id]);
@@ -455,22 +456,27 @@ export default function App() {
 
   function resetForm() {
     setForm(initialForm);
+    setFormModal("");
   }
 
   function resetSlideForm() {
     setSlideForm(initialSlideForm);
+    setFormModal("");
   }
 
   function resetFlyerForm() {
     setFlyerForm(initialFlyerForm);
+    setFormModal("");
   }
 
   function resetProductForm() {
     setProductForm(initialProductForm);
+    setFormModal("");
   }
 
   function resetUserForm() {
     setUserForm(initialUserForm);
+    setFormModal("");
   }
 
   function startEdit(category) {
@@ -484,6 +490,7 @@ export default function App() {
       showInMenu: category.showInMenu === undefined ? true : Boolean(category.showInMenu),
       parentId: category.parentId ? String(category.parentId) : "",
     });
+    setFormModal("category");
   }
 
   function startEditSlide(slide) {
@@ -497,6 +504,7 @@ export default function App() {
       displayOrder: Number(slide.displayOrder || 1),
       active: Boolean(slide.active),
     });
+    setFormModal("slide");
   }
 
   function startEditFlyer(flyer) {
@@ -509,6 +517,7 @@ export default function App() {
       displayOrder: Number(flyer.displayOrder || 1),
       active: Boolean(flyer.active),
     });
+    setFormModal("flyer");
   }
 
   function startEditProduct(product) {
@@ -530,6 +539,7 @@ export default function App() {
       grabado: Boolean(product.grabado),
       videoUrl: product.videoUrl || "",
     });
+    setFormModal("product");
   }
 
   function startEditUser(nextUser) {
@@ -541,6 +551,7 @@ export default function App() {
       rol: nextUser.rol || "CLIENTE",
       permisos: nextUser.permisos || [],
     });
+    setFormModal("user");
   }
 
   async function handleSubmit(event) {
@@ -1068,7 +1079,7 @@ export default function App() {
         throw new Error(data.message || "No se pudo crear el pedido");
       }
 
-      setManualOrderOpen(false);
+      setFormModal("");
       setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] });
       await loadData();
     } catch (error) {
@@ -1226,825 +1237,98 @@ export default function App() {
         </aside>
 
         <section className="contentArea">
-        <article className="panel">
-          {activeTab === "dashboard" ? (
-            <>
-              <h2>Dashboard</h2>
-              <div className="statsGrid">
-                <article className="statCard">
-                  <span className="eyebrow">Usuarios</span>
-                  <strong>{dashboard.stats.users}</strong>
-                </article>
-                <article className="statCard">
-                  <span className="eyebrow">Productos</span>
-                  <strong>{dashboard.stats.products}</strong>
-                </article>
-                <article className="statCard">
-                  <span className="eyebrow">Categorias</span>
-                  <strong>{dashboard.stats.categories}</strong>
-                </article>
-                <article className="statCard">
-                  <span className="eyebrow">Pedidos</span>
-                  <strong>{dashboard.stats.orders}</strong>
-                </article>
-              </div>
+        {activeTab === "dashboard" && (
+          <article className="panel">
+            <h2>Dashboard</h2>
+            <div className="statsGrid">
+              <article className="statCard">
+                <span className="eyebrow">Usuarios</span>
+                <strong>{dashboard.stats.users}</strong>
+              </article>
+              <article className="statCard">
+                <span className="eyebrow">Productos</span>
+                <strong>{dashboard.stats.products}</strong>
+              </article>
+              <article className="statCard">
+                <span className="eyebrow">Categorias</span>
+                <strong>{dashboard.stats.categories}</strong>
+              </article>
+              <article className="statCard">
+                <span className="eyebrow">Pedidos</span>
+                <strong>{dashboard.stats.orders}</strong>
+              </article>
+            </div>
 
-              <div className="dashboardBlocks">
-                <section className="miniPanel">
-                  <h3>Usuarios recientes</h3>
-                  {dashboard.recentUsers.length === 0 ? (
-                    <p className="subtle">No hay usuarios recientes.</p>
-                  ) : (
-                    dashboard.recentUsers.map((recentUser) => (
-                      <div key={recentUser.id} className="miniRow">
-                        <strong>{recentUser.name}</strong>
-                        <small>{recentUser.email}</small>
-                      </div>
-                    ))
-                  )}
-                </section>
-
-                <section className="miniPanel">
-                  <h3>Pedidos recientes</h3>
-                  {dashboard.recentOrders.length === 0 ? (
-                    <p className="subtle">No hay pedidos registrados.</p>
-                  ) : (
-                    dashboard.recentOrders.map((order) => (
-                      <div key={order.id} className="miniRow">
-                        <strong>Pedido #{order.id}</strong>
-                        <small>
-                          {order.user?.name || order.user?.email || "Cliente"} | {order.status} | ${Number(order.total || 0).toFixed(2)}
-                        </small>
-                      </div>
-                    ))
-                  )}
-                </section>
-              </div>
-            </>
-          ) : activeTab === "users" ? (
-            <>
-              <h2>{isEditingUser ? "Editar usuario" : "Nuevo usuario"}</h2>
-              <form onSubmit={handleUserSubmit} className="categoryForm">
-                <label htmlFor="user-name">Nombre</label>
-                <input
-                  id="user-name"
-                  type="text"
-                  value={userForm.name}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, name: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="user-email">Email</label>
-                <input
-                  id="user-email"
-                  type="email"
-                  value={userForm.email}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, email: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="user-password">
-                  {isEditingUser ? "Nueva password (opcional)" : "Password"}
-                </label>
-                <input
-                  id="user-password"
-                  type="password"
-                  value={userForm.password}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
-                />
-
-                <label htmlFor="user-role">Rol</label>
-                <select
-                  id="user-role"
-                  value={userForm.rol}
-                  onChange={(event) => setUserForm((prev) => ({ ...prev, rol: event.target.value }))}
-                >
-                  <option value="CLIENTE">Cliente</option>
-                  <option value="ADMINISTRADOR">Administrador</option>
-                </select>
-
-                {userForm.rol === "ADMINISTRADOR" && (
-                  <>
-                    <label>Permisos del admin (sin seleccion = acceso total)</label>
-                    <div className="permissionsGrid">
-                      {ALL_PERMISSIONS.map((perm) => (
-                        <label key={perm.key} className="inlineCheck">
-                          <input
-                            type="checkbox"
-                            checked={userForm.permisos.includes(perm.key)}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setUserForm((prev) => ({
-                                ...prev,
-                                permisos: checked
-                                  ? [...prev.permisos, perm.key]
-                                  : prev.permisos.filter((p) => p !== perm.key),
-                              }));
-                            }}
-                          />
-                          {perm.label}
-                        </label>
-                      ))}
+            <div className="dashboardBlocks">
+              <section className="miniPanel">
+                <h3>Usuarios recientes</h3>
+                {dashboard.recentUsers.length === 0 ? (
+                  <p className="subtle">No hay usuarios recientes.</p>
+                ) : (
+                  dashboard.recentUsers.map((recentUser) => (
+                    <div key={recentUser.id} className="miniRow">
+                      <strong>{recentUser.name}</strong>
+                      <small>{recentUser.email}</small>
                     </div>
-                  </>
+                  ))
                 )}
+              </section>
 
-                <div className="actions">
-                  <button type="submit" disabled={saving}>
-                    {saving ? "Guardando..." : isEditingUser ? "Actualizar" : "Crear usuario"}
-                  </button>
-                  {isEditingUser && (
-                    <button type="button" className="ghost" onClick={resetUserForm}>
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
-            </>
-          ) : activeTab === "categories" ? (
-            <>
-              <h2>{isEditing ? "Editar categoria" : "Nueva categoria"}</h2>
-              <form onSubmit={handleSubmit} className="categoryForm">
-                <label htmlFor="name">Nombre</label>
-                <input
-                  id="name"
-                  type="text"
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                      slug: prev.id ? prev.slug : slugify(event.target.value),
-                    }))
-                  }
-                  required
-                />
-
-                <label htmlFor="slug">Slug</label>
-                <input
-                  id="slug"
-                  type="text"
-                  value={form.slug}
-                  onChange={(event) => setForm((prev) => ({ ...prev, slug: slugify(event.target.value) }))}
-                  required
-                />
-
-                <label htmlFor="description">Descripcion</label>
-                <textarea
-                  id="description"
-                  rows={4}
-                  value={form.description}
-                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                />
-
-                <label htmlFor="bannerImageUrl">URL imagen categoria</label>
-                <input
-                  id="bannerImageUrl"
-                  type="url"
-                  value={form.bannerImageUrl}
-                  onChange={(event) => setForm((prev) => ({ ...prev, bannerImageUrl: event.target.value }))}
-                />
-
-                <label htmlFor="parentId">Categoria padre</label>
-                <select
-                  id="parentId"
-                  value={form.parentId}
-                  onChange={(event) => setForm((prev) => ({ ...prev, parentId: event.target.value }))}
-                >
-                  <option value="">Ninguna (categoria principal)</option>
-                  {categories
-                    .filter((c) => !c.parentId && c.id !== form.id)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                </select>
-
-                <label className="inlineCheck" htmlFor="active">
-                  <input
-                    id="active"
-                    type="checkbox"
-                    checked={form.active}
-                    onChange={(event) => setForm((prev) => ({ ...prev, active: event.target.checked }))}
-                  />
-                  Activa
-                </label>
-
-                <label className="inlineCheck" htmlFor="showInMenu">
-                  <input
-                    id="showInMenu"
-                    type="checkbox"
-                    checked={form.showInMenu}
-                    onChange={(event) => setForm((prev) => ({ ...prev, showInMenu: event.target.checked }))}
-                  />
-                  Mostrar en menu de la tienda
-                </label>
-
-                <div className="actions">
-                  <button type="submit" disabled={saving}>
-                    {saving ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
-                  </button>
-                  {isEditing && (
-                    <button type="button" className="ghost" onClick={resetForm}>
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
-            </>
-          ) : activeTab === "products" ? (
-            <>
-              <h2>{isEditingProduct ? "Editar producto" : "Nuevo producto"}</h2>
-              <form onSubmit={handleProductSubmit} className="categoryForm">
-                <label htmlFor="product-name">Nombre</label>
-                <input
-                  id="product-name"
-                  type="text"
-                  value={productForm.name}
-                  onChange={(event) =>
-                    setProductForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                      slug: prev.id ? prev.slug : slugify(event.target.value),
-                    }))
-                  }
-                  required
-                />
-
-                <label htmlFor="product-slug">Slug</label>
-                <input
-                  id="product-slug"
-                  type="text"
-                  value={productForm.slug}
-                  onChange={(event) =>
-                    setProductForm((prev) => ({ ...prev, slug: slugify(event.target.value) }))
-                  }
-                  required
-                />
-
-                <label htmlFor="product-description">Descripcion</label>
-                <textarea
-                  id="product-description"
-                  rows={4}
-                  value={productForm.description}
-                  onChange={(event) =>
-                    setProductForm((prev) => ({ ...prev, description: event.target.value }))
-                  }
-                />
-
-                <label htmlFor="product-image">Imagen principal</label>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <input
-                    id="product-image"
-                    type="url"
-                    placeholder="URL o sube una imagen"
-                    value={productForm.imageUrl}
-                    onChange={(event) => setProductForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
-                    style={{ flex: 1 }}
-                    required
-                  />
-                  <label
-                    className="ghost"
-                    style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap" }}
-                  >
-                    {uploadingImage ? "Subiendo..." : "Subir"}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      style={{ display: "none" }}
-                      onChange={(e) => handleImageUpload(e, "imageUrl")}
-                      disabled={uploadingImage}
-                    />
-                  </label>
-                </div>
-                {productForm.imageUrl && (
-                  <img src={productForm.imageUrl} alt="preview" style={{ maxHeight: 80, marginTop: 4, borderRadius: 6, objectFit: "cover" }} />
+              <section className="miniPanel">
+                <h3>Pedidos recientes</h3>
+                {dashboard.recentOrders.length === 0 ? (
+                  <p className="subtle">No hay pedidos registrados.</p>
+                ) : (
+                  dashboard.recentOrders.map((order) => (
+                    <div key={order.id} className="miniRow">
+                      <strong>Pedido #{order.id}</strong>
+                      <small>
+                        {order.user?.name || order.user?.email || "Cliente"} | {order.status} | ${Number(order.total || 0).toFixed(2)}
+                      </small>
+                    </div>
+                  ))
                 )}
+              </section>
+            </div>
+          </article>
+        )}
 
-                <label htmlFor="product-imagenes">Galeria</label>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <textarea
-                    id="product-imagenes"
-                    rows={2}
-                    placeholder="URLs separadas por coma, o sube imagenes"
-                    value={productForm.imagenesRaw}
-                    onChange={(event) => setProductForm((prev) => ({ ...prev, imagenesRaw: event.target.value }))}
-                    style={{ flex: 1 }}
-                  />
-                  <label
-                    className="ghost"
-                    style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap", alignSelf: "flex-start", marginTop: 4 }}
-                  >
-                    {uploadingImage ? "Subiendo..." : "+ Imagen"}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      style={{ display: "none" }}
-                      onChange={(e) => handleImageUpload(e, "gallery")}
-                      disabled={uploadingImage}
-                    />
-                  </label>
-                </div>
-
-                <label htmlFor="product-materiales">Materiales</label>
-                <input
-                  id="product-materiales"
-                  type="text"
-                  placeholder="Ej: Plata 925, bano dorado 18k"
-                  value={productForm.materiales}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, materiales: event.target.value }))}
-                />
-
-                <label htmlFor="product-dimensiones">Dimensiones</label>
-                <input
-                  id="product-dimensiones"
-                  type="text"
-                  placeholder="Ej: Largo 45 cm, diametro 1.2 cm"
-                  value={productForm.dimensiones}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, dimensiones: event.target.value }))}
-                />
-
-                <label htmlFor="product-cuidados">Instrucciones de cuidado</label>
-                <textarea
-                  id="product-cuidados"
-                  rows={3}
-                  placeholder="Ej: Evitar contacto con agua. Limpiar con pano suave."
-                  value={productForm.cuidados}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, cuidados: event.target.value }))}
-                />
-
-                <label className="inlineCheck" htmlFor="product-grabado">
-                  <input
-                    id="product-grabado"
-                    type="checkbox"
-                    checked={productForm.grabado}
-                    onChange={(event) => setProductForm((prev) => ({ ...prev, grabado: event.target.checked }))}
-                  />
-                  Admite grabado personalizado
-                </label>
-
-                <label htmlFor="product-videoUrl">Link de video (YouTube/TikTok)</label>
-                <input
-                  id="product-videoUrl"
-                  type="text"
-                  placeholder="https://youtube.com/watch?v=... o https://tiktok.com/..."
-                  value={productForm.videoUrl}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, videoUrl: event.target.value }))}
-                />
-
-                <label htmlFor="product-category">Categoria</label>
-                <select
-                  id="product-category"
-                  value={productForm.category}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, category: event.target.value }))}
-                >
-                  <option value="">Sin categoria</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.name}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-
-                <label htmlFor="product-price">Precio</label>
-                <input
-                  id="product-price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={productForm.price}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, price: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="product-stock">Stock</label>
-                <input
-                  id="product-stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={productForm.stock}
-                  onChange={(event) => setProductForm((prev) => ({ ...prev, stock: event.target.value }))}
-                />
-
-                <label className="inlineCheck" htmlFor="product-recommended">
-                  <input
-                    id="product-recommended"
-                    type="checkbox"
-                    checked={productForm.recommended}
-                    onChange={(event) =>
-                      setProductForm((prev) => ({ ...prev, recommended: event.target.checked }))
-                    }
-                  />
-                  Recomendado
-                </label>
-
-                <label className="inlineCheck" htmlFor="product-active">
-                  <input
-                    id="product-active"
-                    type="checkbox"
-                    checked={productForm.active}
-                    onChange={(event) => setProductForm((prev) => ({ ...prev, active: event.target.checked }))}
-                  />
-                  Activo
-                </label>
-
-                <div className="actions">
-                  <button type="submit" disabled={saving}>
-                    {saving ? "Guardando..." : isEditingProduct ? "Actualizar" : "Crear"}
-                  </button>
-                  {isEditingProduct && (
-                    <button type="button" className="ghost" onClick={resetProductForm}>
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
-
-              <div style={{ marginTop: 32, padding: 20, background: "#f8f9fa", borderRadius: 10, border: "1px dashed #ccc" }}>
-                <h3 style={{ marginTop: 0 }}>Importacion masiva desde Excel</h3>
-                <p style={{ fontSize: 13, color: "#666", margin: "4px 0 16px" }}>
-                  Descarga la plantilla, llena los datos de tus productos, y sube el Excel junto con las imagenes.
-                  En la columna "imagen_archivo" pon el nombre exacto del archivo de imagen (ej: anillo.jpg).
-                </p>
-
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-                  <button type="button" className="ghost" onClick={handleDownloadTemplate}>
-                    Descargar plantilla Excel
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>
-                    Archivo Excel (.xlsx)
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls"
-                      style={{ display: "block", marginTop: 4 }}
-                      onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); }}
-                    />
-                  </label>
-
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>
-                    Imagenes de productos (opcional, selecciona varias)
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      multiple
-                      style={{ display: "block", marginTop: 4 }}
-                      onChange={(e) => setImportImages(Array.from(e.target.files || []))}
-                    />
-                  </label>
-                  {importImages.length > 0 && (
-                    <small style={{ color: "#666" }}>{importImages.length} imagen(es) seleccionada(s): {importImages.map((f) => f.name).join(", ")}</small>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={handleImportProducts}
-                    disabled={!importFile || importing}
-                    style={{ alignSelf: "flex-start", marginTop: 8 }}
-                  >
-                    {importing ? "Importando..." : "Importar productos"}
-                  </button>
-
-                  {importResult && (
-                    <div style={{ padding: 12, borderRadius: 8, background: importResult.errors?.length ? "#fff3cd" : "#d4edda", fontSize: 13 }}>
-                      <strong>{importResult.message}</strong>
-                      {importResult.errors?.length > 0 && (
-                        <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>
-                          {importResult.errors.map((err, i) => (
-                            <li key={i}>Fila {err.row}: {err.error}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
+        {activeTab === "settings" && (
+          <article className="panel">
+            <h2>Branding y video</h2>
+            <form onSubmit={handleSettingsSubmit} className="categoryForm">
+              <label htmlFor="brandName">Nombre de marca</label>
+              <input id="brandName" type="text" value={settingsForm.brandName} onChange={(event) => setSettingsForm((prev) => ({ ...prev, brandName: event.target.value }))} required />
+              <label htmlFor="logoUrl">URL del logo</label>
+              <input id="logoUrl" type="url" value={settingsForm.logoUrl} onChange={(event) => setSettingsForm((prev) => ({ ...prev, logoUrl: event.target.value }))} />
+              <label htmlFor="promoVideoUrl">URL video promocional (YouTube/TikTok)</label>
+              <input id="promoVideoUrl" type="url" value={settingsForm.promoVideoUrl} onChange={(event) => setSettingsForm((prev) => ({ ...prev, promoVideoUrl: event.target.value }))} />
+              <label htmlFor="promoVideoTitle">Titulo del video</label>
+              <input id="promoVideoTitle" type="text" value={settingsForm.promoVideoTitle} onChange={(event) => setSettingsForm((prev) => ({ ...prev, promoVideoTitle: event.target.value }))} />
+              <div className="actions">
+                <button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar branding"}</button>
               </div>
-            </>
-          ) : activeTab === "slides" ? (
-            <>
-              <h2>{isEditingSlide ? "Editar slide" : "Nuevo slide"}</h2>
-              <form onSubmit={handleSlideSubmit} className="categoryForm">
-                <label htmlFor="slide-title">Titulo</label>
-                <input
-                  id="slide-title"
-                  type="text"
-                  value={slideForm.title}
-                  onChange={(event) => setSlideForm((prev) => ({ ...prev, title: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="slide-subtitle">Subtitulo</label>
-                <input
-                  id="slide-subtitle"
-                  type="text"
-                  value={slideForm.subtitle}
-                  onChange={(event) => setSlideForm((prev) => ({ ...prev, subtitle: event.target.value }))}
-                />
-
-                <label htmlFor="slide-image">URL imagen</label>
-                <input
-                  id="slide-image"
-                  type="url"
-                  value={slideForm.imageUrl}
-                  onChange={(event) => setSlideForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="slide-cta-label">Texto CTA</label>
-                <input
-                  id="slide-cta-label"
-                  type="text"
-                  value={slideForm.ctaLabel}
-                  onChange={(event) => setSlideForm((prev) => ({ ...prev, ctaLabel: event.target.value }))}
-                />
-
-                <label htmlFor="slide-cta-url">URL CTA</label>
-                <input
-                  id="slide-cta-url"
-                  type="text"
-                  value={slideForm.ctaUrl}
-                  onChange={(event) => setSlideForm((prev) => ({ ...prev, ctaUrl: event.target.value }))}
-                />
-
-                <label htmlFor="slide-order">Orden</label>
-                <input
-                  id="slide-order"
-                  type="number"
-                  min={1}
-                  value={slideForm.displayOrder}
-                  onChange={(event) =>
-                    setSlideForm((prev) => ({ ...prev, displayOrder: Number(event.target.value || 1) }))
-                  }
-                  required
-                />
-
-                <label className="inlineCheck" htmlFor="slide-active">
-                  <input
-                    id="slide-active"
-                    type="checkbox"
-                    checked={slideForm.active}
-                    onChange={(event) => setSlideForm((prev) => ({ ...prev, active: event.target.checked }))}
-                  />
-                  Activo
-                </label>
-
-                <div className="actions">
-                  <button type="submit" disabled={saving}>
-                    {saving ? "Guardando..." : isEditingSlide ? "Actualizar" : "Crear"}
-                  </button>
-                  {isEditingSlide && (
-                    <button type="button" className="ghost" onClick={resetSlideForm}>
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
-            </>
-          ) : activeTab === "flyers" ? (
-            <>
-              <h2>{isEditingFlyer ? "Editar flyer horizontal" : "Nuevo flyer horizontal"}</h2>
-              <form onSubmit={handleFlyerSubmit} className="categoryForm">
-                <label htmlFor="flyer-title">Titulo</label>
-                <input
-                  id="flyer-title"
-                  type="text"
-                  value={flyerForm.title}
-                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, title: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="flyer-subtitle">Subtitulo</label>
-                <input
-                  id="flyer-subtitle"
-                  type="text"
-                  value={flyerForm.subtitle}
-                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, subtitle: event.target.value }))}
-                />
-
-                <label htmlFor="flyer-image">URL imagen horizontal</label>
-                <input
-                  id="flyer-image"
-                  type="url"
-                  value={flyerForm.imageUrl}
-                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, imageUrl: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="flyer-link">URL destino (opcional)</label>
-                <input
-                  id="flyer-link"
-                  type="text"
-                  value={flyerForm.linkUrl}
-                  onChange={(event) => setFlyerForm((prev) => ({ ...prev, linkUrl: event.target.value }))}
-                />
-
-                <label htmlFor="flyer-order">Orden</label>
-                <input
-                  id="flyer-order"
-                  type="number"
-                  min={1}
-                  value={flyerForm.displayOrder}
-                  onChange={(event) =>
-                    setFlyerForm((prev) => ({ ...prev, displayOrder: Number(event.target.value || 1) }))
-                  }
-                  required
-                />
-
-                <label className="inlineCheck" htmlFor="flyer-active">
-                  <input
-                    id="flyer-active"
-                    type="checkbox"
-                    checked={flyerForm.active}
-                    onChange={(event) => setFlyerForm((prev) => ({ ...prev, active: event.target.checked }))}
-                  />
-                  Activo
-                </label>
-
-                <div className="actions">
-                  <button type="submit" disabled={saving}>
-                    {saving ? "Guardando..." : isEditingFlyer ? "Actualizar" : "Crear"}
-                  </button>
-                  {isEditingFlyer && (
-                    <button type="button" className="ghost" onClick={resetFlyerForm}>
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              </form>
-            </>
-          ) : activeTab === "orders" ? (
-            <>
-              <h2>{manualOrderOpen ? "Nuevo pedido manual" : "Pedidos"}</h2>
-              {!manualOrderOpen ? (
-                <>
-                  <p className="subtle">Los pedidos se crean desde la tienda o manualmente.</p>
-                  <button type="button" onClick={() => setManualOrderOpen(true)}>
-                    + Crear pedido manual
-                  </button>
-                </>
-              ) : (
-                <form onSubmit={handleManualOrderSubmit} className="categoryForm">
-                  <label htmlFor="mo-nombre">Nombre del cliente</label>
-                  <input
-                    id="mo-nombre"
-                    type="text"
-                    value={manualOrderForm.nombre}
-                    onChange={(e) => setManualOrderForm((p) => ({ ...p, nombre: e.target.value }))}
-                    required
-                  />
-
-                  <label htmlFor="mo-email">Email</label>
-                  <input
-                    id="mo-email"
-                    type="email"
-                    value={manualOrderForm.email}
-                    onChange={(e) => setManualOrderForm((p) => ({ ...p, email: e.target.value }))}
-                    required
-                  />
-
-                  <label htmlFor="mo-telefono">Telefono</label>
-                  <input
-                    id="mo-telefono"
-                    type="tel"
-                    value={manualOrderForm.telefono}
-                    onChange={(e) => setManualOrderForm((p) => ({ ...p, telefono: e.target.value }))}
-                    required
-                  />
-
-                  <label>Buscar producto</label>
-                  <div className="productPicker">
-                    <div className="productPickerFilters">
-                      <select
-                        value={productSearchCat}
-                        onChange={(e) => setProductSearchCat(e.target.value)}
-                      >
-                        <option value="todas">Todas las categorias</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.name}>{c.name}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Buscar por nombre..."
-                        value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
-                      />
-                    </div>
-                    {productSearch.length >= 2 || productSearchCat !== "todas" ? (
-                      <ul className="productPickerResults">
-                        {products
-                          .filter((p) => p.active)
-                          .filter((p) => productSearchCat === "todas" || p.category === productSearchCat)
-                          .filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase()))
-                          .slice(0, 20)
-                          .map((p) => (
-                            <li key={p.id}>
-                              <button type="button" onClick={() => { addManualOrderItem(p.id); setProductSearch(""); }}>
-                                <span>{p.name}</span>
-                                <small>{p.category || "Sin categoria"} — ${Number(p.price).toFixed(2)}</small>
-                              </button>
-                            </li>
-                          ))}
-                        {products
-                          .filter((p) => p.active)
-                          .filter((p) => productSearchCat === "todas" || p.category === productSearchCat)
-                          .filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase()))
-                          .length === 0 && <li className="noResults">Sin resultados</li>}
-                      </ul>
-                    ) : (
-                      <p className="subtle pickerHint">Escribe al menos 2 letras o selecciona una categoria</p>
-                    )}
-                  </div>
-
-                  {manualOrderForm.items.length > 0 && (
-                    <ul className="manualOrderItems">
-                      {manualOrderForm.items.map((item) => (
-                        <li key={item.productId}>
-                          <span>{item.quantity}x {item.name} — ${(item.price * item.quantity).toFixed(2)}</span>
-                          <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.productId)}>x</button>
-                        </li>
-                      ))}
-                      <li className="manualOrderTotal">
-                        <strong>Total: ${manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong>
-                      </li>
-                    </ul>
-                  )}
-
-                  <div className="actions">
-                    <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0}>
-                      {manualOrderSaving ? "Creando..." : "Crear pedido"}
-                    </button>
-                    <button type="button" className="ghost" onClick={() => { setManualOrderOpen(false); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
-              )}
-            </>
-          ) : activeTab === "despacho" ? (
-            <>
-              <h2>Despacho</h2>
-              <p className="subtle">Pedidos pagados pendientes de despacho. Cambia a "Listo para Envio" cuando esten preparados.</p>
-            </>
-          ) : (
-            <>
-              <h2>Branding y video</h2>
-              <form onSubmit={handleSettingsSubmit} className="categoryForm">
-                <label htmlFor="brandName">Nombre de marca</label>
-                <input
-                  id="brandName"
-                  type="text"
-                  value={settingsForm.brandName}
-                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, brandName: event.target.value }))}
-                  required
-                />
-
-                <label htmlFor="logoUrl">URL del logo</label>
-                <input
-                  id="logoUrl"
-                  type="url"
-                  value={settingsForm.logoUrl}
-                  onChange={(event) => setSettingsForm((prev) => ({ ...prev, logoUrl: event.target.value }))}
-                />
-
-                <label htmlFor="promoVideoUrl">URL video promocional (YouTube/TikTok)</label>
-                <input
-                  id="promoVideoUrl"
-                  type="url"
-                  value={settingsForm.promoVideoUrl}
-                  onChange={(event) =>
-                    setSettingsForm((prev) => ({ ...prev, promoVideoUrl: event.target.value }))
-                  }
-                />
-
-                <label htmlFor="promoVideoTitle">Titulo del video</label>
-                <input
-                  id="promoVideoTitle"
-                  type="text"
-                  value={settingsForm.promoVideoTitle}
-                  onChange={(event) =>
-                    setSettingsForm((prev) => ({ ...prev, promoVideoTitle: event.target.value }))
-                  }
-                />
-
-                <div className="actions">
-                  <button type="submit" disabled={saving}>
-                    {saving ? "Guardando..." : "Guardar branding"}
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
-        </article>
+            </form>
+          </article>
+        )}
 
         <article className="panel">
           <div className="listHeader">
             <h2>{TAB_LIST_TITLES[activeTab] || "Vista"}</h2>
-            <button className="ghost" onClick={loadData} disabled={listLoading}>
-              {listLoading ? "Actualizando..." : "Recargar"}
-            </button>
+            <div className="actions">
+              {activeTab === "users" && <button onClick={() => { resetUserForm(); setFormModal("user"); }}>+ Nuevo usuario</button>}
+              {activeTab === "categories" && <button onClick={() => { resetForm(); setFormModal("category"); }}>+ Nueva categoria</button>}
+              {activeTab === "products" && (
+                <>
+                  <button onClick={() => { resetProductForm(); setFormModal("product"); }}>+ Nuevo producto</button>
+                  <button className="ghost" onClick={() => setFormModal("import")}>Importar Excel</button>
+                </>
+              )}
+              {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}
+              {activeTab === "flyers" && <button onClick={() => { resetFlyerForm(); setFormModal("flyer"); }}>+ Nuevo flyer</button>}
+              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
+              <button className="ghost" onClick={loadData} disabled={listLoading}>{listLoading ? "Actualizando..." : "Recargar"}</button>
+            </div>
           </div>
 
           {activeTab === "orders" && (
@@ -2289,6 +1573,276 @@ export default function App() {
         </article>
         </section>
       </section>
+
+      {formModal === "user" && (
+        <div className="modalOverlay" onClick={resetUserForm}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>{isEditingUser ? "Editar usuario" : "Nuevo usuario"}</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleUserSubmit} className="categoryForm">
+              <label htmlFor="user-name">Nombre</label>
+              <input id="user-name" type="text" value={userForm.name} onChange={(e) => setUserForm((p) => ({ ...p, name: e.target.value }))} required />
+              <label htmlFor="user-email">Email</label>
+              <input id="user-email" type="email" value={userForm.email} onChange={(e) => setUserForm((p) => ({ ...p, email: e.target.value }))} required />
+              <label htmlFor="user-password">{isEditingUser ? "Nueva password (opcional)" : "Password"}</label>
+              <input id="user-password" type="password" value={userForm.password} onChange={(e) => setUserForm((p) => ({ ...p, password: e.target.value }))} />
+              <label htmlFor="user-role">Rol</label>
+              <select id="user-role" value={userForm.rol} onChange={(e) => setUserForm((p) => ({ ...p, rol: e.target.value }))}>
+                <option value="CLIENTE">Cliente</option>
+                <option value="ADMINISTRADOR">Administrador</option>
+              </select>
+              {userForm.rol === "ADMINISTRADOR" && (
+                <>
+                  <label>Permisos del admin (sin seleccion = acceso total)</label>
+                  <div className="permissionsGrid">
+                    {ALL_PERMISSIONS.map((perm) => (
+                      <label key={perm.key} className="inlineCheck">
+                        <input type="checkbox" checked={userForm.permisos.includes(perm.key)} onChange={(e) => setUserForm((p) => ({ ...p, permisos: e.target.checked ? [...p.permisos, perm.key] : p.permisos.filter((k) => k !== perm.key) }))} />
+                        {perm.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="actions">
+                <button type="submit" disabled={saving}>{saving ? "Guardando..." : isEditingUser ? "Actualizar" : "Crear usuario"}</button>
+                <button type="button" className="ghost" onClick={resetUserForm}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {formModal === "category" && (
+        <div className="modalOverlay" onClick={resetForm}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>{isEditing ? "Editar categoria" : "Nueva categoria"}</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleSubmit} className="categoryForm">
+              <label htmlFor="name">Nombre</label>
+              <input id="name" type="text" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value, slug: p.id ? p.slug : slugify(e.target.value) }))} required />
+              <label htmlFor="slug">Slug</label>
+              <input id="slug" type="text" value={form.slug} onChange={(e) => setForm((p) => ({ ...p, slug: slugify(e.target.value) }))} required />
+              <label htmlFor="description">Descripcion</label>
+              <textarea id="description" rows={3} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
+              <label htmlFor="bannerImageUrl">URL imagen categoria</label>
+              <input id="bannerImageUrl" type="url" value={form.bannerImageUrl} onChange={(e) => setForm((p) => ({ ...p, bannerImageUrl: e.target.value }))} />
+              <label htmlFor="parentId">Categoria padre</label>
+              <select id="parentId" value={form.parentId} onChange={(e) => setForm((p) => ({ ...p, parentId: e.target.value }))}>
+                <option value="">Ninguna (categoria principal)</option>
+                {categories.filter((c) => !c.parentId && c.id !== form.id).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <label className="inlineCheck" htmlFor="active"><input id="active" type="checkbox" checked={form.active} onChange={(e) => setForm((p) => ({ ...p, active: e.target.checked }))} /> Activa</label>
+              <label className="inlineCheck" htmlFor="showInMenu"><input id="showInMenu" type="checkbox" checked={form.showInMenu} onChange={(e) => setForm((p) => ({ ...p, showInMenu: e.target.checked }))} /> Mostrar en menu</label>
+              <div className="actions">
+                <button type="submit" disabled={saving}>{saving ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}</button>
+                <button type="button" className="ghost" onClick={resetForm}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {formModal === "product" && (
+        <div className="modalOverlay" onClick={resetProductForm}>
+          <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
+            <h2>{isEditingProduct ? "Editar producto" : "Nuevo producto"}</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleProductSubmit} className="categoryForm">
+              <label htmlFor="product-name">Nombre</label>
+              <input id="product-name" type="text" value={productForm.name} onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value, slug: p.id ? p.slug : slugify(e.target.value) }))} required />
+              <label htmlFor="product-slug">Slug</label>
+              <input id="product-slug" type="text" value={productForm.slug} onChange={(e) => setProductForm((p) => ({ ...p, slug: slugify(e.target.value) }))} required />
+              <label htmlFor="product-description">Descripcion</label>
+              <textarea id="product-description" rows={3} value={productForm.description} onChange={(e) => setProductForm((p) => ({ ...p, description: e.target.value }))} />
+              <label htmlFor="product-image">Imagen principal</label>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input id="product-image" type="url" placeholder="URL o sube una imagen" value={productForm.imageUrl} onChange={(e) => setProductForm((p) => ({ ...p, imageUrl: e.target.value }))} style={{ flex: 1 }} required />
+                <label className="ghost" style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap" }}>
+                  {uploadingImage ? "Subiendo..." : "Subir"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "imageUrl")} disabled={uploadingImage} />
+                </label>
+              </div>
+              {productForm.imageUrl && <img src={productForm.imageUrl} alt="preview" style={{ maxHeight: 80, marginTop: 4, borderRadius: 6, objectFit: "cover" }} />}
+              <label htmlFor="product-imagenes">Galeria</label>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <textarea id="product-imagenes" rows={2} placeholder="URLs separadas por coma" value={productForm.imagenesRaw} onChange={(e) => setProductForm((p) => ({ ...p, imagenesRaw: e.target.value }))} style={{ flex: 1 }} />
+                <label className="ghost" style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap", alignSelf: "flex-start", marginTop: 4 }}>
+                  {uploadingImage ? "Subiendo..." : "+ Imagen"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "gallery")} disabled={uploadingImage} />
+                </label>
+              </div>
+              <label htmlFor="product-category">Categoria</label>
+              <select id="product-category" value={productForm.category} onChange={(e) => setProductForm((p) => ({ ...p, category: e.target.value }))}>
+                <option value="">Sin categoria</option>
+                {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+              </select>
+              <label htmlFor="product-price">Precio</label>
+              <input id="product-price" type="number" min="0" step="0.01" value={productForm.price} onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))} required />
+              <label htmlFor="product-stock">Stock</label>
+              <input id="product-stock" type="number" min="0" step="1" value={productForm.stock} onChange={(e) => setProductForm((p) => ({ ...p, stock: e.target.value }))} />
+              <label htmlFor="product-materiales">Materiales</label>
+              <input id="product-materiales" type="text" placeholder="Ej: Plata 925" value={productForm.materiales} onChange={(e) => setProductForm((p) => ({ ...p, materiales: e.target.value }))} />
+              <label htmlFor="product-dimensiones">Dimensiones</label>
+              <input id="product-dimensiones" type="text" placeholder="Ej: Largo 45 cm" value={productForm.dimensiones} onChange={(e) => setProductForm((p) => ({ ...p, dimensiones: e.target.value }))} />
+              <label htmlFor="product-cuidados">Cuidados</label>
+              <textarea id="product-cuidados" rows={2} placeholder="Instrucciones de cuidado" value={productForm.cuidados} onChange={(e) => setProductForm((p) => ({ ...p, cuidados: e.target.value }))} />
+              <label className="inlineCheck" htmlFor="product-grabado"><input id="product-grabado" type="checkbox" checked={productForm.grabado} onChange={(e) => setProductForm((p) => ({ ...p, grabado: e.target.checked }))} /> Grabado</label>
+              <label htmlFor="product-videoUrl">Video (YouTube/TikTok)</label>
+              <input id="product-videoUrl" type="text" value={productForm.videoUrl} onChange={(e) => setProductForm((p) => ({ ...p, videoUrl: e.target.value }))} />
+              <label className="inlineCheck" htmlFor="product-recommended"><input id="product-recommended" type="checkbox" checked={productForm.recommended} onChange={(e) => setProductForm((p) => ({ ...p, recommended: e.target.checked }))} /> Recomendado</label>
+              <label className="inlineCheck" htmlFor="product-active"><input id="product-active" type="checkbox" checked={productForm.active} onChange={(e) => setProductForm((p) => ({ ...p, active: e.target.checked }))} /> Activo</label>
+              <div className="actions">
+                <button type="submit" disabled={saving}>{saving ? "Guardando..." : isEditingProduct ? "Actualizar" : "Crear"}</button>
+                <button type="button" className="ghost" onClick={resetProductForm}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {formModal === "import" && (
+        <div className="modalOverlay" onClick={() => setFormModal("")}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>Importar productos desde Excel</h2>
+            <p style={{ fontSize: 13, color: "#666", margin: "4px 0 16px" }}>
+              Descarga la plantilla, llena los datos y sube el Excel junto con las imagenes.
+            </p>
+            <div className="categoryForm">
+              <button type="button" className="ghost" onClick={handleDownloadTemplate}>Descargar plantilla Excel</button>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Archivo Excel (.xlsx)
+                <input type="file" accept=".xlsx,.xls" style={{ display: "block", marginTop: 4 }} onChange={(e) => { setImportFile(e.target.files?.[0] || null); setImportResult(null); }} />
+              </label>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Imagenes (opcional, selecciona varias)
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple style={{ display: "block", marginTop: 4 }} onChange={(e) => setImportImages(Array.from(e.target.files || []))} />
+              </label>
+              {importImages.length > 0 && <small style={{ color: "#666" }}>{importImages.length} imagen(es): {importImages.map((f) => f.name).join(", ")}</small>}
+              <div className="actions">
+                <button type="button" onClick={handleImportProducts} disabled={!importFile || importing}>{importing ? "Importando..." : "Importar productos"}</button>
+                <button type="button" className="ghost" onClick={() => setFormModal("")}>Cerrar</button>
+              </div>
+              {importResult && (
+                <div style={{ padding: 12, borderRadius: 8, background: importResult.errors?.length ? "#fff3cd" : "#d4edda", fontSize: 13 }}>
+                  <strong>{importResult.message}</strong>
+                  {importResult.errors?.length > 0 && (
+                    <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+                      {importResult.errors.map((err, i) => <li key={i}>Fila {err.row}: {err.error}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {formModal === "slide" && (
+        <div className="modalOverlay" onClick={resetSlideForm}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>{isEditingSlide ? "Editar slide" : "Nuevo slide"}</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleSlideSubmit} className="categoryForm">
+              <label htmlFor="slide-title">Titulo</label>
+              <input id="slide-title" type="text" value={slideForm.title} onChange={(e) => setSlideForm((p) => ({ ...p, title: e.target.value }))} required />
+              <label htmlFor="slide-subtitle">Subtitulo</label>
+              <input id="slide-subtitle" type="text" value={slideForm.subtitle} onChange={(e) => setSlideForm((p) => ({ ...p, subtitle: e.target.value }))} />
+              <label htmlFor="slide-image">URL imagen</label>
+              <input id="slide-image" type="url" value={slideForm.imageUrl} onChange={(e) => setSlideForm((p) => ({ ...p, imageUrl: e.target.value }))} required />
+              <label htmlFor="slide-cta-label">Texto CTA</label>
+              <input id="slide-cta-label" type="text" value={slideForm.ctaLabel} onChange={(e) => setSlideForm((p) => ({ ...p, ctaLabel: e.target.value }))} />
+              <label htmlFor="slide-cta-url">URL CTA</label>
+              <input id="slide-cta-url" type="text" value={slideForm.ctaUrl} onChange={(e) => setSlideForm((p) => ({ ...p, ctaUrl: e.target.value }))} />
+              <label htmlFor="slide-order">Orden</label>
+              <input id="slide-order" type="number" min={1} value={slideForm.displayOrder} onChange={(e) => setSlideForm((p) => ({ ...p, displayOrder: Number(e.target.value || 1) }))} required />
+              <label className="inlineCheck" htmlFor="slide-active"><input id="slide-active" type="checkbox" checked={slideForm.active} onChange={(e) => setSlideForm((p) => ({ ...p, active: e.target.checked }))} /> Activo</label>
+              <div className="actions">
+                <button type="submit" disabled={saving}>{saving ? "Guardando..." : isEditingSlide ? "Actualizar" : "Crear"}</button>
+                <button type="button" className="ghost" onClick={resetSlideForm}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {formModal === "flyer" && (
+        <div className="modalOverlay" onClick={resetFlyerForm}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>{isEditingFlyer ? "Editar flyer" : "Nuevo flyer"}</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleFlyerSubmit} className="categoryForm">
+              <label htmlFor="flyer-title">Titulo</label>
+              <input id="flyer-title" type="text" value={flyerForm.title} onChange={(e) => setFlyerForm((p) => ({ ...p, title: e.target.value }))} required />
+              <label htmlFor="flyer-subtitle">Subtitulo</label>
+              <input id="flyer-subtitle" type="text" value={flyerForm.subtitle} onChange={(e) => setFlyerForm((p) => ({ ...p, subtitle: e.target.value }))} />
+              <label htmlFor="flyer-image">URL imagen</label>
+              <input id="flyer-image" type="url" value={flyerForm.imageUrl} onChange={(e) => setFlyerForm((p) => ({ ...p, imageUrl: e.target.value }))} required />
+              <label htmlFor="flyer-link">URL destino (opcional)</label>
+              <input id="flyer-link" type="text" value={flyerForm.linkUrl} onChange={(e) => setFlyerForm((p) => ({ ...p, linkUrl: e.target.value }))} />
+              <label htmlFor="flyer-order">Orden</label>
+              <input id="flyer-order" type="number" min={1} value={flyerForm.displayOrder} onChange={(e) => setFlyerForm((p) => ({ ...p, displayOrder: Number(e.target.value || 1) }))} required />
+              <label className="inlineCheck" htmlFor="flyer-active"><input id="flyer-active" type="checkbox" checked={flyerForm.active} onChange={(e) => setFlyerForm((p) => ({ ...p, active: e.target.checked }))} /> Activo</label>
+              <div className="actions">
+                <button type="submit" disabled={saving}>{saving ? "Guardando..." : isEditingFlyer ? "Actualizar" : "Crear"}</button>
+                <button type="button" className="ghost" onClick={resetFlyerForm}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {formModal === "manualOrder" && (
+        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>
+          <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
+            <h2>Nuevo pedido manual</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleManualOrderSubmit} className="categoryForm">
+              <label htmlFor="mo-nombre">Nombre del cliente</label>
+              <input id="mo-nombre" type="text" value={manualOrderForm.nombre} onChange={(e) => setManualOrderForm((p) => ({ ...p, nombre: e.target.value }))} required />
+              <label htmlFor="mo-email">Email</label>
+              <input id="mo-email" type="email" value={manualOrderForm.email} onChange={(e) => setManualOrderForm((p) => ({ ...p, email: e.target.value }))} required />
+              <label htmlFor="mo-telefono">Telefono</label>
+              <input id="mo-telefono" type="tel" value={manualOrderForm.telefono} onChange={(e) => setManualOrderForm((p) => ({ ...p, telefono: e.target.value }))} required />
+              <label>Buscar producto</label>
+              <div className="productPicker">
+                <div className="productPickerFilters">
+                  <select value={productSearchCat} onChange={(e) => setProductSearchCat(e.target.value)}>
+                    <option value="todas">Todas las categorias</option>
+                    {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  <input type="text" placeholder="Buscar por nombre..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} />
+                </div>
+                {productSearch.length >= 2 || productSearchCat !== "todas" ? (
+                  <ul className="productPickerResults">
+                    {products.filter((p) => p.active).filter((p) => productSearchCat === "todas" || p.category === productSearchCat).filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase())).slice(0, 20).map((p) => (
+                      <li key={p.id}><button type="button" onClick={() => { addManualOrderItem(p.id); setProductSearch(""); }}><span>{p.name}</span><small>{p.category || "Sin categoria"} — ${Number(p.price).toFixed(2)}</small></button></li>
+                    ))}
+                    {products.filter((p) => p.active).filter((p) => productSearchCat === "todas" || p.category === productSearchCat).filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase())).length === 0 && <li className="noResults">Sin resultados</li>}
+                  </ul>
+                ) : (
+                  <p className="subtle pickerHint">Escribe al menos 2 letras o selecciona una categoria</p>
+                )}
+              </div>
+              {manualOrderForm.items.length > 0 && (
+                <ul className="manualOrderItems">
+                  {manualOrderForm.items.map((item) => (
+                    <li key={item.productId}>
+                      <span>{item.quantity}x {item.name} — ${(item.price * item.quantity).toFixed(2)}</span>
+                      <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.productId)}>x</button>
+                    </li>
+                  ))}
+                  <li className="manualOrderTotal"><strong>Total: ${manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong></li>
+                </ul>
+              )}
+              <div className="actions">
+                <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
+                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {paymentModal !== null && (
         <div className="modalOverlay" onClick={() => setPaymentModal(null)}>
