@@ -194,19 +194,38 @@ h3 {
 }
 
 .subcategoryRow {
-  margin: 0 0 10px;
+  margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   justify-content: center;
+  padding: 0 10px 12px;
+  border-bottom: 1px solid rgba(34, 29, 25, 0.08);
 }
 
-.subcategoryRow span {
-  font-size: 0.72rem;
-  padding: 4px 8px;
+.subItem {
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 5px 14px;
   border-radius: 999px;
-  background: rgba(34, 29, 25, 0.06);
+  border: 1px solid rgba(159, 116, 66, 0.25);
+  background: rgba(159, 116, 66, 0.06);
   color: rgba(34, 29, 25, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subItem:hover {
+  background: rgba(159, 116, 66, 0.14);
+  color: var(--ink);
+  border-color: rgba(159, 116, 66, 0.4);
+}
+
+.subItem.active {
+  background: linear-gradient(100deg, #7f552f, var(--gold));
+  color: #fff;
+  border-color: transparent;
 }
 
 .filtersBar {
@@ -1304,7 +1323,10 @@ h3 {
   }
 
   .subcategoryRow {
-    display: none;
+    padding: 0 14px 10px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
   }
 
   .filtersBar {
