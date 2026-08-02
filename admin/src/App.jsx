@@ -1975,7 +1975,11 @@ export default function App() {
                   {p.recommended && <span className="badge on">Destacado</span>}
                 </div>
                 <div className="actions">
-                  {p.sku && <button type="button" className="ghost" onClick={() => setBarcodeViewProduct(p)}>Codigo</button>}
+                  {p.sku ? (
+                    <button type="button" className="ghost" onClick={() => setBarcodeViewProduct(p)}>Codigo</button>
+                  ) : (
+                    <button type="button" className="ghost" onClick={() => startEditProduct(p)}>Generar codigo</button>
+                  )}
                   <button type="button" className="ghost" onClick={() => startEditProduct(p)}>Editar</button>
                   <button type="button" className="danger" onClick={() => handleDeleteProduct(p)} disabled={deletingId === p.id}>{deletingId === p.id ? "..." : "Desactivar"}</button>
                 </div>
