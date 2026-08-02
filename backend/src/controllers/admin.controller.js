@@ -445,7 +445,8 @@ async function updateProduct(req, res) {
     const finalQuilates = quilates !== undefined ? quilates : existing.quilates;
     const finalQuilatajeGema = quilatajeGema !== undefined ? quilatajeGema : existing.quilatajeGema;
 
-    if (regenerateSku && tipoPieza && material) {
+    const shouldGenerateSku = regenerateSku || !existing.sku;
+    if (shouldGenerateSku && tipoPieza && material) {
       const baseCode = buildBaseCode({ tipoPieza, material, quilates: finalQuilates, gema, origenGema, quilatajeGema: finalQuilatajeGema });
       skuData = { sku: await generateUniqueSku(prisma, baseCode, Number(id)) };
     }
