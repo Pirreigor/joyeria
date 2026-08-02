@@ -399,6 +399,7 @@ async function createProduct(req, res) {
       origenGemaId: gema && origenGema ? origenGema.id : null,
       quilatajeGema: gema && quilatajeGema != null ? Number(quilatajeGema) : null,
       sku: finalSku,
+      createdByUserId: req.user.id,
     },
   });
 
@@ -490,6 +491,11 @@ async function updateProduct(req, res) {
 async function listProducts(req, res) {
   const products = await prisma.producto.findMany({
     orderBy: { createdAt: "desc" },
+    include: {
+      createdBy: {
+        select: { id: true, name: true, email: true },
+      },
+    },
   });
 
   return res.json({ products });
@@ -702,6 +708,12 @@ async function listOrders(req, res) {
       usuario: {
         select: { id: true, name: true, email: true },
       },
+      confirmedBy: {
+        select: { id: true, name: true, email: true },
+      },
+      dispatchedBy: {
+        select: { id: true, name: true, email: true },
+      },
       items: {
         include: { producto: true },
       },
@@ -731,7 +743,10 @@ async function updateOrderStatus(req, res) {
 
   const order = await prisma.pedido.update({
     where: { id: Number(id) },
-    data: { estado: status },
+    data: {
+      estado: status,
+      ...(status === "LISTO_PARA_ENVIO" ? { dispatchedByUserId: req.user.id } : {}),
+    },
   });
 
   return res.json({ order });
@@ -769,6 +784,7 @@ async function confirmPayment(req, res) {
       numeroComprobante: String(numeroComprobante).trim(),
       comprobanteUrl,
       direccionEnvio: String(direccionEnvio).trim(),
+      confirmedByUserId: req.user.id,
     },
   });
 

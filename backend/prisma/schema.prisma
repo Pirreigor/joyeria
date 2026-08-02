@@ -24,15 +24,18 @@ enum EstadoPedido {
 }
 
 model Usuario {
-  id            Int       @id @default(autoincrement())
-  name          String
-  email         String    @unique
-  passwordHash  String
-  rol           Rol       @default(CLIENTE)
-  permisos      String[]  @default([])
-  pedidos       Pedido[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 Int        @id @default(autoincrement())
+  name               String
+  email              String     @unique
+  passwordHash       String
+  rol                Rol        @default(CLIENTE)
+  permisos           String[]   @default([])
+  pedidos            Pedido[]   @relation("PedidoCliente")
+  productosCreados   Producto[] @relation("ProductoCreadoPor")
+  pedidosConfirmados Pedido[]   @relation("PedidoConfirmadoPor")
+  pedidosDespachados Pedido[]   @relation("PedidoDespachadoPor")
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   @@map("usuarios")
 }
@@ -80,6 +83,8 @@ model Producto {
   origenGema    OrigenGema?  @relation(fields: [origenGemaId], references: [id], onDelete: SetNull)
   quilatajeGema Float?
   sku           String?      @unique
+  createdByUserId Int?
+  createdBy     Usuario?     @relation("ProductoCreadoPor", fields: [createdByUserId], references: [id], onDelete: SetNull)
   items         ItemPedido[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -197,7 +202,7 @@ model Flyer {
 model Pedido {
   id               Int          @id @default(autoincrement())
   usuarioId        Int?
-  usuario          Usuario?     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuario          Usuario?     @relation("PedidoCliente", fields: [usuarioId], references: [id], onDelete: Cascade)
   clienteNombre    String?
   clienteEmail     String?
   clienteTelefono  String?
@@ -207,6 +212,10 @@ model Pedido {
   numeroComprobante  String?
   comprobanteUrl     String?
   direccionEnvio     String?
+  confirmedByUserId  Int?
+  confirmedBy        Usuario?     @relation("PedidoConfirmadoPor", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+  dispatchedByUserId Int?
+  dispatchedBy       Usuario?     @relation("PedidoDespachadoPor", fields: [dispatchedByUserId], references: [id], onDelete: SetNull)
   items              ItemPedido[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt

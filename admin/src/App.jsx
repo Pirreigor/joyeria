@@ -1969,6 +1969,7 @@ export default function App() {
                   <strong>{p.name}</strong>
                   <small>{p.category || "Sin categoria"} — ${Number(p.price || 0).toFixed(2)} — Stock: {p.stock}</small>
                   {p.sku && <small>SKU: {p.sku}</small>}
+                  {p.createdBy && <small>Registrado por: {p.createdBy.name}</small>}
                 </div>
                 <div className="card-badges">
                   <span className={`badge ${p.active ? "on" : "off"}`}>{p.active ? "Activo" : "Inactivo"}</span>
@@ -2032,6 +2033,8 @@ export default function App() {
                   <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
                   {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
                   {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                  {order.confirmedBy && <small>Pago confirmado por: {order.confirmedBy.name}</small>}
+                  {order.dispatchedBy && <small>Despachado por: {order.dispatchedBy.name}</small>}
                   {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
                 </div>
                 {order.items?.length > 0 && (
