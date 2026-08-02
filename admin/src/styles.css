@@ -902,12 +902,130 @@ button:disabled {
 }
 
 .modalContentWide {
-  width: min(680px, 100%);
+  width: min(760px, 100%);
 }
 
 .modalContent h2 {
   margin-top: 0;
   margin-bottom: 12px;
+}
+
+.formSection {
+  display: grid;
+  gap: 10px;
+  padding-top: 18px;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.formSection:first-of-type {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: 0;
+}
+
+.formSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.formSectionTitle .eyebrow {
+  margin: 0;
+}
+
+.formSectionHint {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.formGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+
+.formGrid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px 14px;
+}
+
+@media (max-width: 640px) {
+  .formGrid2,
+  .formGrid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.formField {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.imageUploadRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.uploadBtn {
+  padding: 10px 14px;
+  cursor: pointer;
+  border: 1px solid rgba(30, 26, 23, 0.2);
+  border-radius: 12px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.uploadBtn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.imagePreviewThumb {
+  width: 76px;
+  height: 76px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  margin-top: 6px;
+}
+
+.toggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toggleChip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background: #ffffff;
+  color: var(--muted);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.toggleChip input {
+  width: auto;
+}
+
+.toggleChip.active {
+  border-color: var(--gold);
+  background: rgba(163, 117, 63, 0.1);
+  color: var(--gold);
+  font-weight: 600;
 }
 
 .barcodeSection {
@@ -918,11 +1036,20 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 12px;
+  gap: 10px;
+  padding: 18px;
   border: 1px dashed var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   margin-bottom: 8px;
+  background: #fafafa;
+}
+
+.barcodeCodes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 
 .printLabelName {

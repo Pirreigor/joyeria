@@ -272,12 +272,13 @@ function ProductBarcodeLabel({ sku, name, price }) {
 
   return (
     <div className="barcodeSection">
-      <label>Codigo de barras / QR</label>
       <div className="barcodePreview printLabel">
         <p className="printLabelName">{name}</p>
         {price ? <p className="printLabelPrice">S/ {Number(price).toFixed(2)}</p> : null}
-        <canvas ref={barcodeRef} />
-        <canvas ref={qrCanvasRef} />
+        <div className="barcodeCodes">
+          <canvas ref={barcodeRef} />
+          <canvas ref={qrCanvasRef} />
+        </div>
         <p className="printLabelSku">{sku}</p>
       </div>
       <button type="button" className="ghost" onClick={() => window.print()}>Imprimir etiqueta</button>
@@ -2201,92 +2202,168 @@ export default function App() {
             <h2>{isEditingProduct ? "Editar producto" : "Nuevo producto"}</h2>
             {listError && <p className="error">{listError}</p>}
             <form onSubmit={handleProductSubmit} className="categoryForm">
-              <label htmlFor="product-name">Nombre</label>
-              <input id="product-name" type="text" value={productForm.name} onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value, slug: p.id ? p.slug : slugify(e.target.value) }))} required />
-              <label htmlFor="product-slug">Slug</label>
-              <input id="product-slug" type="text" value={productForm.slug} onChange={(e) => setProductForm((p) => ({ ...p, slug: slugify(e.target.value) }))} required />
-              <label htmlFor="product-description">Descripcion</label>
-              <textarea id="product-description" rows={3} value={productForm.description} onChange={(e) => setProductForm((p) => ({ ...p, description: e.target.value }))} />
-              <label htmlFor="product-image">Imagen principal</label>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <input id="product-image" type="url" placeholder="URL o sube una imagen" value={productForm.imageUrl} onChange={(e) => setProductForm((p) => ({ ...p, imageUrl: e.target.value }))} style={{ flex: 1 }} required />
-                <label className="ghost" style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap" }}>
-                  {uploadingImage ? "Subiendo..." : "Subir"}
-                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "imageUrl")} disabled={uploadingImage} />
-                </label>
-              </div>
-              {productForm.imageUrl && <img src={productForm.imageUrl} alt="preview" style={{ maxHeight: 80, marginTop: 4, borderRadius: 6, objectFit: "cover" }} />}
-              <label htmlFor="product-imagenes">Galeria</label>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <textarea id="product-imagenes" rows={2} placeholder="URLs separadas por coma" value={productForm.imagenesRaw} onChange={(e) => setProductForm((p) => ({ ...p, imagenesRaw: e.target.value }))} style={{ flex: 1 }} />
-                <label className="ghost" style={{ padding: "6px 12px", cursor: "pointer", border: "1px solid #ccc", borderRadius: "6px", fontSize: "13px", whiteSpace: "nowrap", alignSelf: "flex-start", marginTop: 4 }}>
-                  {uploadingImage ? "Subiendo..." : "+ Imagen"}
-                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "gallery")} disabled={uploadingImage} />
-                </label>
-              </div>
-              <label htmlFor="product-category">Categoria</label>
-              <select id="product-category" value={productForm.category} onChange={(e) => setProductForm((p) => ({ ...p, category: e.target.value }))}>
-                <option value="">Sin categoria</option>
-                {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-              </select>
-              <label htmlFor="product-price">Precio</label>
-              <input id="product-price" type="number" min="0" step="0.01" value={productForm.price} onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))} required />
-              <label htmlFor="product-stock">Stock</label>
-              <input id="product-stock" type="number" min="0" step="1" value={productForm.stock} onChange={(e) => setProductForm((p) => ({ ...p, stock: e.target.value }))} />
-              <label htmlFor="product-materiales">Materiales</label>
-              <input id="product-materiales" type="text" placeholder="Ej: Plata 925" value={productForm.materiales} onChange={(e) => setProductForm((p) => ({ ...p, materiales: e.target.value }))} />
-              <label htmlFor="product-dimensiones">Dimensiones</label>
-              <input id="product-dimensiones" type="text" placeholder="Ej: Largo 45 cm" value={productForm.dimensiones} onChange={(e) => setProductForm((p) => ({ ...p, dimensiones: e.target.value }))} />
-              <label htmlFor="product-cuidados">Cuidados</label>
-              <textarea id="product-cuidados" rows={2} placeholder="Instrucciones de cuidado" value={productForm.cuidados} onChange={(e) => setProductForm((p) => ({ ...p, cuidados: e.target.value }))} />
-
-              <label>Atributos para el codigo interno (SKU)</label>
-              <label htmlFor="product-tipoPieza">Tipo de pieza</label>
-              <select id="product-tipoPieza" value={productForm.tipoPiezaId} onChange={(e) => setProductForm((p) => ({ ...p, tipoPiezaId: e.target.value }))}>
-                <option value="">Sin definir</option>
-                {tiposPieza.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.code})</option>)}
-              </select>
-              <label htmlFor="product-material">Material</label>
-              <select id="product-material" value={productForm.materialId} onChange={(e) => setProductForm((p) => ({ ...p, materialId: e.target.value }))}>
-                <option value="">Sin definir</option>
-                {materialesCatalogo.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.code})</option>)}
-              </select>
-              {materialesCatalogo.find((m) => String(m.id) === productForm.materialId)?.requiereQuilate && (
-                <>
-                  <label htmlFor="product-quilates">Quilates</label>
-                  <input id="product-quilates" type="number" min="0" step="1" placeholder="Ej: 18" value={productForm.quilates} onChange={(e) => setProductForm((p) => ({ ...p, quilates: e.target.value }))} />
-                </>
-              )}
-              <label htmlFor="product-gema">Gema</label>
-              <select id="product-gema" value={productForm.gemaId} onChange={(e) => setProductForm((p) => ({ ...p, gemaId: e.target.value }))}>
-                <option value="">Ninguna</option>
-                {gemas.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.code})</option>)}
-              </select>
-              {productForm.gemaId && (
-                <>
-                  <label htmlFor="product-origenGema">Origen de la gema</label>
-                  <select id="product-origenGema" value={productForm.origenGemaId} onChange={(e) => setProductForm((p) => ({ ...p, origenGemaId: e.target.value }))}>
-                    <option value="">Sin definir</option>
-                    {origenesGema.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.code})</option>)}
+              <div className="formSection">
+                <div className="formSectionTitle"><p className="eyebrow">Informacion basica</p></div>
+                <div className="formGrid2">
+                  <div className="formField">
+                    <label htmlFor="product-name">Nombre</label>
+                    <input id="product-name" type="text" value={productForm.name} onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value, slug: p.id ? p.slug : slugify(e.target.value) }))} required />
+                  </div>
+                  <div className="formField">
+                    <label htmlFor="product-slug">Slug</label>
+                    <input id="product-slug" type="text" value={productForm.slug} onChange={(e) => setProductForm((p) => ({ ...p, slug: slugify(e.target.value) }))} required />
+                  </div>
+                </div>
+                <div className="formField">
+                  <label htmlFor="product-description">Descripcion</label>
+                  <textarea id="product-description" rows={3} value={productForm.description} onChange={(e) => setProductForm((p) => ({ ...p, description: e.target.value }))} />
+                </div>
+                <div className="formField">
+                  <label htmlFor="product-category">Categoria</label>
+                  <select id="product-category" value={productForm.category} onChange={(e) => setProductForm((p) => ({ ...p, category: e.target.value }))}>
+                    <option value="">Sin categoria</option>
+                    {categories.map((cat) => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                   </select>
-                  <label htmlFor="product-quilatajeGema">Quilataje de la gema (ct)</label>
-                  <input id="product-quilatajeGema" type="number" min="0" step="0.01" placeholder="Ej: 1.30" value={productForm.quilatajeGema} onChange={(e) => setProductForm((p) => ({ ...p, quilatajeGema: e.target.value }))} />
-                </>
-              )}
-              <label htmlFor="product-sku">SKU / codigo</label>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <input id="product-sku" type="text" placeholder="Se genera solo al guardar" value={productForm.sku} onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value.toUpperCase() }))} style={{ flex: 1 }} />
-                {isEditingProduct && (
-                  <button type="button" className="ghost" onClick={handleRegenerateSku} disabled={saving}>Regenerar codigo</button>
-                )}
+                </div>
               </div>
-              <ProductBarcodeLabel sku={productForm.sku} name={productForm.name} price={productForm.price} />
 
-              <label className="inlineCheck" htmlFor="product-grabado"><input id="product-grabado" type="checkbox" checked={productForm.grabado} onChange={(e) => setProductForm((p) => ({ ...p, grabado: e.target.checked }))} /> Grabado</label>
-              <label htmlFor="product-videoUrl">Video (YouTube/TikTok)</label>
-              <input id="product-videoUrl" type="text" value={productForm.videoUrl} onChange={(e) => setProductForm((p) => ({ ...p, videoUrl: e.target.value }))} />
-              <label className="inlineCheck" htmlFor="product-recommended"><input id="product-recommended" type="checkbox" checked={productForm.recommended} onChange={(e) => setProductForm((p) => ({ ...p, recommended: e.target.checked }))} /> Recomendado</label>
-              <label className="inlineCheck" htmlFor="product-active"><input id="product-active" type="checkbox" checked={productForm.active} onChange={(e) => setProductForm((p) => ({ ...p, active: e.target.checked }))} /> Activo</label>
+              <div className="formSection">
+                <div className="formSectionTitle"><p className="eyebrow">Imagenes</p></div>
+                <div className="formField">
+                  <label htmlFor="product-image">Imagen principal</label>
+                  <div className="imageUploadRow">
+                    <input id="product-image" type="url" placeholder="URL o sube una imagen" value={productForm.imageUrl} onChange={(e) => setProductForm((p) => ({ ...p, imageUrl: e.target.value }))} style={{ flex: 1 }} required />
+                    <label className="uploadBtn">
+                      {uploadingImage ? "Subiendo..." : "Subir"}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "imageUrl")} disabled={uploadingImage} />
+                    </label>
+                  </div>
+                  {productForm.imageUrl && <img src={productForm.imageUrl} alt="preview" className="imagePreviewThumb" />}
+                </div>
+                <div className="formField">
+                  <label htmlFor="product-imagenes">Galeria</label>
+                  <div className="imageUploadRow">
+                    <textarea id="product-imagenes" rows={2} placeholder="URLs separadas por coma" value={productForm.imagenesRaw} onChange={(e) => setProductForm((p) => ({ ...p, imagenesRaw: e.target.value }))} style={{ flex: 1 }} />
+                    <label className="uploadBtn" style={{ alignSelf: "flex-start" }}>
+                      {uploadingImage ? "Subiendo..." : "+ Imagen"}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "gallery")} disabled={uploadingImage} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="formSection">
+                <div className="formSectionTitle"><p className="eyebrow">Precio e inventario</p></div>
+                <div className="formGrid2">
+                  <div className="formField">
+                    <label htmlFor="product-price">Precio</label>
+                    <input id="product-price" type="number" min="0" step="0.01" value={productForm.price} onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))} required />
+                  </div>
+                  <div className="formField">
+                    <label htmlFor="product-stock">Stock</label>
+                    <input id="product-stock" type="number" min="0" step="1" value={productForm.stock} onChange={(e) => setProductForm((p) => ({ ...p, stock: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="formSection">
+                <div className="formSectionTitle"><p className="eyebrow">Atributos y codigo (SKU)</p></div>
+                <p className="formSectionHint">Elegi los atributos y el codigo se arma solo. Se usa para el codigo de barras y el QR.</p>
+                <div className="formGrid2">
+                  <div className="formField">
+                    <label htmlFor="product-tipoPieza">Tipo de pieza</label>
+                    <select id="product-tipoPieza" value={productForm.tipoPiezaId} onChange={(e) => setProductForm((p) => ({ ...p, tipoPiezaId: e.target.value }))}>
+                      <option value="">Sin definir</option>
+                      {tiposPieza.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.code})</option>)}
+                    </select>
+                  </div>
+                  <div className="formField">
+                    <label htmlFor="product-material">Material</label>
+                    <select id="product-material" value={productForm.materialId} onChange={(e) => setProductForm((p) => ({ ...p, materialId: e.target.value }))}>
+                      <option value="">Sin definir</option>
+                      {materialesCatalogo.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.code})</option>)}
+                    </select>
+                  </div>
+                </div>
+                {materialesCatalogo.find((m) => String(m.id) === productForm.materialId)?.requiereQuilate && (
+                  <div className="formField">
+                    <label htmlFor="product-quilates">Quilates</label>
+                    <input id="product-quilates" type="number" min="0" step="1" placeholder="Ej: 18" value={productForm.quilates} onChange={(e) => setProductForm((p) => ({ ...p, quilates: e.target.value }))} />
+                  </div>
+                )}
+                <div className="formGrid2">
+                  <div className="formField">
+                    <label htmlFor="product-gema">Gema</label>
+                    <select id="product-gema" value={productForm.gemaId} onChange={(e) => setProductForm((p) => ({ ...p, gemaId: e.target.value }))}>
+                      <option value="">Ninguna</option>
+                      {gemas.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.code})</option>)}
+                    </select>
+                  </div>
+                  {productForm.gemaId && (
+                    <div className="formField">
+                      <label htmlFor="product-origenGema">Origen de la gema</label>
+                      <select id="product-origenGema" value={productForm.origenGemaId} onChange={(e) => setProductForm((p) => ({ ...p, origenGemaId: e.target.value }))}>
+                        <option value="">Sin definir</option>
+                        {origenesGema.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.code})</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {productForm.gemaId && (
+                  <div className="formField">
+                    <label htmlFor="product-quilatajeGema">Quilataje de la gema (ct)</label>
+                    <input id="product-quilatajeGema" type="number" min="0" step="0.01" placeholder="Ej: 1.30" value={productForm.quilatajeGema} onChange={(e) => setProductForm((p) => ({ ...p, quilatajeGema: e.target.value }))} />
+                  </div>
+                )}
+                <div className="formField">
+                  <label htmlFor="product-sku">SKU / codigo</label>
+                  <div className="imageUploadRow">
+                    <input id="product-sku" type="text" placeholder="Se genera solo al guardar" value={productForm.sku} onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value.toUpperCase() }))} style={{ flex: 1 }} />
+                    {isEditingProduct && (
+                      <button type="button" className="ghost" onClick={handleRegenerateSku} disabled={saving}>Regenerar codigo</button>
+                    )}
+                  </div>
+                </div>
+                <ProductBarcodeLabel sku={productForm.sku} name={productForm.name} price={productForm.price} />
+              </div>
+
+              <div className="formSection">
+                <div className="formSectionTitle"><p className="eyebrow">Detalles adicionales</p></div>
+                <div className="formGrid2">
+                  <div className="formField">
+                    <label htmlFor="product-materiales">Materiales</label>
+                    <input id="product-materiales" type="text" placeholder="Ej: Plata 925" value={productForm.materiales} onChange={(e) => setProductForm((p) => ({ ...p, materiales: e.target.value }))} />
+                  </div>
+                  <div className="formField">
+                    <label htmlFor="product-dimensiones">Dimensiones</label>
+                    <input id="product-dimensiones" type="text" placeholder="Ej: Largo 45 cm" value={productForm.dimensiones} onChange={(e) => setProductForm((p) => ({ ...p, dimensiones: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="formField">
+                  <label htmlFor="product-cuidados">Cuidados</label>
+                  <textarea id="product-cuidados" rows={2} placeholder="Instrucciones de cuidado" value={productForm.cuidados} onChange={(e) => setProductForm((p) => ({ ...p, cuidados: e.target.value }))} />
+                </div>
+                <div className="formField">
+                  <label htmlFor="product-videoUrl">Video (YouTube/TikTok)</label>
+                  <input id="product-videoUrl" type="text" value={productForm.videoUrl} onChange={(e) => setProductForm((p) => ({ ...p, videoUrl: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="formSection">
+                <div className="formSectionTitle"><p className="eyebrow">Visibilidad</p></div>
+                <div className="toggleRow">
+                  <label className={`toggleChip ${productForm.grabado ? "active" : ""}`} htmlFor="product-grabado">
+                    <input id="product-grabado" type="checkbox" checked={productForm.grabado} onChange={(e) => setProductForm((p) => ({ ...p, grabado: e.target.checked }))} /> Grabado
+                  </label>
+                  <label className={`toggleChip ${productForm.recommended ? "active" : ""}`} htmlFor="product-recommended">
+                    <input id="product-recommended" type="checkbox" checked={productForm.recommended} onChange={(e) => setProductForm((p) => ({ ...p, recommended: e.target.checked }))} /> Recomendado
+                  </label>
+                  <label className={`toggleChip ${productForm.active ? "active" : ""}`} htmlFor="product-active">
+                    <input id="product-active" type="checkbox" checked={productForm.active} onChange={(e) => setProductForm((p) => ({ ...p, active: e.target.checked }))} /> Activo
+                  </label>
+                </div>
+              </div>
+
               <div className="actions">
                 <button type="submit" disabled={saving}>{saving ? "Guardando..." : isEditingProduct ? "Actualizar" : "Crear"}</button>
                 <button type="button" className="ghost" onClick={resetProductForm}>Cancelar</button>
