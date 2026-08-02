@@ -69,11 +69,71 @@ model Producto {
   cuidados      String?
   grabado       Boolean      @default(false)
   videoUrl      String?
+  tipoPiezaId   Int?
+  tipoPieza     TipoPieza?   @relation(fields: [tipoPiezaId], references: [id], onDelete: SetNull)
+  materialId    Int?
+  material      Material?    @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  quilates      Int?
+  gemaId        Int?
+  gema          Gema?        @relation(fields: [gemaId], references: [id], onDelete: SetNull)
+  origenGemaId  Int?
+  origenGema    OrigenGema?  @relation(fields: [origenGemaId], references: [id], onDelete: SetNull)
+  quilatajeGema Float?
+  sku           String?      @unique
   items         ItemPedido[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
   @@map("productos")
+}
+
+model TipoPieza {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  code      String     @unique
+  active    Boolean    @default(true)
+  productos Producto[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("tipos_pieza")
+}
+
+model Material {
+  id              Int        @id @default(autoincrement())
+  name            String     @unique
+  code            String     @unique
+  requiereQuilate Boolean    @default(true)
+  active          Boolean    @default(true)
+  productos       Producto[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("materiales_catalogo")
+}
+
+model Gema {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  code      String     @unique
+  active    Boolean    @default(true)
+  productos Producto[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("gemas")
+}
+
+model OrigenGema {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  code      String     @unique
+  active    Boolean    @default(true)
+  productos Producto[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("origenes_gema")
 }
 
 model Categoria {

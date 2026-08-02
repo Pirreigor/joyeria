@@ -35,6 +35,13 @@ const {
   revokeInvitation,
   resendInvitation,
 } = require("../controllers/invitation.controller");
+const {
+  listTiposPieza, createTipoPieza, updateTipoPieza, deleteTipoPieza,
+  listMateriales, createMaterial, updateMaterial, deleteMaterial,
+  listGemas, createGema, updateGema, deleteGema,
+  listOrigenesGema, createOrigenGema, updateOrigenGema, deleteOrigenGema,
+  findProductBySku,
+} = require("../controllers/catalog.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { requireRole, requirePermission } = require("../middleware/role.middleware");
 const { uploadComprobante } = require("../middleware/upload.middleware");
@@ -78,10 +85,31 @@ router.get("/products", requirePermission("products"), listProducts);
 router.post("/products", requirePermission("products"), createProduct);
 router.patch("/products/:id", requirePermission("products"), updateProduct);
 router.delete("/products/:id", requirePermission("products"), deleteProduct);
+router.get("/products/by-sku/:sku", requirePermission("products"), findProductBySku);
 
 router.post("/upload-image", requirePermission("products"), uploadImageMiddleware, uploadImage);
 router.get("/products/export-template", requirePermission("products"), exportTemplate);
 router.post("/products/import", requirePermission("products"), uploadImportFiles, importProducts);
+
+router.get("/tipos-pieza", requirePermission("atributos"), listTiposPieza);
+router.post("/tipos-pieza", requirePermission("atributos"), createTipoPieza);
+router.patch("/tipos-pieza/:id", requirePermission("atributos"), updateTipoPieza);
+router.delete("/tipos-pieza/:id", requirePermission("atributos"), deleteTipoPieza);
+
+router.get("/materiales", requirePermission("atributos"), listMateriales);
+router.post("/materiales", requirePermission("atributos"), createMaterial);
+router.patch("/materiales/:id", requirePermission("atributos"), updateMaterial);
+router.delete("/materiales/:id", requirePermission("atributos"), deleteMaterial);
+
+router.get("/gemas", requirePermission("atributos"), listGemas);
+router.post("/gemas", requirePermission("atributos"), createGema);
+router.patch("/gemas/:id", requirePermission("atributos"), updateGema);
+router.delete("/gemas/:id", requirePermission("atributos"), deleteGema);
+
+router.get("/origenes-gema", requirePermission("atributos"), listOrigenesGema);
+router.post("/origenes-gema", requirePermission("atributos"), createOrigenGema);
+router.patch("/origenes-gema/:id", requirePermission("atributos"), updateOrigenGema);
+router.delete("/origenes-gema/:id", requirePermission("atributos"), deleteOrigenGema);
 
 router.get("/orders", requirePermission("orders"), listOrders);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);

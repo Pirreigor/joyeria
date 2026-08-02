@@ -1,7 +1,19 @@
 const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/hash");
+const { buildBaseCode, generateUniqueSku } = require("../utils/sku");
 
 const ROLES_VALIDOS = ["ADMINISTRADOR", "VENDEDOR", "CLIENTE"];
+
+async function resolveSkuAttributes({ tipoPiezaId, materialId, gemaId, origenGemaId }) {
+  const [tipoPieza, material, gema, origenGema] = await Promise.all([
+    tipoPiezaId ? prisma.tipoPieza.findUnique({ where: { id: Number(tipoPiezaId) } }) : null,
+    materialId ? prisma.material.findUnique({ where: { id: Number(materialId) } }) : null,
+    gemaId ? prisma.gema.findUnique({ where: { id: Number(gemaId) } }) : null,
+    origenGemaId ? prisma.origenGema.findUnique({ where: { id: Number(origenGemaId) } }) : null,
+  ]);
+
+  return { tipoPieza, material, gema, origenGema };
+}
 
 function slugify(value) {
   return String(value || "")
@@ -331,7 +343,11 @@ async function deleteFlyer(req, res) {
 }
 
 async function createProduct(req, res) {
-  const { name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active, materiales, dimensiones, cuidados, grabado, videoUrl } = req.body;
+  const {
+    name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active,
+    materiales, dimensiones, cuidados, grabado, videoUrl,
+    tipoPiezaId, materialId, quilates, gemaId, origenGemaId, quilatajeGema, sku,
+  } = req.body;
 
   if (!name || !slug || price === undefined || !imageUrl) {
     return res.status(400).json({ message: "name, slug, price e imageUrl son obligatorios" });
@@ -347,6 +363,16 @@ async function createProduct(req, res) {
     if (!categoryExists) {
       return res.status(400).json({ message: "La categoria no existe" });
     }
+  }
+
+  const { tipoPieza, material, gema, origenGema } = await resolveSkuAttributes({
+    tipoPiezaId, materialId, gemaId, origenGemaId,
+  });
+
+  let finalSku = sku ? String(sku).trim().toUpperCase() : null;
+  if (!finalSku && tipoPieza && material) {
+    const baseCode = buildBaseCode({ tipoPieza, material, quilates, gema, origenGema, quilatajeGema });
+    finalSku = await generateUniqueSku(prisma, baseCode);
   }
 
   const product = await prisma.producto.create({
@@ -366,6 +392,13 @@ async function createProduct(req, res) {
       cuidados: cuidados || null,
       grabado: Boolean(grabado),
       videoUrl: videoUrl || null,
+      tipoPiezaId: tipoPieza ? tipoPieza.id : null,
+      materialId: material ? material.id : null,
+      quilates: material?.requiereQuilate && quilates ? Number(quilates) : null,
+      gemaId: gema ? gema.id : null,
+      origenGemaId: gema && origenGema ? origenGema.id : null,
+      quilatajeGema: gema && quilatajeGema != null ? Number(quilatajeGema) : null,
+      sku: finalSku,
     },
   });
 
@@ -374,7 +407,11 @@ async function createProduct(req, res) {
 
 async function updateProduct(req, res) {
   const { id } = req.params;
-  const { name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active, materiales, dimensiones, cuidados, grabado, videoUrl } = req.body;
+  const {
+    name, slug, description, price, stock, imageUrl, imagenes, category, recommended, active,
+    materiales, dimensiones, cuidados, grabado, videoUrl,
+    tipoPiezaId, materialId, quilates, gemaId, origenGemaId, quilatajeGema, sku, regenerateSku,
+  } = req.body;
 
   const existing = await prisma.producto.findUnique({ where: { id: Number(id) } });
   if (!existing) {
@@ -391,6 +428,37 @@ async function updateProduct(req, res) {
     if (!categoryExists) {
       return res.status(400).json({ message: "La categoria no existe" });
     }
+  }
+
+  const attrsProvided = [tipoPiezaId, materialId, quilates, gemaId, origenGemaId, quilatajeGema].some((v) => v !== undefined);
+  let skuData = {};
+
+  if (sku !== undefined) {
+    skuData = { sku: sku ? String(sku).trim().toUpperCase() : null };
+  } else if (regenerateSku || attrsProvided) {
+    const { tipoPieza, material, gema, origenGema } = await resolveSkuAttributes({
+      tipoPiezaId: tipoPiezaId !== undefined ? tipoPiezaId : existing.tipoPiezaId,
+      materialId: materialId !== undefined ? materialId : existing.materialId,
+      gemaId: gemaId !== undefined ? gemaId : existing.gemaId,
+      origenGemaId: origenGemaId !== undefined ? origenGemaId : existing.origenGemaId,
+    });
+    const finalQuilates = quilates !== undefined ? quilates : existing.quilates;
+    const finalQuilatajeGema = quilatajeGema !== undefined ? quilatajeGema : existing.quilatajeGema;
+
+    if (regenerateSku && tipoPieza && material) {
+      const baseCode = buildBaseCode({ tipoPieza, material, quilates: finalQuilates, gema, origenGema, quilatajeGema: finalQuilatajeGema });
+      skuData = { sku: await generateUniqueSku(prisma, baseCode, Number(id)) };
+    }
+
+    skuData = {
+      ...skuData,
+      ...(tipoPiezaId !== undefined ? { tipoPiezaId: tipoPieza ? tipoPieza.id : null } : {}),
+      ...(materialId !== undefined ? { materialId: material ? material.id : null } : {}),
+      ...(quilates !== undefined ? { quilates: material?.requiereQuilate && quilates ? Number(quilates) : null } : {}),
+      ...(gemaId !== undefined ? { gemaId: gema ? gema.id : null } : {}),
+      ...(origenGemaId !== undefined ? { origenGemaId: gema && origenGema ? origenGema.id : null } : {}),
+      ...(quilatajeGema !== undefined ? { quilatajeGema: gema && quilatajeGema != null ? Number(quilatajeGema) : null } : {}),
+    };
   }
 
   const product = await prisma.producto.update({
@@ -411,6 +479,7 @@ async function updateProduct(req, res) {
       ...(cuidados !== undefined ? { cuidados: cuidados || null } : {}),
       ...(grabado !== undefined ? { grabado: Boolean(grabado) } : {}),
       ...(videoUrl !== undefined ? { videoUrl: videoUrl || null } : {}),
+      ...skuData,
     },
   });
 

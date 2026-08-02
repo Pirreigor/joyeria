@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import JsBarcode from "jsbarcode";
+import QRCode from "qrcode";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const TOKEN_KEY = "admin_token";
@@ -61,6 +63,13 @@ const initialProductForm = {
   cuidados: "",
   grabado: false,
   videoUrl: "",
+  tipoPiezaId: "",
+  materialId: "",
+  quilates: "",
+  gemaId: "",
+  origenGemaId: "",
+  quilatajeGema: "",
+  sku: "",
 };
 
 const initialUserForm = {
@@ -79,11 +88,28 @@ const initialInviteForm = {
   permisos: [],
 };
 
+const CATALOG_ENDPOINTS = {
+  tipoPieza: { path: "tipos-pieza", label: "Tipo de pieza" },
+  material: { path: "materiales", label: "Material" },
+  gema: { path: "gemas", label: "Gema" },
+  origenGema: { path: "origenes-gema", label: "Origen de gema" },
+};
+
+const initialCatalogForm = {
+  type: "tipoPieza",
+  id: null,
+  name: "",
+  code: "",
+  requiereQuilate: true,
+  active: true,
+};
+
 const ALL_PERMISSIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "users", label: "Usuarios" },
   { key: "categories", label: "Categorias" },
   { key: "products", label: "Productos" },
+  { key: "atributos", label: "Atributos" },
   { key: "slides", label: "Slides" },
   { key: "flyers", label: "Flyers" },
   { key: "orders", label: "Pedidos" },
@@ -106,6 +132,7 @@ const STAFF_MENU = [
     items: [
       { key: "categories", label: "Categorias", short: "CA" },
       { key: "products", label: "Productos", short: "PR" },
+      { key: "atributos", label: "Atributos", short: "AT" },
     ],
   },
   {
@@ -146,6 +173,7 @@ const TAB_LIST_TITLES = {
   orders: "Listado pedidos",
   despacho: "Pedidos listos para despacho",
   settings: "Preview branding",
+  atributos: "Atributos del catalogo",
 };
 
 function MenuIcon({ tabKey }) {
@@ -220,6 +248,43 @@ function MenuIcon({ tabKey }) {
   );
 }
 
+function ProductBarcodeLabel({ sku, name, price }) {
+  const barcodeRef = useRef(null);
+  const qrCanvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!sku) return;
+
+    if (barcodeRef.current) {
+      try {
+        JsBarcode(barcodeRef.current, sku, { format: "CODE128", width: 2, height: 50, displayValue: true, fontSize: 14 });
+      } catch (error) {
+        // sku con caracteres no soportados por Code128 (raro, ya que se genera con letras/numeros/guiones)
+      }
+    }
+
+    if (qrCanvasRef.current) {
+      QRCode.toCanvas(qrCanvasRef.current, sku, { width: 110, margin: 1 }).catch(() => {});
+    }
+  }, [sku]);
+
+  if (!sku) return null;
+
+  return (
+    <div className="barcodeSection">
+      <label>Codigo de barras / QR</label>
+      <div className="barcodePreview printLabel">
+        <p className="printLabelName">{name}</p>
+        {price ? <p className="printLabelPrice">S/ {Number(price).toFixed(2)}</p> : null}
+        <canvas ref={barcodeRef} />
+        <canvas ref={qrCanvasRef} />
+        <p className="printLabelSku">{sku}</p>
+      </div>
+      <button type="button" className="ghost" onClick={() => window.print()}>Imprimir etiqueta</button>
+    </div>
+  );
+}
+
 function roleLabel(rol) {
   if (rol === "ADMINISTRADOR") return "Admin";
   if (rol === "VENDEDOR") return "Vendedor";
@@ -246,6 +311,10 @@ export default function App() {
   const [authError, setAuthError] = useState("");
 
   const [categories, setCategories] = useState([]);
+  const [tiposPieza, setTiposPieza] = useState([]);
+  const [materialesCatalogo, setMaterialesCatalogo] = useState([]);
+  const [gemas, setGemas] = useState([]);
+  const [origenesGema, setOrigenesGema] = useState([]);
   const [dashboard, setDashboard] = useState({
     stats: { users: 0, products: 0, categories: 0, orders: 0 },
     recentOrders: [],
@@ -283,6 +352,10 @@ export default function App() {
   const [inviteForm, setInviteForm] = useState(initialInviteForm);
   const [inviting, setInviting] = useState(false);
   const [invitationActionId, setInvitationActionId] = useState(null);
+
+  const [catalogForm, setCatalogForm] = useState(initialCatalogForm);
+  const [catalogSaving, setCatalogSaving] = useState(false);
+  const [catalogDeletingId, setCatalogDeletingId] = useState(null);
 
   const [inviteToken, setInviteToken] = useState(() => new URLSearchParams(window.location.search).get("invite"));
   const [inviteInfo, setInviteInfo] = useState(null);
@@ -340,7 +413,7 @@ export default function App() {
       if (listSort === "name_asc") items.sort((a, b) => a.name.localeCompare(b.name));
       else if (listSort === "name_desc") items.sort((a, b) => b.name.localeCompare(a.name));
     } else if (activeTab === "products") {
-      items = products.filter((p) => !q || `${p.name} ${p.category || ""} ${p.slug}`.toLowerCase().includes(q));
+      items = products.filter((p) => !q || `${p.name} ${p.category || ""} ${p.slug} ${p.sku || ""}`.toLowerCase().includes(q));
       if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       else if (listSort === "name_asc") items.sort((a, b) => a.name.localeCompare(b.name));
@@ -564,7 +637,8 @@ export default function App() {
     const can = (key) => perms.length === 0 || perms.includes(key);
 
     try {
-      const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData] = await Promise.all([
+      const needsAttrCatalogs = can("products") || can("atributos");
+      const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData, tiposPiezaData, materialesData, gemasData, origenesGemaData] = await Promise.all([
         can("dashboard") ? request("/api/admin/dashboard") : Promise.resolve({ stats: { users: 0, products: 0, categories: 0, orders: 0 }, recentOrders: [], recentUsers: [] }),
         can("users") ? request("/api/admin/users") : Promise.resolve({ users: [] }),
         can("users") ? request("/api/admin/invitations") : Promise.resolve({ invitations: [] }),
@@ -574,6 +648,10 @@ export default function App() {
         can("flyers") ? request("/api/admin/flyers") : Promise.resolve({ flyers: [] }),
         (can("orders") || can("despacho")) ? request("/api/admin/orders") : Promise.resolve({ orders: [] }),
         can("settings") ? request("/api/admin/settings") : Promise.resolve(null),
+        needsAttrCatalogs ? request("/api/admin/tipos-pieza") : Promise.resolve({ items: [] }),
+        needsAttrCatalogs ? request("/api/admin/materiales") : Promise.resolve({ items: [] }),
+        needsAttrCatalogs ? request("/api/admin/gemas") : Promise.resolve({ items: [] }),
+        needsAttrCatalogs ? request("/api/admin/origenes-gema") : Promise.resolve({ items: [] }),
       ]);
       setDashboard({
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
@@ -593,6 +671,10 @@ export default function App() {
         promoVideoUrl: settingsData?.settings?.promoVideoUrl || "",
         promoVideoTitle: settingsData?.settings?.promoVideoTitle || "",
       });
+      setTiposPieza(tiposPiezaData.items || []);
+      setMaterialesCatalogo(materialesData.items || []);
+      setGemas(gemasData.items || []);
+      setOrigenesGema(origenesGemaData.items || []);
     } catch (error) {
       setListError(error.message || "No se pudieron cargar datos del panel");
     } finally {
@@ -689,6 +771,13 @@ export default function App() {
       cuidados: product.cuidados || "",
       grabado: Boolean(product.grabado),
       videoUrl: product.videoUrl || "",
+      tipoPiezaId: product.tipoPiezaId ? String(product.tipoPiezaId) : "",
+      materialId: product.materialId ? String(product.materialId) : "",
+      quilates: product.quilates ? String(product.quilates) : "",
+      gemaId: product.gemaId ? String(product.gemaId) : "",
+      origenGemaId: product.origenGemaId ? String(product.origenGemaId) : "",
+      quilatajeGema: product.quilatajeGema != null ? String(product.quilatajeGema) : "",
+      sku: product.sku || "",
     });
     setFormModal("product");
   }
@@ -886,6 +975,13 @@ export default function App() {
       cuidados: productForm.cuidados.trim() || null,
       grabado: Boolean(productForm.grabado),
       videoUrl: productForm.videoUrl.trim() || null,
+      tipoPiezaId: productForm.tipoPiezaId || null,
+      materialId: productForm.materialId || null,
+      quilates: productForm.quilates ? Number(productForm.quilates) : null,
+      gemaId: productForm.gemaId || null,
+      origenGemaId: productForm.origenGemaId || null,
+      quilatajeGema: productForm.quilatajeGema ? Number(productForm.quilatajeGema) : null,
+      sku: productForm.sku.trim() || undefined,
     };
 
     try {
@@ -893,22 +989,41 @@ export default function App() {
         throw new Error("name, slug, price e imageUrl son obligatorios");
       }
 
+      let data;
       if (isEditingProduct) {
-        await request(`/api/admin/products/${productForm.id}`, {
+        data = await request(`/api/admin/products/${productForm.id}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
       } else {
-        await request("/api/admin/products", {
+        data = await request("/api/admin/products", {
           method: "POST",
           body: JSON.stringify(payload),
         });
       }
 
-      resetProductForm();
+      setProductForm((p) => ({ ...p, id: data.product.id, sku: data.product.sku || "" }));
       await loadData();
     } catch (error) {
       setListError(error.message || "No se pudo guardar el producto");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRegenerateSku() {
+    setSaving(true);
+    setListError("");
+
+    try {
+      const data = await request(`/api/admin/products/${productForm.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ regenerateSku: true }),
+      });
+      setProductForm((p) => ({ ...p, sku: data.product.sku || "" }));
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo regenerar el codigo");
     } finally {
       setSaving(false);
     }
@@ -1014,6 +1129,78 @@ export default function App() {
       setListError(error.message || "No se pudo reenviar la invitacion");
     } finally {
       setInvitationActionId(null);
+    }
+  }
+
+  function resetCatalogForm() {
+    setCatalogForm(initialCatalogForm);
+    setFormModal("");
+  }
+
+  function startEditCatalog(type, item) {
+    setCatalogForm({
+      type,
+      id: item.id,
+      name: item.name,
+      code: item.code,
+      requiereQuilate: item.requiereQuilate === undefined ? true : Boolean(item.requiereQuilate),
+      active: Boolean(item.active),
+    });
+  }
+
+  async function handleCatalogSubmit(event) {
+    event.preventDefault();
+    setCatalogSaving(true);
+    setListError("");
+
+    const { path } = CATALOG_ENDPOINTS[catalogForm.type];
+    const payload = {
+      name: catalogForm.name.trim(),
+      code: catalogForm.code.trim(),
+      active: catalogForm.active,
+      ...(catalogForm.type === "material" ? { requiereQuilate: catalogForm.requiereQuilate } : {}),
+    };
+
+    try {
+      if (!payload.name || !payload.code) {
+        throw new Error("name y code son obligatorios");
+      }
+
+      if (catalogForm.id) {
+        await request(`/api/admin/${path}/${catalogForm.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await request(`/api/admin/${path}`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      resetCatalogForm();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar el atributo");
+    } finally {
+      setCatalogSaving(false);
+    }
+  }
+
+  async function handleCatalogDelete(type, item) {
+    const confirmed = window.confirm(`Eliminar "${item.name}"?`);
+    if (!confirmed) return;
+
+    setCatalogDeletingId(item.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/${CATALOG_ENDPOINTS[type].path}/${item.id}`, { method: "DELETE" });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo eliminar el atributo");
+    } finally {
+      setCatalogDeletingId(null);
     }
   }
 
@@ -1602,7 +1789,7 @@ export default function App() {
             </div>
           )}
 
-          {!["dashboard", "settings"].includes(activeTab) && (
+          {!["dashboard", "settings", "atributos"].includes(activeTab) && (
             <div className="listToolbar">
               <input
                 type="text"
@@ -1652,6 +1839,40 @@ export default function App() {
                 </div>
               </article>
             )}
+
+            {activeTab === "atributos" && [
+              { type: "tipoPieza", title: "Tipos de pieza", items: tiposPieza },
+              { type: "material", title: "Materiales", items: materialesCatalogo },
+              { type: "gema", title: "Gemas", items: gemas },
+              { type: "origenGema", title: "Origenes de gema", items: origenesGema },
+            ].map((section) => (
+              <div key={section.type} style={{ marginBottom: 24 }}>
+                <div className="listHeader" style={{ marginTop: 0 }}>
+                  <h3 style={{ margin: 0 }}>{section.title}</h3>
+                  <button type="button" className="ghost" onClick={() => { setCatalogForm({ ...initialCatalogForm, type: section.type }); setFormModal("catalog"); }}>
+                    + Agregar
+                  </button>
+                </div>
+                {section.items.length === 0 && <p className="empty">Sin registros todavia.</p>}
+                {section.items.map((item) => (
+                  <article key={item.id} className="card">
+                    <div className="card-info">
+                      <strong>{item.name}</strong>
+                      <small>Codigo: {item.code}{section.type === "material" ? ` — ${item.requiereQuilate ? "usa quilates" : "no usa quilates"}` : ""}</small>
+                    </div>
+                    <div className="card-badges">
+                      <span className={`badge ${item.active ? "on" : "off"}`}>{item.active ? "Activo" : "Inactivo"}</span>
+                    </div>
+                    <div className="actions">
+                      <button type="button" className="ghost" onClick={() => { startEditCatalog(section.type, item); setFormModal("catalog"); }}>Editar</button>
+                      <button type="button" className="danger" onClick={() => handleCatalogDelete(section.type, item)} disabled={catalogDeletingId === item.id}>
+                        {catalogDeletingId === item.id ? "..." : "Eliminar"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ))}
 
             {activeTab === "users" && pagedList.map((u) => (
               <article key={u.id} className="card">
@@ -1729,6 +1950,7 @@ export default function App() {
                 <div className="card-info">
                   <strong>{p.name}</strong>
                   <small>{p.category || "Sin categoria"} — ${Number(p.price || 0).toFixed(2)} — Stock: {p.stock}</small>
+                  {p.sku && <small>SKU: {p.sku}</small>}
                 </div>
                 <div className="card-badges">
                   <span className={`badge ${p.active ? "on" : "off"}`}>{p.active ? "Activo" : "Inactivo"}</span>
@@ -1812,7 +2034,7 @@ export default function App() {
               </article>
             ))}
 
-            {!listLoading && filteredList.length === 0 && !["dashboard", "settings"].includes(activeTab) && (
+            {!listLoading && filteredList.length === 0 && !["dashboard", "settings", "atributos"].includes(activeTab) && (
               <p style={{ padding: "16px", textAlign: "center", color: "var(--muted)" }}>
                 {listSearch ? "Sin resultados para la busqueda." : "No hay elementos."}
               </p>
@@ -1912,6 +2134,35 @@ export default function App() {
         </div>
       )}
 
+      {formModal === "catalog" && (
+        <div className="modalOverlay" onClick={resetCatalogForm}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>{catalogForm.id ? "Editar" : "Agregar"} — {CATALOG_ENDPOINTS[catalogForm.type].label}</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleCatalogSubmit} className="categoryForm">
+              <label htmlFor="catalog-name">Nombre</label>
+              <input id="catalog-name" type="text" value={catalogForm.name} onChange={(e) => setCatalogForm((p) => ({ ...p, name: e.target.value }))} required />
+              <label htmlFor="catalog-code">Codigo (para el SKU)</label>
+              <input id="catalog-code" type="text" placeholder="Ej: AN, OR, D, L" value={catalogForm.code} onChange={(e) => setCatalogForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))} required />
+              {catalogForm.type === "material" && (
+                <label className="inlineCheck" htmlFor="catalog-requiere-quilate">
+                  <input id="catalog-requiere-quilate" type="checkbox" checked={catalogForm.requiereQuilate} onChange={(e) => setCatalogForm((p) => ({ ...p, requiereQuilate: e.target.checked }))} />
+                  Usa quilates (ej. Oro, Platino)
+                </label>
+              )}
+              <label className="inlineCheck" htmlFor="catalog-active">
+                <input id="catalog-active" type="checkbox" checked={catalogForm.active} onChange={(e) => setCatalogForm((p) => ({ ...p, active: e.target.checked }))} />
+                Activo
+              </label>
+              <div className="actions">
+                <button type="submit" disabled={catalogSaving}>{catalogSaving ? "Guardando..." : catalogForm.id ? "Actualizar" : "Crear"}</button>
+                <button type="button" className="ghost" onClick={resetCatalogForm}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {formModal === "category" && (
         <div className="modalOverlay" onClick={resetForm}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
@@ -1988,6 +2239,49 @@ export default function App() {
               <input id="product-dimensiones" type="text" placeholder="Ej: Largo 45 cm" value={productForm.dimensiones} onChange={(e) => setProductForm((p) => ({ ...p, dimensiones: e.target.value }))} />
               <label htmlFor="product-cuidados">Cuidados</label>
               <textarea id="product-cuidados" rows={2} placeholder="Instrucciones de cuidado" value={productForm.cuidados} onChange={(e) => setProductForm((p) => ({ ...p, cuidados: e.target.value }))} />
+
+              <label>Atributos para el codigo interno (SKU)</label>
+              <label htmlFor="product-tipoPieza">Tipo de pieza</label>
+              <select id="product-tipoPieza" value={productForm.tipoPiezaId} onChange={(e) => setProductForm((p) => ({ ...p, tipoPiezaId: e.target.value }))}>
+                <option value="">Sin definir</option>
+                {tiposPieza.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.code})</option>)}
+              </select>
+              <label htmlFor="product-material">Material</label>
+              <select id="product-material" value={productForm.materialId} onChange={(e) => setProductForm((p) => ({ ...p, materialId: e.target.value }))}>
+                <option value="">Sin definir</option>
+                {materialesCatalogo.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.code})</option>)}
+              </select>
+              {materialesCatalogo.find((m) => String(m.id) === productForm.materialId)?.requiereQuilate && (
+                <>
+                  <label htmlFor="product-quilates">Quilates</label>
+                  <input id="product-quilates" type="number" min="0" step="1" placeholder="Ej: 18" value={productForm.quilates} onChange={(e) => setProductForm((p) => ({ ...p, quilates: e.target.value }))} />
+                </>
+              )}
+              <label htmlFor="product-gema">Gema</label>
+              <select id="product-gema" value={productForm.gemaId} onChange={(e) => setProductForm((p) => ({ ...p, gemaId: e.target.value }))}>
+                <option value="">Ninguna</option>
+                {gemas.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.code})</option>)}
+              </select>
+              {productForm.gemaId && (
+                <>
+                  <label htmlFor="product-origenGema">Origen de la gema</label>
+                  <select id="product-origenGema" value={productForm.origenGemaId} onChange={(e) => setProductForm((p) => ({ ...p, origenGemaId: e.target.value }))}>
+                    <option value="">Sin definir</option>
+                    {origenesGema.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.code})</option>)}
+                  </select>
+                  <label htmlFor="product-quilatajeGema">Quilataje de la gema (ct)</label>
+                  <input id="product-quilatajeGema" type="number" min="0" step="0.01" placeholder="Ej: 1.30" value={productForm.quilatajeGema} onChange={(e) => setProductForm((p) => ({ ...p, quilatajeGema: e.target.value }))} />
+                </>
+              )}
+              <label htmlFor="product-sku">SKU / codigo</label>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input id="product-sku" type="text" placeholder="Se genera solo al guardar" value={productForm.sku} onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value.toUpperCase() }))} style={{ flex: 1 }} />
+                {isEditingProduct && (
+                  <button type="button" className="ghost" onClick={handleRegenerateSku} disabled={saving}>Regenerar codigo</button>
+                )}
+              </div>
+              <ProductBarcodeLabel sku={productForm.sku} name={productForm.name} price={productForm.price} />
+
               <label className="inlineCheck" htmlFor="product-grabado"><input id="product-grabado" type="checkbox" checked={productForm.grabado} onChange={(e) => setProductForm((p) => ({ ...p, grabado: e.target.checked }))} /> Grabado</label>
               <label htmlFor="product-videoUrl">Video (YouTube/TikTok)</label>
               <input id="product-videoUrl" type="text" value={productForm.videoUrl} onChange={(e) => setProductForm((p) => ({ ...p, videoUrl: e.target.value }))} />

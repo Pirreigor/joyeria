@@ -909,3 +909,46 @@ button:disabled {
   margin-top: 0;
   margin-bottom: 12px;
 }
+
+.barcodeSection {
+  margin-top: 6px;
+}
+
+.barcodePreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.printLabelName {
+  margin: 0;
+  font-weight: 700;
+}
+
+.printLabelPrice,
+.printLabelSku {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printLabel,
+  .printLabel * {
+    visibility: visible;
+  }
+  .printLabel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
