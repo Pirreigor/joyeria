@@ -397,6 +397,14 @@ textarea {
   background: #ffffff;
 }
 
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f0f0f0;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .inlineCheck {
   display: flex;
   align-items: center;
@@ -1049,6 +1057,12 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 24px;
+  flex-wrap: wrap;
+}
+
+.barcodeActions {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
 }
 

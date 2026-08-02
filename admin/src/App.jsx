@@ -268,6 +268,14 @@ function ProductBarcodeLabel({ sku, name, price }) {
     }
   }, [sku]);
 
+  function downloadCanvas(canvas, filename) {
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
+
   if (!sku) return null;
 
   return (
@@ -281,7 +289,11 @@ function ProductBarcodeLabel({ sku, name, price }) {
         </div>
         <p className="printLabelSku">{sku}</p>
       </div>
-      <button type="button" className="ghost" onClick={() => window.print()}>Imprimir etiqueta</button>
+      <div className="barcodeActions">
+        <button type="button" className="ghost" onClick={() => window.print()}>Imprimir etiqueta</button>
+        <button type="button" className="ghost" onClick={() => downloadCanvas(barcodeRef.current, `${sku}-barras.png`)}>Descargar barras</button>
+        <button type="button" className="ghost" onClick={() => downloadCanvas(qrCanvasRef.current, `${sku}-qr.png`)}>Descargar QR</button>
+      </div>
     </div>
   );
 }
@@ -353,6 +365,8 @@ export default function App() {
   const [inviteForm, setInviteForm] = useState(initialInviteForm);
   const [inviting, setInviting] = useState(false);
   const [invitationActionId, setInvitationActionId] = useState(null);
+
+  const [barcodeViewProduct, setBarcodeViewProduct] = useState(null);
 
   const [catalogForm, setCatalogForm] = useState(initialCatalogForm);
   const [catalogSaving, setCatalogSaving] = useState(false);
@@ -1013,6 +1027,9 @@ export default function App() {
   }
 
   async function handleRegenerateSku() {
+    const confirmed = window.confirm("Esto va a reemplazar el codigo actual por uno nuevo. Si ya imprimiste una etiqueta con el codigo viejo, dejara de coincidir. Continuar?");
+    if (!confirmed) return;
+
     setSaving(true);
     setListError("");
 
@@ -1958,6 +1975,7 @@ export default function App() {
                   {p.recommended && <span className="badge on">Destacado</span>}
                 </div>
                 <div className="actions">
+                  {p.sku && <button type="button" className="ghost" onClick={() => setBarcodeViewProduct(p)}>Codigo</button>}
                   <button type="button" className="ghost" onClick={() => startEditProduct(p)}>Editar</button>
                   <button type="button" className="danger" onClick={() => handleDeleteProduct(p)} disabled={deletingId === p.id}>{deletingId === p.id ? "..." : "Desactivar"}</button>
                 </div>
@@ -2196,6 +2214,18 @@ export default function App() {
         </div>
       )}
 
+      {barcodeViewProduct && (
+        <div className="modalOverlay" onClick={() => setBarcodeViewProduct(null)}>
+          <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
+            <h2>Codigo de {barcodeViewProduct.name}</h2>
+            <ProductBarcodeLabel sku={barcodeViewProduct.sku} name={barcodeViewProduct.name} price={barcodeViewProduct.price} />
+            <div className="actions">
+              <button type="button" className="ghost" onClick={() => setBarcodeViewProduct(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {formModal === "product" && (
         <div className="modalOverlay" onClick={resetProductForm}>
           <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
@@ -2318,11 +2348,20 @@ export default function App() {
                 <div className="formField">
                   <label htmlFor="product-sku">SKU / codigo</label>
                   <div className="imageUploadRow">
-                    <input id="product-sku" type="text" placeholder="Se genera solo al guardar" value={productForm.sku} onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value.toUpperCase() }))} style={{ flex: 1 }} />
+                    <input
+                      id="product-sku"
+                      type="text"
+                      placeholder="Se genera solo al guardar"
+                      value={productForm.sku}
+                      onChange={(e) => setProductForm((p) => ({ ...p, sku: e.target.value.toUpperCase() }))}
+                      style={{ flex: 1 }}
+                      disabled={isEditingProduct}
+                    />
                     {isEditingProduct && (
                       <button type="button" className="ghost" onClick={handleRegenerateSku} disabled={saving}>Regenerar codigo</button>
                     )}
                   </div>
+                  {isEditingProduct && <p className="formSectionHint">El codigo es unico y no se edita a mano. Usa "Regenerar codigo" si necesitas uno nuevo.</p>}
                 </div>
                 <ProductBarcodeLabel sku={productForm.sku} name={productForm.name} price={productForm.price} />
               </div>
