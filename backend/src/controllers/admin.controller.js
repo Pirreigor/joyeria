@@ -1,7 +1,7 @@
 const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/hash");
 
-const ROLES_VALIDOS = ["ADMINISTRADOR", "CLIENTE"];
+const ROLES_VALIDOS = ["ADMINISTRADOR", "VENDEDOR", "CLIENTE"];
 
 function slugify(value) {
   return String(value || "")

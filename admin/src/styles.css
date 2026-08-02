@@ -456,6 +456,14 @@ button:disabled {
   overflow: hidden;
 }
 
+.listSubheading {
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--panel-alt, #f6f6f6);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
 .card {
   display: flex;
   align-items: center;

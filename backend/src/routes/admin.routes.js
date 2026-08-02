@@ -29,6 +29,12 @@ const {
   confirmPayment,
 } = require("../controllers/admin.controller");
 const { uploadImage, exportTemplate, importProducts } = require("../controllers/import.controller");
+const {
+  createInvitation,
+  listInvitations,
+  revokeInvitation,
+  resendInvitation,
+} = require("../controllers/invitation.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { requireRole, requirePermission } = require("../middleware/role.middleware");
 const { uploadComprobante } = require("../middleware/upload.middleware");
@@ -36,7 +42,7 @@ const { uploadImage: uploadImageMiddleware, uploadImportFiles } = require("../mi
 
 const router = Router();
 
-router.use(requireAuth, requireRole("ADMINISTRADOR"));
+router.use(requireAuth, requireRole("ADMINISTRADOR", "VENDEDOR"));
 
 router.get("/dashboard", requirePermission("dashboard"), getDashboard);
 
@@ -44,6 +50,11 @@ router.get("/users", requirePermission("users"), listUsers);
 router.post("/users", requirePermission("users"), createUser);
 router.patch("/users/:id", requirePermission("users"), updateUser);
 router.delete("/users/:id", requirePermission("users"), deleteUser);
+
+router.get("/invitations", requirePermission("users"), listInvitations);
+router.post("/invitations", requirePermission("users"), createInvitation);
+router.post("/invitations/:id/resend", requirePermission("users"), resendInvitation);
+router.delete("/invitations/:id", requirePermission("users"), revokeInvitation);
 
 router.get("/settings", requirePermission("settings"), getStoreSettings);
 router.patch("/settings", requirePermission("settings"), updateStoreSettings);

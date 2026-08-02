@@ -9,6 +9,7 @@ datasource db {
 
 enum Rol {
   ADMINISTRADOR
+  VENDEDOR
   CLIENTE
 }
 
@@ -34,6 +35,21 @@ model Usuario {
   updatedAt     DateTime  @updatedAt
 
   @@map("usuarios")
+}
+
+model InvitacionUsuario {
+  id            Int       @id @default(autoincrement())
+  email         String
+  name          String
+  rol           Rol       @default(ADMINISTRADOR)
+  permisos      String[]  @default([])
+  token         String    @unique
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  invitedByName String?
+  createdAt     DateTime  @default(now())
+
+  @@map("invitaciones_usuarios")
 }
 
 model Producto {

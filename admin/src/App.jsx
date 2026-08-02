@@ -72,6 +72,13 @@ const initialUserForm = {
   permisos: [],
 };
 
+const initialInviteForm = {
+  name: "",
+  email: "",
+  rol: "CLIENTE",
+  permisos: [],
+};
+
 const ALL_PERMISSIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "users", label: "Usuarios" },
@@ -84,46 +91,49 @@ const ALL_PERMISSIONS = [
   { key: "settings", label: "Branding" },
 ];
 
+const STAFF_MENU = [
+  {
+    key: "operaciones",
+    label: "Operaciones",
+    items: [
+      { key: "dashboard", label: "Dashboard", short: "DB" },
+      { key: "users", label: "Usuarios", short: "US" },
+    ],
+  },
+  {
+    key: "catalogo",
+    label: "Catalogo",
+    items: [
+      { key: "categories", label: "Categorias", short: "CA" },
+      { key: "products", label: "Productos", short: "PR" },
+    ],
+  },
+  {
+    key: "contenido",
+    label: "Contenido",
+    items: [
+      { key: "slides", label: "Slider", short: "SL" },
+      { key: "flyers", label: "Flyers", short: "FL" },
+    ],
+  },
+  {
+    key: "ventas",
+    label: "Ventas",
+    items: [
+      { key: "orders", label: "Pedidos", short: "PE" },
+      { key: "despacho", label: "Despacho", short: "DE" },
+    ],
+  },
+  {
+    key: "sistema",
+    label: "Sistema",
+    items: [{ key: "settings", label: "Branding", short: "BR" }],
+  },
+];
+
 const MENU_BY_ROLE = {
-  ADMINISTRADOR: [
-    {
-      key: "operaciones",
-      label: "Operaciones",
-      items: [
-        { key: "dashboard", label: "Dashboard", short: "DB" },
-        { key: "users", label: "Usuarios", short: "US" },
-      ],
-    },
-    {
-      key: "catalogo",
-      label: "Catalogo",
-      items: [
-        { key: "categories", label: "Categorias", short: "CA" },
-        { key: "products", label: "Productos", short: "PR" },
-      ],
-    },
-    {
-      key: "contenido",
-      label: "Contenido",
-      items: [
-        { key: "slides", label: "Slider", short: "SL" },
-        { key: "flyers", label: "Flyers", short: "FL" },
-      ],
-    },
-    {
-      key: "ventas",
-      label: "Ventas",
-      items: [
-        { key: "orders", label: "Pedidos", short: "PE" },
-        { key: "despacho", label: "Despacho", short: "DE" },
-      ],
-    },
-    {
-      key: "sistema",
-      label: "Sistema",
-      items: [{ key: "settings", label: "Branding", short: "BR" }],
-    },
-  ],
+  ADMINISTRADOR: STAFF_MENU,
+  VENDEDOR: STAFF_MENU,
 };
 
 const TAB_LIST_TITLES = {
@@ -210,6 +220,12 @@ function MenuIcon({ tabKey }) {
   );
 }
 
+function roleLabel(rol) {
+  if (rol === "ADMINISTRADOR") return "Admin";
+  if (rol === "VENDEDOR") return "Vendedor";
+  return "Cliente";
+}
+
 function slugify(value) {
   return String(value || "")
     .normalize("NFD")
@@ -236,6 +252,7 @@ export default function App() {
     recentUsers: [],
   });
   const [users, setUsers] = useState([]);
+  const [invitations, setInvitations] = useState([]);
   const [products, setProducts] = useState([]);
   const [slides, setSlides] = useState([]);
   const [flyers, setFlyers] = useState([]);
@@ -263,6 +280,19 @@ export default function App() {
   const [flyerForm, setFlyerForm] = useState(initialFlyerForm);
   const [productForm, setProductForm] = useState(initialProductForm);
   const [userForm, setUserForm] = useState(initialUserForm);
+  const [inviteForm, setInviteForm] = useState(initialInviteForm);
+  const [inviting, setInviting] = useState(false);
+  const [invitationActionId, setInvitationActionId] = useState(null);
+
+  const [inviteToken] = useState(() => new URLSearchParams(window.location.search).get("invite"));
+  const [inviteInfo, setInviteInfo] = useState(null);
+  const [inviteInfoLoading, setInviteInfoLoading] = useState(Boolean(inviteToken));
+  const [inviteInfoError, setInviteInfoError] = useState("");
+  const [acceptPassword, setAcceptPassword] = useState("");
+  const [acceptConfirm, setAcceptConfirm] = useState("");
+  const [acceptSaving, setAcceptSaving] = useState(false);
+  const [acceptError, setAcceptError] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -284,7 +314,7 @@ export default function App() {
   const roleMenuSections = useMemo(() => {
     const sections = MENU_BY_ROLE[role] || [];
     const perms = user?.permisos || [];
-    if (!perms.length) return sections;
+    if (role === "ADMINISTRADOR" && !perms.length) return sections;
     return sections
       .map((s) => ({ ...s, items: s.items.filter((i) => perms.includes(i.key)) }))
       .filter((s) => s.items.length > 0);
@@ -394,6 +424,25 @@ export default function App() {
     setListPage(1);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!inviteToken) return;
+
+    (async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/invitations/${inviteToken}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.message || "No se pudo validar la invitacion");
+        }
+        setInviteInfo(data.invitation);
+      } catch (error) {
+        setInviteInfoError(error.message || "No se pudo validar la invitacion");
+      } finally {
+        setInviteInfoLoading(false);
+      }
+    })();
+  }, [inviteToken]);
+
   async function request(path, options = {}) {
     const response = await fetch(`${API_URL}${path}`, {
       ...options,
@@ -430,8 +479,8 @@ export default function App() {
         }),
       });
 
-      if (data.user?.rol !== "ADMINISTRADOR") {
-        throw new Error("Tu usuario no tiene permisos de administrador");
+      if (!["ADMINISTRADOR", "VENDEDOR"].includes(data.user?.rol)) {
+        throw new Error("Tu usuario no tiene permisos para acceder al panel");
       }
 
       localStorage.setItem(TOKEN_KEY, data.token);
@@ -446,6 +495,40 @@ export default function App() {
     }
   }
 
+  async function handleAcceptInvitation(event) {
+    event.preventDefault();
+    setAcceptError("");
+
+    if (!acceptPassword || acceptPassword !== acceptConfirm) {
+      setAcceptError("Las contrasenas no coinciden");
+      return;
+    }
+
+    setAcceptSaving(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/accept-invitation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: inviteToken, password: acceptPassword }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || "No se pudo completar el registro");
+      }
+
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      window.history.replaceState({}, "", window.location.pathname);
+      setToken(data.token);
+      setUser(data.user);
+    } catch (error) {
+      setAcceptError(error.message || "No se pudo completar el registro");
+    } finally {
+      setAcceptSaving(false);
+    }
+  }
+
   function handleLogout() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -457,6 +540,7 @@ export default function App() {
       recentUsers: [],
     });
     setUsers([]);
+    setInvitations([]);
     setCategories([]);
     setProducts([]);
     setFlyers([]);
@@ -466,6 +550,7 @@ export default function App() {
     setFlyerForm(initialFlyerForm);
     setProductForm(initialProductForm);
     setUserForm(initialUserForm);
+    setInviteForm(initialInviteForm);
     setAuthError("");
     setListError("");
   }
@@ -478,9 +563,10 @@ export default function App() {
     const can = (key) => perms.length === 0 || perms.includes(key);
 
     try {
-      const [dashboardData, usersData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData] = await Promise.all([
+      const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData] = await Promise.all([
         can("dashboard") ? request("/api/admin/dashboard") : Promise.resolve({ stats: { users: 0, products: 0, categories: 0, orders: 0 }, recentOrders: [], recentUsers: [] }),
         can("users") ? request("/api/admin/users") : Promise.resolve({ users: [] }),
+        can("users") ? request("/api/admin/invitations") : Promise.resolve({ invitations: [] }),
         can("categories") ? request("/api/admin/categories") : Promise.resolve({ categories: [] }),
         can("products") ? request("/api/admin/products") : Promise.resolve({ products: [] }),
         can("slides") ? request("/api/admin/slides") : Promise.resolve({ slides: [] }),
@@ -494,6 +580,7 @@ export default function App() {
         recentUsers: dashboardData?.recentUsers || [],
       });
       setUsers(usersData.users || []);
+      setInvitations(invitationsData.invitations || []);
       setCategories(categoriesData.categories || []);
       setProducts(productsData.products || []);
       setSlides(slidesData.slides || []);
@@ -534,6 +621,11 @@ export default function App() {
 
   function resetUserForm() {
     setUserForm(initialUserForm);
+    setFormModal("");
+  }
+
+  function resetInviteForm() {
+    setInviteForm(initialInviteForm);
     setFormModal("");
   }
 
@@ -831,7 +923,7 @@ export default function App() {
       email: userForm.email.trim(),
       password: userForm.password,
       role: userForm.rol,
-      permissions: userForm.rol === "ADMINISTRADOR" ? userForm.permisos : [],
+      permissions: ["ADMINISTRADOR", "VENDEDOR"].includes(userForm.rol) ? userForm.permisos : [],
     };
 
     try {
@@ -861,6 +953,66 @@ export default function App() {
       setListError(error.message || "No se pudo guardar el usuario");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleInviteSubmit(event) {
+    event.preventDefault();
+    setInviting(true);
+    setListError("");
+
+    try {
+      if (!inviteForm.name.trim() || !inviteForm.email.trim()) {
+        throw new Error("name y email son obligatorios");
+      }
+
+      await request("/api/admin/invitations", {
+        method: "POST",
+        body: JSON.stringify({
+          name: inviteForm.name.trim(),
+          email: inviteForm.email.trim(),
+          role: inviteForm.rol,
+          permissions: ["ADMINISTRADOR", "VENDEDOR"].includes(inviteForm.rol) ? inviteForm.permisos : [],
+        }),
+      });
+
+      resetInviteForm();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo enviar la invitacion");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleRevokeInvitation(invitation) {
+    const confirmed = window.confirm(`Revocar la invitacion a "${invitation.email}"?`);
+    if (!confirmed) return;
+
+    setInvitationActionId(invitation.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/invitations/${invitation.id}`, { method: "DELETE" });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo revocar la invitacion");
+    } finally {
+      setInvitationActionId(null);
+    }
+  }
+
+  async function handleResendInvitation(invitation) {
+    setInvitationActionId(invitation.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/invitations/${invitation.id}/resend`, { method: "POST" });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo reenviar la invitacion");
+    } finally {
+      setInvitationActionId(null);
     }
   }
 
@@ -1173,6 +1325,57 @@ export default function App() {
     }
   }
 
+  if (inviteToken) {
+    return (
+      <main className="authPage">
+        <section className="authCard">
+          <p className="eyebrow">Don Joyero</p>
+          <h1>Completa tu registro</h1>
+
+          {inviteInfoLoading && <p>Validando invitacion...</p>}
+
+          {!inviteInfoLoading && inviteInfoError && (
+            <p className="error">{inviteInfoError}</p>
+          )}
+
+          {!inviteInfoLoading && !inviteInfoError && inviteInfo && (
+            <>
+              <p>Fuiste invitado como <strong>{inviteInfo.name}</strong> ({roleLabel(inviteInfo.rol)}) con el email {inviteInfo.email}.</p>
+
+              <form onSubmit={handleAcceptInvitation} className="authForm">
+                {acceptError && <p className="error">{acceptError}</p>}
+
+                <label htmlFor="accept-password">Elegi tu contrasena</label>
+                <input
+                  id="accept-password"
+                  type="password"
+                  value={acceptPassword}
+                  onChange={(event) => setAcceptPassword(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+
+                <label htmlFor="accept-confirm">Confirma tu contrasena</label>
+                <input
+                  id="accept-confirm"
+                  type="password"
+                  value={acceptConfirm}
+                  onChange={(event) => setAcceptConfirm(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+
+                <button type="submit" disabled={acceptSaving}>
+                  {acceptSaving ? "Guardando..." : "Crear mi cuenta"}
+                </button>
+              </form>
+            </>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   if (!token) {
     return (
       <main className="authPage">
@@ -1375,6 +1578,7 @@ export default function App() {
             <h2>{TAB_LIST_TITLES[activeTab] || "Vista"}</h2>
             <div className="actions">
               {activeTab === "users" && <button onClick={() => { resetUserForm(); setFormModal("user"); }}>+ Nuevo usuario</button>}
+              {activeTab === "users" && <button type="button" className="ghost" onClick={() => { resetInviteForm(); setFormModal("invite"); }}>+ Invitar usuario</button>}
               {activeTab === "categories" && <button onClick={() => { resetForm(); setFormModal("category"); }}>+ Nueva categoria</button>}
               {activeTab === "products" && (
                 <>
@@ -1453,10 +1657,16 @@ export default function App() {
                 <div className="card-info">
                   <strong>{u.name}</strong>
                   <small>{u.email} — Creado: {new Date(u.createdAt).toLocaleDateString()}</small>
-                  {u.rol === "ADMINISTRADOR" && <small>{u.permisos?.length > 0 ? `Permisos: ${u.permisos.join(", ")}` : "Acceso total"}</small>}
+                  {["ADMINISTRADOR", "VENDEDOR"].includes(u.rol) && (
+                    <small>
+                      {u.permisos?.length > 0
+                        ? `Permisos: ${u.permisos.join(", ")}`
+                        : u.rol === "ADMINISTRADOR" ? "Acceso total" : "Sin acceso a secciones"}
+                    </small>
+                  )}
                 </div>
                 <div className="card-badges">
-                  <span className={`badge ${u.rol === "ADMINISTRADOR" ? "on" : "off"}`}>{u.rol === "ADMINISTRADOR" ? "Admin" : "Cliente"}</span>
+                  <span className={`badge ${u.rol === "CLIENTE" ? "off" : "on"}`}>{roleLabel(u.rol)}</span>
                 </div>
                 <div className="actions">
                   <button type="button" className="ghost" onClick={() => startEditUser(u)}>Editar</button>
@@ -1464,6 +1674,35 @@ export default function App() {
                 </div>
               </article>
             ))}
+
+            {activeTab === "users" && invitations.length > 0 && (
+              <>
+                <h3 className="listSubheading">Invitaciones pendientes</h3>
+                {invitations.map((inv) => {
+                  const expired = new Date(inv.expiresAt) < new Date();
+                  return (
+                    <article key={inv.id} className="card">
+                      <div className="card-info">
+                        <strong>{inv.name}</strong>
+                        <small>{inv.email} — Expira: {new Date(inv.expiresAt).toLocaleDateString()}</small>
+                      </div>
+                      <div className="card-badges">
+                        <span className={`badge ${expired ? "off" : "on"}`}>{expired ? "Expirada" : "Pendiente"}</span>
+                        <span className={`badge ${inv.rol === "CLIENTE" ? "off" : "on"}`}>{roleLabel(inv.rol)}</span>
+                      </div>
+                      <div className="actions">
+                        <button type="button" className="ghost" onClick={() => handleResendInvitation(inv)} disabled={invitationActionId === inv.id}>
+                          {invitationActionId === inv.id ? "..." : "Reenviar"}
+                        </button>
+                        <button type="button" className="danger" onClick={() => handleRevokeInvitation(inv)} disabled={invitationActionId === inv.id}>
+                          {invitationActionId === inv.id ? "..." : "Revocar"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </>
+            )}
 
             {activeTab === "categories" && pagedList.map((c) => (
               <article key={c.id} className={c._parent ? "card card-sub" : "card"}>
@@ -1605,11 +1844,14 @@ export default function App() {
               <label htmlFor="user-role">Rol</label>
               <select id="user-role" value={userForm.rol} onChange={(e) => setUserForm((p) => ({ ...p, rol: e.target.value }))}>
                 <option value="CLIENTE">Cliente</option>
+                <option value="VENDEDOR">Vendedor</option>
                 <option value="ADMINISTRADOR">Administrador</option>
               </select>
-              {userForm.rol === "ADMINISTRADOR" && (
+              {["ADMINISTRADOR", "VENDEDOR"].includes(userForm.rol) && (
                 <>
-                  <label>Permisos del admin (sin seleccion = acceso total)</label>
+                  <label>
+                    Permisos ({userForm.rol === "ADMINISTRADOR" ? "sin seleccion = acceso total" : "sin seleccion = sin acceso a ninguna seccion"})
+                  </label>
                   <div className="permissionsGrid">
                     {ALL_PERMISSIONS.map((perm) => (
                       <label key={perm.key} className="inlineCheck">
@@ -1623,6 +1865,46 @@ export default function App() {
               <div className="actions">
                 <button type="submit" disabled={saving}>{saving ? "Guardando..." : isEditingUser ? "Actualizar" : "Crear usuario"}</button>
                 <button type="button" className="ghost" onClick={resetUserForm}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {formModal === "invite" && (
+        <div className="modalOverlay" onClick={resetInviteForm}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>Invitar usuario</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleInviteSubmit} className="categoryForm">
+              <label htmlFor="invite-name">Nombre</label>
+              <input id="invite-name" type="text" value={inviteForm.name} onChange={(e) => setInviteForm((p) => ({ ...p, name: e.target.value }))} required />
+              <label htmlFor="invite-email">Email</label>
+              <input id="invite-email" type="email" value={inviteForm.email} onChange={(e) => setInviteForm((p) => ({ ...p, email: e.target.value }))} required />
+              <label htmlFor="invite-role">Rol</label>
+              <select id="invite-role" value={inviteForm.rol} onChange={(e) => setInviteForm((p) => ({ ...p, rol: e.target.value }))}>
+                <option value="CLIENTE">Cliente</option>
+                <option value="VENDEDOR">Vendedor</option>
+                <option value="ADMINISTRADOR">Administrador</option>
+              </select>
+              {["ADMINISTRADOR", "VENDEDOR"].includes(inviteForm.rol) && (
+                <>
+                  <label>
+                    Permisos ({inviteForm.rol === "ADMINISTRADOR" ? "sin seleccion = acceso total" : "sin seleccion = sin acceso a ninguna seccion"})
+                  </label>
+                  <div className="permissionsGrid">
+                    {ALL_PERMISSIONS.map((perm) => (
+                      <label key={perm.key} className="inlineCheck">
+                        <input type="checkbox" checked={inviteForm.permisos.includes(perm.key)} onChange={(e) => setInviteForm((p) => ({ ...p, permisos: e.target.checked ? [...p.permisos, perm.key] : p.permisos.filter((k) => k !== perm.key) }))} />
+                        {perm.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="actions">
+                <button type="submit" disabled={inviting}>{inviting ? "Enviando..." : "Enviar invitacion"}</button>
+                <button type="button" className="ghost" onClick={resetInviteForm}>Cancelar</button>
               </div>
             </form>
           </div>

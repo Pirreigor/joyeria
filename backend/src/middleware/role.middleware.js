@@ -12,11 +12,13 @@ function requireRole(...roles) {
   };
 }
 
-// permisos vacío = acceso total (superadmin)
+// permisos vacío = acceso total, pero solo para ADMINISTRADOR (superadmin).
+// Para otros roles (ej. VENDEDOR), vacío = sin acceso a ninguna seccion.
 function requirePermission(perm) {
   return (req, res, next) => {
     const permisos = req.user?.permisos || [];
-    if (permisos.length === 0 || permisos.includes(perm)) return next();
+    if (req.user?.rol === "ADMINISTRADOR" && permisos.length === 0) return next();
+    if (permisos.includes(perm)) return next();
     return res.status(403).json({ message: "Sin permiso para esta seccion" });
   };
 }
