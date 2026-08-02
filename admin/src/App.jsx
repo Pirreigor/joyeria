@@ -284,7 +284,7 @@ export default function App() {
   const [inviting, setInviting] = useState(false);
   const [invitationActionId, setInvitationActionId] = useState(null);
 
-  const [inviteToken] = useState(() => new URLSearchParams(window.location.search).get("invite"));
+  const [inviteToken, setInviteToken] = useState(() => new URLSearchParams(window.location.search).get("invite"));
   const [inviteInfo, setInviteInfo] = useState(null);
   const [inviteInfoLoading, setInviteInfoLoading] = useState(Boolean(inviteToken));
   const [inviteInfoError, setInviteInfoError] = useState("");
@@ -520,6 +520,7 @@ export default function App() {
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(data.user));
       window.history.replaceState({}, "", window.location.pathname);
+      setInviteToken(null);
       setToken(data.token);
       setUser(data.user);
     } catch (error) {
