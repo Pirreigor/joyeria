@@ -248,6 +248,33 @@ function MenuIcon({ tabKey }) {
   );
 }
 
+function DedicationQrLabel({ url, label }) {
+  const qrCanvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!url || !qrCanvasRef.current) return;
+    QRCode.toCanvas(qrCanvasRef.current, url, { width: 140, margin: 1 }).catch(() => {});
+  }, [url]);
+
+  function downloadCanvas() {
+    if (!qrCanvasRef.current) return;
+    const link = document.createElement("a");
+    link.download = `dedicatoria-${label || "qr"}.png`;
+    link.href = qrCanvasRef.current.toDataURL("image/png");
+    link.click();
+  }
+
+  return (
+    <div className="barcodePreview">
+      <canvas ref={qrCanvasRef} />
+      <div className="barcodeActions">
+        <button type="button" className="ghost" onClick={downloadCanvas}>Descargar QR</button>
+        <button type="button" className="ghost" onClick={() => navigator.clipboard?.writeText(url)}>Copiar link</button>
+      </div>
+    </div>
+  );
+}
+
 function ProductBarcodeLabel({ sku, name, price }) {
   const barcodeRef = useRef(null);
   const qrCanvasRef = useRef(null);
@@ -367,6 +394,9 @@ export default function App() {
   const [invitationActionId, setInvitationActionId] = useState(null);
 
   const [barcodeViewProduct, setBarcodeViewProduct] = useState(null);
+  const [dedicationOrder, setDedicationOrder] = useState(null);
+  const [dedicationList, setDedicationList] = useState([]);
+  const [dedicationLoading, setDedicationLoading] = useState(false);
 
   const [catalogForm, setCatalogForm] = useState(initialCatalogForm);
   const [catalogSaving, setCatalogSaving] = useState(false);
@@ -1425,6 +1455,21 @@ export default function App() {
     }
   }
 
+  async function openDedicationView(order) {
+    setDedicationOrder(order);
+    setDedicationLoading(true);
+    setDedicationList([]);
+
+    try {
+      const data = await request(`/api/admin/orders/${order.id}/dedicatorias`);
+      setDedicationList(data.dedicatorias || []);
+    } catch (error) {
+      setListError(error.message || "No se pudieron cargar las dedicatorias");
+    } finally {
+      setDedicationLoading(false);
+    }
+  }
+
   async function handlePaymentSubmit(event) {
     event.preventDefault();
     setPaymentSaving(true);
@@ -2043,6 +2088,9 @@ export default function App() {
                   </ul>
                 )}
                 <div className="actions">
+                  {["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
+                    <button type="button" className="ghost" onClick={() => openDedicationView(order)}>Dedicatorias</button>
+                  )}
                   {activeTab === "despacho" ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
                   ) : (
@@ -2228,6 +2276,32 @@ export default function App() {
             <ProductBarcodeLabel sku={barcodeViewProduct.sku} name={barcodeViewProduct.name} price={barcodeViewProduct.price} />
             <div className="actions">
               <button type="button" className="ghost" onClick={() => setBarcodeViewProduct(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dedicationOrder && (
+        <div className="modalOverlay" onClick={() => setDedicationOrder(null)}>
+          <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
+            <h2>Dedicatorias del pedido #{dedicationOrder.id}</h2>
+            {listError && <p className="error">{listError}</p>}
+            {dedicationLoading && <p>Cargando...</p>}
+            {!dedicationLoading && dedicationList.length === 0 && <p className="empty">Sin dedicatorias para este pedido.</p>}
+            {!dedicationLoading && dedicationList.map((d) => (
+              <div key={d.id} className="formSection">
+                <div className="formSectionTitle">
+                  <p className="eyebrow">{d.productoNombre}{d.unidad ? ` — unidad ${d.unidad}` : ""}</p>
+                  <span className={`badge ${d.escrita ? "on" : "off"}`}>{d.escrita ? "Escrita" : "Pendiente"}</span>
+                </div>
+                <DedicationQrLabel url={d.url} label={`${dedicationOrder.id}-${d.id}`} />
+                {d.escrita && (
+                  <p className="formSectionHint">Para: {d.para} — "{d.mensaje}"</p>
+                )}
+              </div>
+            ))}
+            <div className="actions">
+              <button type="button" className="ghost" onClick={() => setDedicationOrder(null)}>Cerrar</button>
             </div>
           </div>
         </div>

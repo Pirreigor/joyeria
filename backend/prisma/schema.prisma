@@ -224,14 +224,29 @@ model Pedido {
 }
 
 model ItemPedido {
-  id         Int      @id @default(autoincrement())
-  pedidoId   Int
-  pedido     Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  productoId Int
-  producto   Producto @relation(fields: [productoId], references: [id])
-  quantity   Int
-  unitPrice  Float
-  createdAt  DateTime @default(now())
+  id           Int           @id @default(autoincrement())
+  pedidoId     Int
+  pedido       Pedido        @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  productoId   Int
+  producto     Producto      @relation(fields: [productoId], references: [id])
+  quantity     Int
+  unitPrice    Float
+  dedicatorias Dedicatoria[]
+  createdAt    DateTime      @default(now())
 
   @@map("items_pedido")
+}
+
+model Dedicatoria {
+  id           Int        @id @default(autoincrement())
+  token        String     @unique
+  itemPedidoId Int
+  itemPedido   ItemPedido @relation(fields: [itemPedidoId], references: [id], onDelete: Cascade)
+  para         String?
+  mensaje      String?
+  escrita      Boolean    @default(false)
+  writtenAt    DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@map("dedicatorias")
 }

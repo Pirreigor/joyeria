@@ -10,7 +10,88 @@ const PLACEHOLDER = "https://images.unsplash.com/photo-1515562141207-7a88fb7ce33
 
 const initialAuthForm = { name: "", email: "", password: "" };
 
+function DedicationPage({ token }) {
+  const [state, setState] = useState({ loading: true, error: "", dedicatoria: null });
+  const [para, setPara] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/dedicatorias/${token}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || "No se pudo cargar la dedicatoria");
+        setState({ loading: false, error: "", dedicatoria: data.dedicatoria });
+      } catch (error) {
+        setState({ loading: false, error: error.message || "No se pudo cargar la dedicatoria", dedicatoria: null });
+      }
+    })();
+  }, [token]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setSaveError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/dedicatorias/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ para, mensaje }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "No se pudo guardar la dedicatoria");
+      setState((s) => ({ ...s, dedicatoria: data.dedicatoria }));
+    } catch (error) {
+      setSaveError(error.message || "No se pudo guardar la dedicatoria");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="page dedicationPage">
+      <div className="dedicationCard">
+        {state.loading && <p>Cargando...</p>}
+        {!state.loading && state.error && <p className="dedicationError">{state.error}</p>}
+        {!state.loading && !state.error && state.dedicatoria && (
+          <>
+            <img
+              className="productModalImage"
+              src={state.dedicatoria.producto?.imageUrl || PLACEHOLDER}
+              alt={state.dedicatoria.producto?.name || ""}
+            />
+            <h1 className="dedicationTitle">{state.dedicatoria.producto?.name}</h1>
+            {state.dedicatoria.escrita ? (
+              <div className="dedicationText">
+                <p className="dedicationPara">Para: {state.dedicatoria.para}</p>
+                <p className="dedicationMensaje">{state.dedicatoria.mensaje}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="dedicationForm">
+                <p className="dedicationHint">Esta pieza es un regalo. Deja unas palabras — una vez guardada, la dedicatoria no se puede editar.</p>
+                {saveError && <p className="dedicationError">{saveError}</p>}
+                <label htmlFor="dedication-para">Para</label>
+                <input id="dedication-para" type="text" value={para} onChange={(e) => setPara(e.target.value)} required />
+                <label htmlFor="dedication-mensaje">Dedicatoria</label>
+                <textarea id="dedication-mensaje" rows={5} value={mensaje} onChange={(e) => setMensaje(e.target.value)} required />
+                <button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar dedicatoria"}</button>
+              </form>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [dedicationToken] = useState(() => {
+    const match = window.location.pathname.match(/^\/dedicatoria\/([^/]+)\/?$/);
+    return match ? match[1] : null;
+  });
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [slides, setSlides] = useState([]);
@@ -446,6 +527,10 @@ export default function App() {
     } finally {
       setCheckoutLoading(false);
     }
+  }
+
+  if (dedicationToken) {
+    return <DedicationPage token={dedicationToken} />;
   }
 
   return (

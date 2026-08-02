@@ -27,6 +27,7 @@ const {
   listOrders,
   updateOrderStatus,
   confirmPayment,
+  listOrderDedicatorias,
 } = require("../controllers/admin.controller");
 const { uploadImage, exportTemplate, importProducts } = require("../controllers/import.controller");
 const {
@@ -114,5 +115,6 @@ router.delete("/origenes-gema/:id", requirePermission("atributos"), deleteOrigen
 router.get("/orders", requirePermission("orders"), listOrders);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
 router.patch("/orders/:id/status", requirePermission("orders"), updateOrderStatus);
+router.get("/orders/:id/dedicatorias", requirePermission("orders"), listOrderDedicatorias);
 
 module.exports = router;

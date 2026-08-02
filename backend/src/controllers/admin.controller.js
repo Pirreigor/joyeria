@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/hash");
 const { buildBaseCode, generateUniqueSku } = require("../utils/sku");
@@ -769,7 +770,10 @@ async function confirmPayment(req, res) {
     return res.status(400).json({ message: "El comprobante de pago (imagen) es obligatorio" });
   }
 
-  const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
+  const existing = await prisma.pedido.findUnique({
+    where: { id: Number(id) },
+    include: { items: true },
+  });
   if (!existing) {
     return res.status(404).json({ message: "Pedido no encontrado" });
   }
@@ -788,7 +792,55 @@ async function confirmPayment(req, res) {
     },
   });
 
+  const yaTieneDedicatorias = await prisma.dedicatoria.count({
+    where: { itemPedido: { pedidoId: existing.id } },
+  });
+
+  if (yaTieneDedicatorias === 0) {
+    const dedicatorias = [];
+    for (const item of existing.items) {
+      for (let i = 0; i < item.quantity; i++) {
+        dedicatorias.push({
+          token: crypto.randomBytes(16).toString("hex"),
+          itemPedidoId: item.id,
+        });
+      }
+    }
+    if (dedicatorias.length > 0) {
+      await prisma.dedicatoria.createMany({ data: dedicatorias });
+    }
+  }
+
   return res.json({ order });
+}
+
+async function listOrderDedicatorias(req, res) {
+  const { id } = req.params;
+
+  const items = await prisma.itemPedido.findMany({
+    where: { pedidoId: Number(id) },
+    include: {
+      producto: { select: { id: true, name: true } },
+      dedicatorias: { orderBy: { id: "asc" } },
+    },
+  });
+
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+  const dedicatorias = items.flatMap((item) =>
+    item.dedicatorias.map((d, index) => ({
+      id: d.id,
+      token: d.token,
+      url: `${frontendUrl}/dedicatoria/${d.token}`,
+      productoNombre: item.producto.name,
+      unidad: item.quantity > 1 ? `${index + 1}/${item.quantity}` : null,
+      escrita: d.escrita,
+      para: d.para,
+      mensaje: d.mensaje,
+    }))
+  );
+
+  return res.json({ dedicatorias });
 }
 
 module.exports = {
@@ -818,4 +870,5 @@ module.exports = {
   listOrders,
   updateOrderStatus,
   confirmPayment,
+  listOrderDedicatorias,
 };
