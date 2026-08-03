@@ -1051,6 +1051,44 @@ button:disabled {
   margin-top: 6px;
 }
 
+.imagePreviewGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.imagePreviewItem {
+  position: relative;
+}
+
+.imagePreviewItem .imagePreviewThumb {
+  margin-top: 0;
+}
+
+.imagePreviewRemove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.imagePreviewRemove:hover {
+  border-color: #9a2c2c;
+  color: #9a2c2c;
+}
+
 .toggleRow {
   display: flex;
   flex-wrap: wrap;

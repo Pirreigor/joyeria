@@ -2455,6 +2455,23 @@ export default function App() {
                       <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "gallery")} disabled={uploadingImage} />
                     </label>
                   </div>
+                  {productForm.imagenesRaw && (
+                    <div className="imagePreviewGrid">
+                      {productForm.imagenesRaw.split(",").map((u) => u.trim()).filter(Boolean).map((url, idx, arr) => (
+                        <div className="imagePreviewItem" key={`${url}-${idx}`}>
+                          <img src={url} alt="" className="imagePreviewThumb" />
+                          <button
+                            type="button"
+                            className="imagePreviewRemove"
+                            aria-label="Quitar imagen"
+                            onClick={() => setProductForm((p) => ({ ...p, imagenesRaw: arr.filter((_, i) => i !== idx).join(", ") }))}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
