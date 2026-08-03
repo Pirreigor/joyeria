@@ -87,11 +87,122 @@ function DedicationPage({ token }) {
   );
 }
 
+function DedicationItemCard({ item, onSaved }) {
+  const [para, setPara] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setSaveError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/dedicatorias/${item.token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ para, mensaje }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "No se pudo guardar la dedicatoria");
+      onSaved(item.token, data.dedicatoria);
+    } catch (error) {
+      setSaveError(error.message || "No se pudo guardar la dedicatoria");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="dedicationItemCard">
+      <img
+        className="productModalImage"
+        src={item.productoImageUrl || PLACEHOLDER}
+        alt={item.productoNombre || ""}
+      />
+      <h2 className="dedicationTitle">{item.productoNombre}{item.unidad ? ` (${item.unidad})` : ""}</h2>
+      {item.escrita ? (
+        <div className="dedicationText">
+          <p className="dedicationPara">Para: {item.para}</p>
+          <p className="dedicationMensaje">{item.mensaje}</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="dedicationForm">
+          <p className="dedicationHint">Esta pieza es un regalo. Deja unas palabras — una vez guardada, la dedicatoria no se puede editar.</p>
+          {saveError && <p className="dedicationError">{saveError}</p>}
+          <label htmlFor={`para-${item.token}`}>Para</label>
+          <input id={`para-${item.token}`} type="text" value={para} onChange={(e) => setPara(e.target.value)} required />
+          <label htmlFor={`mensaje-${item.token}`}>Dedicatoria</label>
+          <textarea id={`mensaje-${item.token}`} rows={4} value={mensaje} onChange={(e) => setMensaje(e.target.value)} required />
+          <button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar dedicatoria"}</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function OrderDedicationSearchPage() {
+  const [pedidoId, setPedidoId] = useState("");
+  const [contacto, setContacto] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [items, setItems] = useState(null);
+
+  async function handleSearch(event) {
+    event.preventDefault();
+    setSearching(true);
+    setSearchError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/dedicatorias/buscar/${encodeURIComponent(pedidoId.trim())}?contacto=${encodeURIComponent(contacto.trim())}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "No se pudo buscar el pedido");
+      setItems(data.dedicatorias || []);
+    } catch (error) {
+      setSearchError(error.message || "No se pudo buscar el pedido");
+      setItems(null);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function handleSaved(token, dedicatoria) {
+    setItems((prev) => prev.map((i) => (i.token === token ? { ...i, ...dedicatoria, escrita: true } : i)));
+  }
+
+  return (
+    <div className="page dedicationPage">
+      {items === null ? (
+        <div className="dedicationCard">
+          <h1 className="dedicationTitle">Editar mi dedicatoria</h1>
+          <p className="dedicationHint">Ingresa el numero de tu pedido y el email o telefono con el que compraste.</p>
+          <form onSubmit={handleSearch} className="dedicationForm">
+            {searchError && <p className="dedicationError">{searchError}</p>}
+            <label htmlFor="buscar-pedido">N° de pedido</label>
+            <input id="buscar-pedido" type="number" min="1" value={pedidoId} onChange={(e) => setPedidoId(e.target.value)} required />
+            <label htmlFor="buscar-contacto">Email o telefono</label>
+            <input id="buscar-contacto" type="text" value={contacto} onChange={(e) => setContacto(e.target.value)} required />
+            <button type="submit" disabled={searching}>{searching ? "Buscando..." : "Buscar pedido"}</button>
+          </form>
+        </div>
+      ) : (
+        <div className="dedicationResults">
+          {items.length === 0 && <p className="dedicationHint">Este pedido no tiene piezas con dedicatoria.</p>}
+          {items.map((item) => <DedicationItemCard key={item.token} item={item} onSaved={handleSaved} />)}
+          <button type="button" className="ghostBtn" onClick={() => setItems(null)}>Buscar otro pedido</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [dedicationToken] = useState(() => {
     const match = window.location.pathname.match(/^\/dedicatoria\/([^/]+)\/?$/);
     return match ? match[1] : null;
   });
+  const [showDedicationSearch] = useState(() => /^\/dedicatoria\/?$/.test(window.location.pathname));
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [slides, setSlides] = useState([]);
@@ -533,6 +644,10 @@ export default function App() {
     return <DedicationPage token={dedicationToken} />;
   }
 
+  if (showDedicationSearch) {
+    return <OrderDedicationSearchPage />;
+  }
+
   return (
     <div className="page">
       <header className="topHeader">
@@ -552,6 +667,8 @@ export default function App() {
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
+
+          <a href="/dedicatoria" className="ghostBtn">Mi dedicatoria</a>
 
           {user ? (
             <button type="button" className="ghostBtn" onClick={logout}>

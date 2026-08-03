@@ -1521,6 +1521,21 @@ h3 {
   color: #9a2c2c;
 }
 
+.dedicationResults {
+  width: min(480px, 100%);
+  display: grid;
+  gap: 20px;
+}
+
+.dedicationItemCard {
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
 .whatsappFloat img {
   width: 48px;
   height: 48px;
