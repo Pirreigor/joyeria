@@ -217,6 +217,12 @@ model Pedido {
   dispatchedByUserId Int?
   dispatchedBy       Usuario?     @relation("PedidoDespachadoPor", fields: [dispatchedByUserId], references: [id], onDelete: SetNull)
   items              ItemPedido[]
+  dedicatoriaDe          String?
+  dedicatoriaPara        String?
+  dedicatoriaMensaje     String?
+  dedicatoriaYoutubeUrl  String?
+  dedicatoriaEscrita     Boolean   @default(false)
+  dedicatoriaEscritaAt   DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
