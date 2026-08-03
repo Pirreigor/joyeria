@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
 import joyeritoImg from "../asset/joyerito-sin fondo.png";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
@@ -90,7 +91,87 @@ function DedicationPage({ token }) {
 function youtubeEmbedUrl(url) {
   if (!url) return null;
   const match = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
-  return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+  return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0` : null;
+}
+
+function DedicationVideo({ url }) {
+  const embedUrl = youtubeEmbedUrl(url);
+  if (!embedUrl) return null;
+  return (
+    <div className="dedicationVideo">
+      <iframe
+        src={embedUrl}
+        title="Video dedicatoria"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
+function ShareQr({ url }) {
+  const canvasRef = useRef(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!url || !canvasRef.current) return;
+    QRCode.toCanvas(canvasRef.current, url, { width: 160, margin: 1 }).catch(() => {});
+  }, [url]);
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard no disponible */
+    }
+  }
+
+  return (
+    <div className="dedicationShare">
+      <p className="dedicationHint">Comparti este enlace o codigo QR con tu persona especial:</p>
+      <canvas ref={canvasRef} />
+      <div className="dedicationShareLink">
+        <input type="text" readOnly value={url} onFocus={(e) => e.target.select()} />
+        <button type="button" onClick={copyLink}>{copied ? "Copiado!" : "Copiar"}</button>
+      </div>
+    </div>
+  );
+}
+
+function SharedDedicationPage({ token }) {
+  const [state, setState] = useState({ loading: true, error: "", dedicatoria: null });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/dedicatorias/ver/${token}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || "No se pudo cargar la dedicatoria");
+        setState({ loading: false, error: "", dedicatoria: data.dedicatoria });
+      } catch (error) {
+        setState({ loading: false, error: error.message || "No se pudo cargar la dedicatoria", dedicatoria: null });
+      }
+    })();
+  }, [token]);
+
+  return (
+    <div className="page dedicationPage">
+      <div className="dedicationCard">
+        {state.loading && <p>Cargando...</p>}
+        {!state.loading && state.error && <p className="dedicationError">{state.error}</p>}
+        {!state.loading && !state.error && state.dedicatoria && (
+          <div className="dedicationText">
+            <p className="dedicationPara">De: {state.dedicatoria.de}</p>
+            <p className="dedicationPara">Para: {state.dedicatoria.para}</p>
+            <p className="dedicationMensaje">{state.dedicatoria.mensaje}</p>
+            <DedicationVideo url={state.dedicatoria.youtubeUrl} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function OrderDedicationSearchPage() {
@@ -151,7 +232,7 @@ function OrderDedicationSearchPage() {
     setSearchError("");
   }
 
-  const embedUrl = dedicatoria ? youtubeEmbedUrl(dedicatoria.youtubeUrl) : null;
+  const shareUrl = dedicatoria?.token ? `${window.location.origin}/dedicatoria/ver/${dedicatoria.token}` : null;
 
   return (
     <div className="page dedicationPage">
@@ -176,16 +257,8 @@ function OrderDedicationSearchPage() {
               <p className="dedicationPara">De: {dedicatoria.de}</p>
               <p className="dedicationPara">Para: {dedicatoria.para}</p>
               <p className="dedicationMensaje">{dedicatoria.mensaje}</p>
-              {embedUrl && (
-                <div className="dedicationVideo">
-                  <iframe
-                    src={embedUrl}
-                    title="Video dedicatoria"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              )}
+              <DedicationVideo url={dedicatoria.youtubeUrl} />
+              {shareUrl && <ShareQr url={shareUrl} />}
             </div>
           ) : (
             <form onSubmit={handleSave} className="dedicationForm">
@@ -210,9 +283,13 @@ function OrderDedicationSearchPage() {
 }
 
 export default function App() {
+  const [sharedDedicationToken] = useState(() => {
+    const match = window.location.pathname.match(/^\/dedicatoria\/ver\/([^/]+)\/?$/);
+    return match ? match[1] : null;
+  });
   const [dedicationToken] = useState(() => {
     const match = window.location.pathname.match(/^\/dedicatoria\/([^/]+)\/?$/);
-    return match ? match[1] : null;
+    return match && match[1] !== "ver" ? match[1] : null;
   });
   const [showDedicationSearch] = useState(() => /^\/dedicatoria\/?$/.test(window.location.pathname));
   const [products, setProducts] = useState([]);
@@ -650,6 +727,10 @@ export default function App() {
     } finally {
       setCheckoutLoading(false);
     }
+  }
+
+  if (sharedDedicationToken) {
+    return <SharedDedicationPage token={sharedDedicationToken} />;
   }
 
   if (dedicationToken) {

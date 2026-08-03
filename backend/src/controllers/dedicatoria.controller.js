@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const prisma = require("../utils/prisma");
 
 async function getDedicatoria(req, res) {
@@ -55,6 +56,7 @@ function serializePedidoDedicatoria(pedido) {
     mensaje: pedido.dedicatoriaMensaje,
     youtubeUrl: pedido.dedicatoriaYoutubeUrl,
     escrita: pedido.dedicatoriaEscrita,
+    token: pedido.dedicatoriaToken,
   };
 }
 
@@ -111,10 +113,29 @@ async function guardarDedicatoriaPedido(req, res) {
       dedicatoriaYoutubeUrl: youtubeUrl ? String(youtubeUrl).trim() : null,
       dedicatoriaEscrita: true,
       dedicatoriaEscritaAt: new Date(),
+      dedicatoriaToken: crypto.randomBytes(16).toString("hex"),
     },
   });
 
   return res.json({ dedicatoria: serializePedidoDedicatoria(updated) });
+}
+
+async function verDedicatoriaCompartida(req, res) {
+  const { token } = req.params;
+
+  const pedido = await prisma.pedido.findUnique({ where: { dedicatoriaToken: token } });
+  if (!pedido || !pedido.dedicatoriaEscrita) {
+    return res.status(404).json({ message: "Dedicatoria no encontrada" });
+  }
+
+  return res.json({
+    dedicatoria: {
+      de: pedido.dedicatoriaDe,
+      para: pedido.dedicatoriaPara,
+      mensaje: pedido.dedicatoriaMensaje,
+      youtubeUrl: pedido.dedicatoriaYoutubeUrl,
+    },
+  });
 }
 
 async function submitDedicatoria(req, res) {
@@ -166,4 +187,5 @@ module.exports = {
   submitDedicatoria,
   buscarPedido,
   guardarDedicatoriaPedido,
+  verDedicatoriaCompartida,
 };

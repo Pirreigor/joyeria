@@ -1521,19 +1521,41 @@ h3 {
   color: #9a2c2c;
 }
 
-.dedicationResults {
-  width: min(480px, 100%);
+.dedicationShare {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--line);
   display: grid;
-  gap: 20px;
+  justify-items: center;
+  gap: 10px;
 }
 
-.dedicationItemCard {
-  background: rgba(255, 255, 255, 0.97);
+.dedicationShareLink {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+}
+
+.dedicationShareLink input {
+  flex: 1;
+  min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 24px;
-  text-align: center;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: var(--ink);
+  opacity: 0.8;
+}
+
+.dedicationShareLink button {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: var(--gold);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .dedicationVideo {
