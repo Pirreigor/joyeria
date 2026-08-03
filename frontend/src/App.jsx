@@ -335,6 +335,8 @@ export default function App() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
 
+  const [contactForm, setContactForm] = useState({ nombre: "", email: "", mensaje: "" });
+
   useEffect(() => {
     const savedCart = localStorage.getItem(CART_KEY);
     const savedToken = localStorage.getItem(TOKEN_KEY);
@@ -729,6 +731,16 @@ export default function App() {
     }
   }
 
+  function handleContactSubmit(event) {
+    event.preventDefault();
+
+    const mensaje = `Hola! Soy ${contactForm.nombre.trim()}${contactForm.email.trim() ? ` (${contactForm.email.trim()})` : ""}. ${contactForm.mensaje.trim()}`;
+    const whatsappUrl = `https://wa.me/51941445104?text=${encodeURIComponent(mensaje)}`;
+
+    setContactForm({ nombre: "", email: "", mensaje: "" });
+    window.open(whatsappUrl, "_blank");
+  }
+
   if (sharedDedicationToken) {
     return <SharedDedicationPage token={sharedDedicationToken} />;
   }
@@ -763,13 +775,9 @@ export default function App() {
 
           <a href="/dedicatoria" className="ghostBtn">Mi dedicatoria</a>
 
-          {user ? (
+          {user && (
             <button type="button" className="ghostBtn" onClick={logout}>
               {user.name ? `Salir (${user.name})` : "Cerrar sesion"}
-            </button>
-          ) : (
-            <button type="button" className="ghostBtn" onClick={() => openAuth("login")}>
-              Ingresar
             </button>
           )}
 
@@ -1150,23 +1158,42 @@ export default function App() {
             cotizaciones especiales y recomendaciones para regalos.
           </p>
           <div className="contactList">
-            <a href="tel:+593999999999">Telefono: +593 999 999 999</a>
-            <a href="mailto:ventas@donjoyero.com">Email: ventas@donjoyero.com</a>
-            <a href="https://wa.me/593999999999" target="_blank" rel="noreferrer">
+            <a href="tel:+51941445104">Telefono: +51 941 445 104</a>
+            <a href="https://wa.me/51941445104" target="_blank" rel="noreferrer">
               WhatsApp directo
             </a>
           </div>
         </div>
 
-        <form className="contactForm" onSubmit={(event) => event.preventDefault()}>
+        <form className="contactForm" onSubmit={handleContactSubmit}>
           <label htmlFor="contact-name">Nombre</label>
-          <input id="contact-name" type="text" placeholder="Tu nombre" />
+          <input
+            id="contact-name"
+            type="text"
+            placeholder="Tu nombre"
+            value={contactForm.nombre}
+            onChange={(e) => setContactForm((p) => ({ ...p, nombre: e.target.value }))}
+            required
+          />
 
           <label htmlFor="contact-email">Email</label>
-          <input id="contact-email" type="email" placeholder="tu@email.com" />
+          <input
+            id="contact-email"
+            type="email"
+            placeholder="tu@email.com"
+            value={contactForm.email}
+            onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))}
+          />
 
           <label htmlFor="contact-message">Mensaje</label>
-          <textarea id="contact-message" rows={4} placeholder="Cuentalos que estas buscando" />
+          <textarea
+            id="contact-message"
+            rows={4}
+            placeholder="Cuentalos que estas buscando"
+            value={contactForm.mensaje}
+            onChange={(e) => setContactForm((p) => ({ ...p, mensaje: e.target.value }))}
+            required
+          />
 
           <button type="submit" className="ctaBtn">Solicitar asesoria</button>
         </form>
