@@ -163,6 +163,8 @@ const MENU_BY_ROLE = {
   VENDEDOR: STAFF_MENU,
 };
 
+const ORDER_LOCKED_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
+
 const TAB_LIST_TITLES = {
   dashboard: "Resumen general",
   users: "Listado usuarios",
@@ -1433,13 +1435,9 @@ export default function App() {
     }
   }
 
-  function handleOrderStatusChange(orderId, newStatus) {
-    if (newStatus === "PAGADO") {
-      setPaymentModal(orderId);
-      setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
-      return;
-    }
-    handleUpdateOrderStatus(orderId, newStatus);
+  function openPaymentModal(orderId) {
+    setPaymentModal(orderId);
+    setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
   }
 
   async function handleUpdateOrderStatus(orderId, newStatus) {
@@ -2093,17 +2091,9 @@ export default function App() {
                   )}
                   {activeTab === "despacho" ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
-                  ) : (
-                    <select value={order.estado} onChange={(e) => handleOrderStatusChange(order.id, e.target.value)}>
-                      <option value="PREPARAR">Preparar</option>
-                      <option value="NUEVO">Nuevo</option>
-                      <option value="PAGADO">Pagado</option>
-                      <option value="LISTO_PARA_ENVIO">Listo para Envio</option>
-                      <option value="ENVIADO">Enviado</option>
-                      <option value="ENTREGADO">Entregado</option>
-                      <option value="CANCELADO">Cancelado</option>
-                    </select>
-                  )}
+                  ) : !ORDER_LOCKED_STATES.includes(order.estado) ? (
+                    <button type="button" onClick={() => openPaymentModal(order.id)}>Pagar</button>
+                  ) : null}
                 </div>
               </article>
             ))}
