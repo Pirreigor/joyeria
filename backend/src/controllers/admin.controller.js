@@ -726,7 +726,7 @@ async function listOrders(req, res) {
 
 async function updateOrderStatus(req, res) {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, courierEnvio, numeroGuia } = req.body;
 
   const ESTADOS_VALIDOS = ["PREPARAR", "NUEVO", "PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
   if (!ESTADOS_VALIDOS.includes(status)) {
@@ -735,6 +735,10 @@ async function updateOrderStatus(req, res) {
 
   if (status === "PAGADO") {
     return res.status(400).json({ message: "Para marcar como PAGADO use el endpoint de confirmacion de pago" });
+  }
+
+  if (status === "ENVIADO" && (!courierEnvio || !String(courierEnvio).trim() || !numeroGuia || !String(numeroGuia).trim())) {
+    return res.status(400).json({ message: "courierEnvio y numeroGuia son obligatorios para marcar como Enviado" });
   }
 
   const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
@@ -747,6 +751,7 @@ async function updateOrderStatus(req, res) {
     data: {
       estado: status,
       ...(status === "LISTO_PARA_ENVIO" ? { dispatchedByUserId: req.user.id } : {}),
+      ...(status === "ENVIADO" ? { courierEnvio: String(courierEnvio).trim(), numeroGuia: String(numeroGuia).trim() } : {}),
     },
   });
 

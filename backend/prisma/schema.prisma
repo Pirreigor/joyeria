@@ -216,6 +216,8 @@ model Pedido {
   confirmedBy        Usuario?     @relation("PedidoConfirmadoPor", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
   dispatchedByUserId Int?
   dispatchedBy       Usuario?     @relation("PedidoDespachadoPor", fields: [dispatchedByUserId], references: [id], onDelete: SetNull)
+  courierEnvio       String?
+  numeroGuia         String?
   items              ItemPedido[]
   dedicatoriaDe          String?
   dedicatoriaPara        String?

@@ -116,6 +116,7 @@ const ALL_PERMISSIONS = [
   { key: "flyers", label: "Flyers" },
   { key: "orders", label: "Pedidos" },
   { key: "despacho", label: "Despacho" },
+  { key: "envios", label: "Envios" },
   { key: "settings", label: "Branding" },
 ];
 
@@ -152,6 +153,7 @@ const STAFF_MENU = [
     items: [
       { key: "orders", label: "Pedidos", short: "PE" },
       { key: "despacho", label: "Despacho", short: "DE" },
+      { key: "envios", label: "Envios", short: "EN" },
     ],
   },
   {
@@ -178,6 +180,7 @@ const TAB_LIST_TITLES = {
   flyers: "Listado flyers",
   orders: "Listado pedidos",
   despacho: "Pedidos listos para despacho",
+  envios: "Pedidos listos para envio",
   settings: "Preview branding",
   atributos: "Atributos del catalogo",
 };
@@ -247,7 +250,7 @@ function MenuIcon({ tabKey }) {
     );
   }
 
-  if (tabKey === "despacho") {
+  if (tabKey === "despacho" || tabKey === "envios") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9 1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
@@ -389,6 +392,10 @@ export default function App() {
   const [paymentModal, setPaymentModal] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
   const [paymentSaving, setPaymentSaving] = useState(false);
+
+  const [shippingModal, setShippingModal] = useState(null);
+  const [shippingForm, setShippingForm] = useState({ courierEnvio: "", numeroGuia: "" });
+  const [shippingSaving, setShippingSaving] = useState(false);
   const [settingsForm, setSettingsForm] = useState(initialSettingsForm);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState("");
@@ -488,8 +495,9 @@ export default function App() {
       items = flyers.filter((f) => !q || `${f.title} ${f.subtitle || ""}`.toLowerCase().includes(q));
       if (listSort === "order") items.sort((a, b) => a.displayOrder - b.displayOrder);
       else if (listSort === "name_asc") items.sort((a, b) => a.title.localeCompare(b.title));
-    } else if (activeTab === "orders" || activeTab === "despacho") {
+    } else if (activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") {
       let base = activeTab === "despacho" ? orders.filter((o) => o.estado === "PAGADO")
+        : activeTab === "envios" ? orders.filter((o) => o.estado === "LISTO_PARA_ENVIO")
         : orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO");
       items = base.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
       if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -729,7 +737,7 @@ export default function App() {
         can("products") ? request("/api/admin/products") : Promise.resolve({ products: [] }),
         can("slides") ? request("/api/admin/slides") : Promise.resolve({ slides: [] }),
         can("flyers") ? request("/api/admin/flyers") : Promise.resolve({ flyers: [] }),
-        (can("orders") || can("despacho") || can("clientes")) ? request("/api/admin/orders") : Promise.resolve({ orders: [] }),
+        (can("orders") || can("despacho") || can("clientes") || can("envios")) ? request("/api/admin/orders") : Promise.resolve({ orders: [] }),
         can("settings") ? request("/api/admin/settings") : Promise.resolve(null),
         needsAttrCatalogs ? request("/api/admin/tipos-pieza") : Promise.resolve({ items: [] }),
         needsAttrCatalogs ? request("/api/admin/materiales") : Promise.resolve({ items: [] }),
@@ -1476,6 +1484,30 @@ export default function App() {
     setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
   }
 
+  function openShippingModal(orderId) {
+    setShippingModal(orderId);
+    setShippingForm({ courierEnvio: "", numeroGuia: "" });
+  }
+
+  async function handleShippingSubmit(event) {
+    event.preventDefault();
+    setShippingSaving(true);
+    setListError("");
+
+    try {
+      await request(`/api/admin/orders/${shippingModal}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "ENVIADO", ...shippingForm }),
+      });
+      setShippingModal(null);
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo marcar el pedido como enviado");
+    } finally {
+      setShippingSaving(false);
+    }
+  }
+
   async function handleUpdateOrderStatus(orderId, newStatus) {
     setListError("");
     try {
@@ -1896,8 +1928,8 @@ export default function App() {
                 onChange={(e) => { setListSearch(e.target.value); setListPage(1); }}
               />
               <select className="listSortSelect" value={listSort} onChange={(e) => { setListSort(e.target.value); setListPage(1); }}>
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "clientes") && <option value="newest">Mas recientes</option>}
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "clientes") && <option value="oldest">Mas antiguos</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "envios" || activeTab === "clientes") && <option value="newest">Mas recientes</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "envios" || activeTab === "clientes") && <option value="oldest">Mas antiguos</option>}
                 {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_asc">Nombre A-Z</option>}
                 {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_desc">Nombre Z-A</option>}
                 {activeTab === "products" && <option value="price_asc">Precio menor</option>}
@@ -1905,8 +1937,8 @@ export default function App() {
                 {activeTab === "products" && <option value="stock_asc">Menor stock</option>}
                 {(activeTab === "slides" || activeTab === "flyers") && <option value="order">Por orden</option>}
                 {(activeTab === "slides" || activeTab === "flyers") && <option value="name_asc">Nombre A-Z</option>}
-                {(activeTab === "orders" || activeTab === "despacho") && <option value="total_desc">Mayor total</option>}
-                {(activeTab === "orders" || activeTab === "despacho") && <option value="total_asc">Menor total</option>}
+                {(activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") && <option value="total_desc">Mayor total</option>}
+                {(activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") && <option value="total_asc">Menor total</option>}
               </select>
               <span className="listCount">{filteredList.length} resultado{filteredList.length !== 1 ? "s" : ""}</span>
             </div>
@@ -2101,7 +2133,7 @@ export default function App() {
               </article>
             ))}
 
-            {(activeTab === "orders" || activeTab === "despacho") && pagedList.map((order) => (
+            {(activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") && pagedList.map((order) => (
               <article className="card card-vertical" key={order.id}>
                 <div className="card-info">
                   <div className="orderHeader">
@@ -2112,6 +2144,7 @@ export default function App() {
                   <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
                   {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
                   {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                  {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
                   {order.confirmedBy && <small>Pago confirmado por: {order.confirmedBy.name}</small>}
                   {order.dispatchedBy && <small>Despachado por: {order.dispatchedBy.name}</small>}
                   {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
@@ -2127,6 +2160,8 @@ export default function App() {
                   )}
                   {activeTab === "despacho" ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
+                  ) : activeTab === "envios" ? (
+                    <button type="button" onClick={() => openShippingModal(order.id)}>Marcar Enviado</button>
                   ) : !ORDER_LOCKED_STATES.includes(order.estado) ? (
                     <button type="button" onClick={() => openPaymentModal(order.id)}>Pagar</button>
                   ) : null}
@@ -2747,6 +2782,43 @@ export default function App() {
                   {paymentSaving ? "Confirmando..." : "Confirmar pago"}
                 </button>
                 <button type="button" className="ghost" onClick={() => setPaymentModal(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {shippingModal !== null && (
+        <div className="modalOverlay" onClick={() => setShippingModal(null)}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>Marcar enviado — Pedido #{shippingModal}</h2>
+            <form onSubmit={handleShippingSubmit} className="categoryForm">
+              {listError && <p className="error">{listError}</p>}
+              <label htmlFor="sm-courier">Courier</label>
+              <input
+                id="sm-courier"
+                type="text"
+                value={shippingForm.courierEnvio}
+                onChange={(e) => setShippingForm((p) => ({ ...p, courierEnvio: e.target.value }))}
+                required
+              />
+
+              <label htmlFor="sm-guia">Numero de guia</label>
+              <input
+                id="sm-guia"
+                type="text"
+                value={shippingForm.numeroGuia}
+                onChange={(e) => setShippingForm((p) => ({ ...p, numeroGuia: e.target.value }))}
+                required
+              />
+
+              <div className="actions">
+                <button type="submit" disabled={shippingSaving}>
+                  {shippingSaving ? "Guardando..." : "Marcar enviado"}
+                </button>
+                <button type="button" className="ghost" onClick={() => setShippingModal(null)}>
                   Cancelar
                 </button>
               </div>
