@@ -551,6 +551,52 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.clienteOrdersList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+.clienteOrderItem {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.clienteOrderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.clienteDedicatoria {
+  display: grid;
+  gap: 4px;
+}
+
+.clienteDedicatoriaMensaje {
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.clienteDedicatoriaLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.clienteSinDedicatoria {
+  opacity: 0.6;
+  font-style: italic;
+}
+
 .badge {
   width: fit-content;
   font-size: 0.72rem;

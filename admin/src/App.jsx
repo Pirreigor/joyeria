@@ -3,6 +3,7 @@ import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || "https://donjoyero.com";
 const TOKEN_KEY = "admin_token";
 const USER_KEY = "admin_user";
 const LIST_PAGE_SIZE = 12;
@@ -107,6 +108,7 @@ const initialCatalogForm = {
 const ALL_PERMISSIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "users", label: "Usuarios" },
+  { key: "clientes", label: "Clientes" },
   { key: "categories", label: "Categorias" },
   { key: "products", label: "Productos" },
   { key: "atributos", label: "Atributos" },
@@ -124,6 +126,7 @@ const STAFF_MENU = [
     items: [
       { key: "dashboard", label: "Dashboard", short: "DB" },
       { key: "users", label: "Usuarios", short: "US" },
+      { key: "clientes", label: "Clientes", short: "CL" },
     ],
   },
   {
@@ -168,6 +171,7 @@ const ORDER_LOCKED_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO
 const TAB_LIST_TITLES = {
   dashboard: "Resumen general",
   users: "Listado usuarios",
+  clientes: "Listado clientes",
   categories: "Listado categorias",
   products: "Listado productos",
   slides: "Listado slides",
@@ -191,6 +195,14 @@ function MenuIcon({ tabKey }) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-8 2a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 2c-3 0-6 1.5-6 3.5V21h12v-2.5c0-2-3-3.5-6-3.5zm-8 0c-2.5 0-5 1.1-5 2.7V21h5v-2.5a4.6 4.6 0 0 1 1.7-3.4A8.5 8.5 0 0 0 8 15z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "clientes") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 12c2.7 0 8 1.3 8 4v3H4v-3c0-2.7 5.3-4 8-4zm0-2a4 4 0 1 1 4-4 4 4 0 0 1-4 4z" />
       </svg>
     );
   }
@@ -484,6 +496,30 @@ export default function App() {
       else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
       else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
+    } else if (activeTab === "clientes") {
+      const map = new Map();
+      for (const o of orders) {
+        const key = o.usuarioId ? `u-${o.usuarioId}` : `c-${(o.clienteEmail || o.clienteTelefono || o.clienteNombre || "?").toLowerCase()}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            nombre: o.clienteNombre || o.usuario?.name || "Cliente",
+            email: o.clienteEmail || o.usuario?.email || "",
+            telefono: o.clienteTelefono || "",
+            pedidos: [],
+          });
+        }
+        map.get(key).pedidos.push(o);
+      }
+      for (const cliente of map.values()) {
+        cliente.pedidos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        cliente.ultimoPedido = cliente.pedidos[0]?.createdAt;
+      }
+      items = Array.from(map.values()).filter((c) => !q || `${c.nombre} ${c.email} ${c.telefono}`.toLowerCase().includes(q));
+      if (listSort === "newest") items.sort((a, b) => new Date(b.ultimoPedido) - new Date(a.ultimoPedido));
+      else if (listSort === "oldest") items.sort((a, b) => new Date(a.ultimoPedido) - new Date(b.ultimoPedido));
+      else if (listSort === "name_desc") items.sort((a, b) => b.nombre.localeCompare(a.nombre));
+      else items.sort((a, b) => a.nombre.localeCompare(b.nombre));
     }
 
     return items;
@@ -693,7 +729,7 @@ export default function App() {
         can("products") ? request("/api/admin/products") : Promise.resolve({ products: [] }),
         can("slides") ? request("/api/admin/slides") : Promise.resolve({ slides: [] }),
         can("flyers") ? request("/api/admin/flyers") : Promise.resolve({ flyers: [] }),
-        (can("orders") || can("despacho")) ? request("/api/admin/orders") : Promise.resolve({ orders: [] }),
+        (can("orders") || can("despacho") || can("clientes")) ? request("/api/admin/orders") : Promise.resolve({ orders: [] }),
         can("settings") ? request("/api/admin/settings") : Promise.resolve(null),
         needsAttrCatalogs ? request("/api/admin/tipos-pieza") : Promise.resolve({ items: [] }),
         needsAttrCatalogs ? request("/api/admin/materiales") : Promise.resolve({ items: [] }),
@@ -1860,10 +1896,10 @@ export default function App() {
                 onChange={(e) => { setListSearch(e.target.value); setListPage(1); }}
               />
               <select className="listSortSelect" value={listSort} onChange={(e) => { setListSort(e.target.value); setListPage(1); }}>
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho") && <option value="newest">Mas recientes</option>}
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho") && <option value="oldest">Mas antiguos</option>}
-                {(activeTab === "users" || activeTab === "categories" || activeTab === "products") && <option value="name_asc">Nombre A-Z</option>}
-                {(activeTab === "users" || activeTab === "categories" || activeTab === "products") && <option value="name_desc">Nombre Z-A</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "clientes") && <option value="newest">Mas recientes</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "clientes") && <option value="oldest">Mas antiguos</option>}
+                {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_asc">Nombre A-Z</option>}
+                {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_desc">Nombre Z-A</option>}
                 {activeTab === "products" && <option value="price_asc">Precio menor</option>}
                 {activeTab === "products" && <option value="price_desc">Precio mayor</option>}
                 {activeTab === "products" && <option value="stock_asc">Menor stock</option>}
@@ -2095,6 +2131,40 @@ export default function App() {
                     <button type="button" onClick={() => openPaymentModal(order.id)}>Pagar</button>
                   ) : null}
                 </div>
+              </article>
+            ))}
+
+            {activeTab === "clientes" && pagedList.map((cliente) => (
+              <article className="card card-vertical" key={cliente.key}>
+                <div className="card-info">
+                  <strong>{cliente.nombre}</strong>
+                  <small>{cliente.email}{cliente.telefono ? ` — Tel: ${cliente.telefono}` : ""}</small>
+                  <small>{cliente.pedidos.length} pedido{cliente.pedidos.length !== 1 ? "s" : ""}</small>
+                </div>
+                <ul className="clienteOrdersList">
+                  {cliente.pedidos.map((pedido) => (
+                    <li key={pedido.id} className="clienteOrderItem">
+                      <div className="clienteOrderHeader">
+                        <span>Pedido #{pedido.id} — {new Date(pedido.createdAt).toLocaleDateString()}</span>
+                        <span className={`orderBadge ${pedido.estado.toLowerCase()}`}>{pedido.estado}</span>
+                      </div>
+                      {pedido.dedicatoriaEscrita ? (
+                        <div className="clienteDedicatoria">
+                          <small>De: {pedido.dedicatoriaDe} — Para: {pedido.dedicatoriaPara}</small>
+                          <small className="clienteDedicatoriaMensaje">"{pedido.dedicatoriaMensaje}"</small>
+                          {pedido.dedicatoriaToken && (
+                            <div className="clienteDedicatoriaLink">
+                              <a href={`${FRONTEND_URL}/dedicatoria/ver/${pedido.dedicatoriaToken}`} target="_blank" rel="noreferrer" className="imageLink">Ver dedicatoria</a>
+                              <button type="button" className="ghost" onClick={() => navigator.clipboard?.writeText(`${FRONTEND_URL}/dedicatoria/ver/${pedido.dedicatoriaToken}`)}>Copiar link</button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <small className="clienteSinDedicatoria">Sin dedicatoria todavia</small>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </article>
             ))}
 
