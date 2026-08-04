@@ -727,22 +727,26 @@ export default function App() {
     const perms = user?.permisos || [];
     const can = (key) => (user?.rol === "ADMINISTRADOR" && perms.length === 0) || perms.includes(key);
 
+    const dashboardFallback = { stats: { users: 0, products: 0, categories: 0, orders: 0 }, recentOrders: [], recentUsers: [] };
+    const fetchOrFallback = (allowed, path, fallback) =>
+      allowed ? request(path).catch(() => fallback) : Promise.resolve(fallback);
+
     try {
-      const needsAttrCatalogs = can("products") || can("atributos");
+      const needsAttrCatalogs = can("atributos");
       const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData, tiposPiezaData, materialesData, gemasData, origenesGemaData] = await Promise.all([
-        can("dashboard") ? request("/api/admin/dashboard") : Promise.resolve({ stats: { users: 0, products: 0, categories: 0, orders: 0 }, recentOrders: [], recentUsers: [] }),
-        can("users") ? request("/api/admin/users") : Promise.resolve({ users: [] }),
-        can("users") ? request("/api/admin/invitations") : Promise.resolve({ invitations: [] }),
-        can("categories") ? request("/api/admin/categories") : Promise.resolve({ categories: [] }),
-        can("products") ? request("/api/admin/products") : Promise.resolve({ products: [] }),
-        can("slides") ? request("/api/admin/slides") : Promise.resolve({ slides: [] }),
-        can("flyers") ? request("/api/admin/flyers") : Promise.resolve({ flyers: [] }),
-        (can("orders") || can("despacho") || can("clientes") || can("envios")) ? request("/api/admin/orders") : Promise.resolve({ orders: [] }),
-        can("settings") ? request("/api/admin/settings") : Promise.resolve(null),
-        needsAttrCatalogs ? request("/api/admin/tipos-pieza") : Promise.resolve({ items: [] }),
-        needsAttrCatalogs ? request("/api/admin/materiales") : Promise.resolve({ items: [] }),
-        needsAttrCatalogs ? request("/api/admin/gemas") : Promise.resolve({ items: [] }),
-        needsAttrCatalogs ? request("/api/admin/origenes-gema") : Promise.resolve({ items: [] }),
+        fetchOrFallback(can("dashboard"), "/api/admin/dashboard", dashboardFallback),
+        fetchOrFallback(can("users"), "/api/admin/users", { users: [] }),
+        fetchOrFallback(can("users"), "/api/admin/invitations", { invitations: [] }),
+        fetchOrFallback(can("categories"), "/api/admin/categories", { categories: [] }),
+        fetchOrFallback(can("products"), "/api/admin/products", { products: [] }),
+        fetchOrFallback(can("slides"), "/api/admin/slides", { slides: [] }),
+        fetchOrFallback(can("flyers"), "/api/admin/flyers", { flyers: [] }),
+        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios"), "/api/admin/orders", { orders: [] }),
+        fetchOrFallback(can("settings"), "/api/admin/settings", null),
+        fetchOrFallback(needsAttrCatalogs, "/api/admin/tipos-pieza", { items: [] }),
+        fetchOrFallback(needsAttrCatalogs, "/api/admin/materiales", { items: [] }),
+        fetchOrFallback(needsAttrCatalogs, "/api/admin/gemas", { items: [] }),
+        fetchOrFallback(needsAttrCatalogs, "/api/admin/origenes-gema", { items: [] }),
       ]);
       setDashboard({
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
