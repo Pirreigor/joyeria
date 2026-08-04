@@ -362,8 +362,8 @@ function slugify(value) {
 export default function App() {
   const [token, setToken] = useState("");
   const [user, setUser] = useState(null);
-  const [email, setEmail] = useState("admin@joyeria.local");
-  const [password, setPassword] = useState("Admin12345");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
@@ -1712,6 +1712,7 @@ export default function App() {
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              placeholder="tu@email.com"
               autoComplete="email"
               required
             />
@@ -1722,6 +1723,7 @@ export default function App() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
               autoComplete="current-password"
               required
             />
