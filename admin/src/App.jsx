@@ -725,7 +725,7 @@ export default function App() {
     setListError("");
 
     const perms = user?.permisos || [];
-    const can = (key) => perms.length === 0 || perms.includes(key);
+    const can = (key) => (user?.rol === "ADMINISTRADOR" && perms.length === 0) || perms.includes(key);
 
     try {
       const needsAttrCatalogs = can("products") || can("atributos");
