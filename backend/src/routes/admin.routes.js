@@ -44,7 +44,7 @@ const {
   findProductBySku,
 } = require("../controllers/catalog.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
-const { requireRole, requirePermission } = require("../middleware/role.middleware");
+const { requireRole, requirePermission, requireAnyPermission } = require("../middleware/role.middleware");
 const { uploadComprobante } = require("../middleware/upload.middleware");
 const { uploadImage: uploadImageMiddleware, uploadImportFiles } = require("../middleware/uploadImage.middleware");
 
@@ -112,9 +112,9 @@ router.post("/origenes-gema", requirePermission("atributos"), createOrigenGema);
 router.patch("/origenes-gema/:id", requirePermission("atributos"), updateOrigenGema);
 router.delete("/origenes-gema/:id", requirePermission("atributos"), deleteOrigenGema);
 
-router.get("/orders", requirePermission("orders"), listOrders);
+router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios"), listOrders);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
-router.patch("/orders/:id/status", requirePermission("orders"), updateOrderStatus);
-router.get("/orders/:id/dedicatorias", requirePermission("orders"), listOrderDedicatorias);
+router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios"), updateOrderStatus);
+router.get("/orders/:id/dedicatorias", requireAnyPermission("orders", "despacho", "envios"), listOrderDedicatorias);
 
 module.exports = router;
