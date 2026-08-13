@@ -191,6 +191,20 @@ function YoutubeAvailabilityCheck({ url, onStatusChange }) {
   );
 }
 
+function DedicationDisplay({ de, para, mensaje, youtubeUrl }) {
+  return (
+    <div className="dedicationText">
+      <p className="dedicationFrom">De {de}</p>
+      <svg className="dedicationHeart" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 20.7 2.7 11.4c-2.3-2.3-2.3-6.1 0-8.4 2.3-2.3 6.1-2.3 8.4 0l.9.9.9-.9c2.3-2.3 6.1-2.3 8.4 0 2.3 2.3 2.3 6.1 0 8.4L12 20.7z" />
+      </svg>
+      <h2 className="dedicationTo">Para {para}</h2>
+      <blockquote className="dedicationMensaje">{mensaje}</blockquote>
+      <DedicationVideo url={youtubeUrl} />
+    </div>
+  );
+}
+
 function DedicationVideo({ url }) {
   const embedUrl = youtubeEmbedUrl(url);
   if (!embedUrl) return null;
@@ -259,12 +273,12 @@ function SharedDedicationPage({ token }) {
         {state.loading && <p>Cargando...</p>}
         {!state.loading && state.error && <p className="dedicationError">{state.error}</p>}
         {!state.loading && !state.error && state.dedicatoria && (
-          <div className="dedicationText">
-            <p className="dedicationPara">De: {state.dedicatoria.de}</p>
-            <p className="dedicationPara">Para: {state.dedicatoria.para}</p>
-            <p className="dedicationMensaje">{state.dedicatoria.mensaje}</p>
-            <DedicationVideo url={state.dedicatoria.youtubeUrl} />
-          </div>
+          <DedicationDisplay
+            de={state.dedicatoria.de}
+            para={state.dedicatoria.para}
+            mensaje={state.dedicatoria.mensaje}
+            youtubeUrl={state.dedicatoria.youtubeUrl}
+          />
         )}
       </div>
     </div>
@@ -352,13 +366,10 @@ function OrderDedicationSearchPage() {
         <div className="dedicationCard">
           <h1 className="dedicationTitle">Pedido #{pedidoId}</h1>
           {dedicatoria.escrita ? (
-            <div className="dedicationText">
-              <p className="dedicationPara">De: {dedicatoria.de}</p>
-              <p className="dedicationPara">Para: {dedicatoria.para}</p>
-              <p className="dedicationMensaje">{dedicatoria.mensaje}</p>
-              <DedicationVideo url={dedicatoria.youtubeUrl} />
+            <>
+              <DedicationDisplay de={dedicatoria.de} para={dedicatoria.para} mensaje={dedicatoria.mensaje} youtubeUrl={dedicatoria.youtubeUrl} />
               {shareUrl && <ShareQr url={shareUrl} />}
-            </div>
+            </>
           ) : (
             <form onSubmit={handleSave} className="dedicationForm">
               <p className="dedicationHint">Deja unas palabras para acompañar tu regalo — una vez guardada, la dedicatoria no se puede editar.</p>

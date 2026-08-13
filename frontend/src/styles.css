@@ -1543,15 +1543,38 @@ h3 {
   margin-top: 12px;
 }
 
-.dedicationPara {
-  font-weight: 700;
-  margin-bottom: 8px;
+.dedicationFrom {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.55;
+}
+
+.dedicationHeart {
+  width: 18px;
+  height: 18px;
+  margin: 10px 0;
+  fill: var(--gold);
+}
+
+.dedicationTo {
+  margin: 0 0 18px;
+  font-family: "Cinzel", serif;
+  font-size: 2rem;
+  line-height: 1.15;
+  color: var(--ink);
 }
 
 .dedicationMensaje {
   white-space: pre-wrap;
-  line-height: 1.6;
+  line-height: 1.7;
   font-style: italic;
+  font-size: 1.15rem;
+  color: var(--ink);
+  margin: 0 auto;
+  max-width: 38ch;
 }
 
 .dedicationError {
