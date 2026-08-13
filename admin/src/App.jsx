@@ -168,7 +168,6 @@ const MENU_BY_ROLE = {
 const ORDER_LOCKED_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
 
 const ORDER_STAGES = [
-  { key: "todos", label: "Todos", estados: null },
   { key: "preparar", label: "Preparar", estados: ["PREPARAR", "NUEVO"], color: "#d69e2e" },
   { key: "pagado", label: "Pagado", estados: ["PAGADO"], color: "#38a169" },
   { key: "listo", label: "Listo para envio", estados: ["LISTO_PARA_ENVIO"], color: "#dd6b20" },
@@ -390,9 +389,11 @@ export default function App() {
   const [slides, setSlides] = useState([]);
   const [flyers, setFlyers] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [ordersFilter, setOrdersFilter] = useState("todos");
+  const [ordersFilter, setOrdersFilter] = useState("preparar");
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const [exportingOrders, setExportingOrders] = useState(false);
+  const [historialDateFrom, setHistorialDateFrom] = useState("");
+  const [historialDateTo, setHistorialDateTo] = useState("");
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
   const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
@@ -506,14 +507,23 @@ export default function App() {
       else if (listSort === "name_asc") items.sort((a, b) => a.title.localeCompare(b.title));
     } else if (activeTab === "orders") {
       const stage = ORDER_STAGES.find((s) => s.key === ordersFilter) || ORDER_STAGES[0];
-      const base = stage.estados ? orders.filter((o) => stage.estados.includes(o.estado)) : orders;
+      const base = orders.filter((o) => stage.estados.includes(o.estado));
       items = base.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
       if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
       else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
     } else if (activeTab === "historial") {
-      items = orders.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
+      const fromTime = historialDateFrom ? new Date(`${historialDateFrom}T00:00:00`).getTime() : null;
+      const toTime = historialDateTo ? new Date(`${historialDateTo}T23:59:59.999`).getTime() : null;
+      items = orders.filter((o) => {
+        if (!q && !fromTime && !toTime) return true;
+        const matchesSearch = !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q);
+        const created = new Date(o.createdAt).getTime();
+        const matchesFrom = !fromTime || created >= fromTime;
+        const matchesTo = !toTime || created <= toTime;
+        return matchesSearch && matchesFrom && matchesTo;
+      });
       if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
       else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
@@ -545,7 +555,7 @@ export default function App() {
     }
 
     return items;
-  }, [activeTab, users, categories, products, slides, flyers, orders, ordersFilter, listSearch, listSort]);
+  }, [activeTab, users, categories, products, slides, flyers, orders, ordersFilter, listSearch, listSort, historialDateFrom, historialDateTo]);
 
   const listTotalPages = Math.ceil(filteredList.length / LIST_PAGE_SIZE);
   const pagedList = filteredList.slice((listPage - 1) * LIST_PAGE_SIZE, listPage * LIST_PAGE_SIZE);
@@ -553,10 +563,11 @@ export default function App() {
   const orderStageCounts = useMemo(() => {
     const counts = {};
     ORDER_STAGES.forEach((stage) => {
-      counts[stage.key] = stage.estados ? orders.filter((o) => stage.estados.includes(o.estado)).length : orders.length;
+      counts[stage.key] = orders.filter((o) => stage.estados.includes(o.estado)).length;
     });
     return counts;
   }, [orders]);
+  const orderStagesTotal = ORDER_STAGES.reduce((sum, stage) => sum + orderStageCounts[stage.key], 0);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -1977,15 +1988,15 @@ export default function App() {
           {activeTab === "orders" && (
             <div className="orderPipeline">
               <div className="orderProgressBar">
-                {orderStageCounts.todos === 0 ? (
+                {orderStagesTotal === 0 ? (
                   <div className="orderProgressSegment" style={{ width: "100%", background: "var(--line)" }} />
                 ) : (
-                  ORDER_STAGES.filter((s) => s.estados).map((stage) => (
+                  ORDER_STAGES.map((stage) => (
                     orderStageCounts[stage.key] > 0 && (
                       <div
                         key={stage.key}
                         className="orderProgressSegment"
-                        style={{ width: `${(orderStageCounts[stage.key] / orderStageCounts.todos) * 100}%`, background: stage.color }}
+                        style={{ width: `${(orderStageCounts[stage.key] / orderStagesTotal) * 100}%`, background: stage.color }}
                         title={`${stage.label}: ${orderStageCounts[stage.key]}`}
                       />
                     )
@@ -2006,6 +2017,18 @@ export default function App() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {activeTab === "historial" && (
+            <div className="historialDateBar">
+              <label htmlFor="historial-desde">Desde</label>
+              <input id="historial-desde" type="date" value={historialDateFrom} onChange={(e) => { setHistorialDateFrom(e.target.value); setListPage(1); }} />
+              <label htmlFor="historial-hasta">Hasta</label>
+              <input id="historial-hasta" type="date" value={historialDateTo} onChange={(e) => { setHistorialDateTo(e.target.value); setListPage(1); }} />
+              {(historialDateFrom || historialDateTo) && (
+                <button type="button" className="ghost" onClick={() => { setHistorialDateFrom(""); setHistorialDateTo(""); setListPage(1); }}>Limpiar fechas</button>
+              )}
             </div>
           )}
 
