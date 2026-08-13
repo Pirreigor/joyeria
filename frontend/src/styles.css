@@ -548,11 +548,22 @@ h3 {
   margin: 0;
 }
 
+.catalogWrap {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   padding: 0 24px;
+}
+
+@media (min-width: 1401px) {
+  .grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 .card {

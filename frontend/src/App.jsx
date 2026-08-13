@@ -1128,6 +1128,7 @@ export default function App() {
         )}
       </section>
 
+      <div className="catalogWrap">
       {inCategoryView ? (
         <section className="categoryMeta">
           <p className="breadcrumb">INICIO / {selectedCategoryData?.name?.toUpperCase() || "CATEGORIA"}</p>
@@ -1269,6 +1270,7 @@ export default function App() {
           )}
         </>
       )}
+      </div>
 
       {flyers.length > 0 && (
         <section className="flyersSection" aria-label="Flyers promocionales">
