@@ -808,27 +808,67 @@ button:disabled {
   margin-bottom: 2px;
 }
 
-.orderFilterBar {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
+.orderPipeline {
+  margin-bottom: 14px;
 }
 
-.filterBtn {
+.orderProgressBar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+  margin-bottom: 10px;
+}
+
+.orderProgressSegment {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.orderStageBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stageChip {
+  --stage-color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  padding: 6px 14px;
+  padding: 6px 12px 6px 14px;
   font: inherit;
   font-size: 0.82rem;
   cursor: pointer;
 }
 
-.filterBtn.active {
-  background: var(--gold);
+.stageChip::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--stage-color);
+}
+
+.stageChip.active {
+  background: var(--stage-color);
   color: #fff;
-  border-color: var(--gold);
+  border-color: var(--stage-color);
+}
+
+.stageChip.active::before {
+  background: #fff;
+}
+
+.stageChipCount {
+  font-weight: 700;
+  opacity: 0.85;
 }
 
 .manualOrderItems {

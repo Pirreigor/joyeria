@@ -115,8 +115,6 @@ const ALL_PERMISSIONS = [
   { key: "slides", label: "Slides" },
   { key: "flyers", label: "Flyers" },
   { key: "orders", label: "Pedidos" },
-  { key: "despacho", label: "Despacho" },
-  { key: "envios", label: "Envios" },
   { key: "settings", label: "Branding" },
 ];
 
@@ -152,8 +150,6 @@ const STAFF_MENU = [
     label: "Ventas",
     items: [
       { key: "orders", label: "Pedidos", short: "PE" },
-      { key: "despacho", label: "Despacho", short: "DE" },
-      { key: "envios", label: "Envios", short: "EN" },
     ],
   },
   {
@@ -170,6 +166,18 @@ const MENU_BY_ROLE = {
 
 const ORDER_LOCKED_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
 
+const ORDER_STAGES = [
+  { key: "todos", label: "Todos", estados: null },
+  { key: "preparar", label: "Preparar", estados: ["PREPARAR", "NUEVO"], color: "#d69e2e" },
+  { key: "pagado", label: "Pagado", estados: ["PAGADO"], color: "#38a169" },
+  { key: "listo", label: "Listo para envio", estados: ["LISTO_PARA_ENVIO"], color: "#dd6b20" },
+  { key: "enviado", label: "Enviado", estados: ["ENVIADO"], color: "#805ad5" },
+  { key: "entregado", label: "Entregado", estados: ["ENTREGADO"], color: "#2f855a" },
+  { key: "cancelado", label: "Cancelado", estados: ["CANCELADO"], color: "#9a2c2c" },
+];
+
+const ORDERS_MENU_KEYS = ["orders", "despacho", "envios"];
+
 const TAB_LIST_TITLES = {
   dashboard: "Resumen general",
   users: "Listado usuarios",
@@ -179,8 +187,6 @@ const TAB_LIST_TITLES = {
   slides: "Listado slides",
   flyers: "Listado flyers",
   orders: "Listado pedidos",
-  despacho: "Pedidos listos para despacho",
-  envios: "Pedidos listos para envio",
   settings: "Preview branding",
   atributos: "Atributos del catalogo",
 };
@@ -246,14 +252,6 @@ function MenuIcon({ tabKey }) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 14-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z" />
-      </svg>
-    );
-  }
-
-  if (tabKey === "despacho" || tabKey === "envios") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9 1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
       </svg>
     );
   }
@@ -455,7 +453,7 @@ export default function App() {
     const perms = user?.permisos || [];
     if (role === "ADMINISTRADOR" && !perms.length) return sections;
     return sections
-      .map((s) => ({ ...s, items: s.items.filter((i) => perms.includes(i.key)) }))
+      .map((s) => ({ ...s, items: s.items.filter((i) => i.key === "orders" ? ORDERS_MENU_KEYS.some((k) => perms.includes(k)) : perms.includes(i.key)) }))
       .filter((s) => s.items.length > 0);
   }, [role, user]);
   const roleMenu = useMemo(
@@ -495,10 +493,9 @@ export default function App() {
       items = flyers.filter((f) => !q || `${f.title} ${f.subtitle || ""}`.toLowerCase().includes(q));
       if (listSort === "order") items.sort((a, b) => a.displayOrder - b.displayOrder);
       else if (listSort === "name_asc") items.sort((a, b) => a.title.localeCompare(b.title));
-    } else if (activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") {
-      let base = activeTab === "despacho" ? orders.filter((o) => o.estado === "PAGADO")
-        : activeTab === "envios" ? orders.filter((o) => o.estado === "LISTO_PARA_ENVIO")
-        : orders.filter((o) => ordersFilter === "todos" ? true : ordersFilter === "preparar" ? o.estado === "PREPARAR" : o.estado === "PAGADO");
+    } else if (activeTab === "orders") {
+      const stage = ORDER_STAGES.find((s) => s.key === ordersFilter) || ORDER_STAGES[0];
+      const base = stage.estados ? orders.filter((o) => stage.estados.includes(o.estado)) : orders;
       items = base.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
       if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -535,6 +532,14 @@ export default function App() {
 
   const listTotalPages = Math.ceil(filteredList.length / LIST_PAGE_SIZE);
   const pagedList = filteredList.slice((listPage - 1) * LIST_PAGE_SIZE, listPage * LIST_PAGE_SIZE);
+
+  const orderStageCounts = useMemo(() => {
+    const counts = {};
+    ORDER_STAGES.forEach((stage) => {
+      counts[stage.key] = stage.estados ? orders.filter((o) => stage.estados.includes(o.estado)).length : orders.length;
+    });
+    return counts;
+  }, [orders]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -1917,10 +1922,37 @@ export default function App() {
           </div>
 
           {activeTab === "orders" && (
-            <div className="orderFilterBar">
-              <button type="button" className={ordersFilter === "todos" ? "filterBtn active" : "filterBtn"} onClick={() => { setOrdersFilter("todos"); setListPage(1); }}>Todos</button>
-              <button type="button" className={ordersFilter === "preparar" ? "filterBtn active" : "filterBtn"} onClick={() => { setOrdersFilter("preparar"); setListPage(1); }}>Preparar</button>
-              <button type="button" className={ordersFilter === "pagado" ? "filterBtn active" : "filterBtn"} onClick={() => { setOrdersFilter("pagado"); setListPage(1); }}>Pagados</button>
+            <div className="orderPipeline">
+              <div className="orderProgressBar">
+                {orderStageCounts.todos === 0 ? (
+                  <div className="orderProgressSegment" style={{ width: "100%", background: "var(--line)" }} />
+                ) : (
+                  ORDER_STAGES.filter((s) => s.estados).map((stage) => (
+                    orderStageCounts[stage.key] > 0 && (
+                      <div
+                        key={stage.key}
+                        className="orderProgressSegment"
+                        style={{ width: `${(orderStageCounts[stage.key] / orderStageCounts.todos) * 100}%`, background: stage.color }}
+                        title={`${stage.label}: ${orderStageCounts[stage.key]}`}
+                      />
+                    )
+                  ))
+                )}
+              </div>
+              <div className="orderStageBar">
+                {ORDER_STAGES.map((stage) => (
+                  <button
+                    type="button"
+                    key={stage.key}
+                    className={ordersFilter === stage.key ? "stageChip active" : "stageChip"}
+                    style={stage.color ? { "--stage-color": stage.color } : undefined}
+                    onClick={() => { setOrdersFilter(stage.key); setListPage(1); }}
+                  >
+                    {stage.label}
+                    <span className="stageChipCount">{orderStageCounts[stage.key]}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1934,8 +1966,8 @@ export default function App() {
                 onChange={(e) => { setListSearch(e.target.value); setListPage(1); }}
               />
               <select className="listSortSelect" value={listSort} onChange={(e) => { setListSort(e.target.value); setListPage(1); }}>
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "envios" || activeTab === "clientes") && <option value="newest">Mas recientes</option>}
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "despacho" || activeTab === "envios" || activeTab === "clientes") && <option value="oldest">Mas antiguos</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "clientes") && <option value="newest">Mas recientes</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "clientes") && <option value="oldest">Mas antiguos</option>}
                 {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_asc">Nombre A-Z</option>}
                 {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_desc">Nombre Z-A</option>}
                 {activeTab === "products" && <option value="price_asc">Precio menor</option>}
@@ -1943,8 +1975,8 @@ export default function App() {
                 {activeTab === "products" && <option value="stock_asc">Menor stock</option>}
                 {(activeTab === "slides" || activeTab === "flyers") && <option value="order">Por orden</option>}
                 {(activeTab === "slides" || activeTab === "flyers") && <option value="name_asc">Nombre A-Z</option>}
-                {(activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") && <option value="total_desc">Mayor total</option>}
-                {(activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") && <option value="total_asc">Menor total</option>}
+                {activeTab === "orders" && <option value="total_desc">Mayor total</option>}
+                {activeTab === "orders" && <option value="total_asc">Menor total</option>}
               </select>
               <span className="listCount">{filteredList.length} resultado{filteredList.length !== 1 ? "s" : ""}</span>
             </div>
@@ -2139,7 +2171,7 @@ export default function App() {
               </article>
             ))}
 
-            {(activeTab === "orders" || activeTab === "despacho" || activeTab === "envios") && pagedList.map((order) => (
+            {activeTab === "orders" && pagedList.map((order) => (
               <article className="card card-vertical" key={order.id}>
                 <div className="card-info">
                   <div className="orderHeader">
@@ -2164,10 +2196,12 @@ export default function App() {
                   {["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openDedicationView(order)}>Dedicatorias</button>
                   )}
-                  {activeTab === "despacho" ? (
+                  {order.estado === "PAGADO" ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
-                  ) : activeTab === "envios" ? (
+                  ) : order.estado === "LISTO_PARA_ENVIO" ? (
                     <button type="button" onClick={() => openShippingModal(order.id)}>Marcar Enviado</button>
+                  ) : order.estado === "ENVIADO" ? (
+                    <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "ENTREGADO")}>Marcar Entregado</button>
                   ) : !ORDER_LOCKED_STATES.includes(order.estado) ? (
                     <button type="button" onClick={() => openPaymentModal(order.id)}>Pagar</button>
                   ) : null}
