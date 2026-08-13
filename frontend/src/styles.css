@@ -45,11 +45,12 @@ h3 {
 
 .headerGrid {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto auto auto auto;
   grid-template-areas:
     "logo name   actions cart"
     "logo nav    actions cart";
   align-items: center;
+  justify-content: center;
   column-gap: 20px;
   row-gap: 8px;
   max-width: 1180px;
@@ -1395,7 +1396,7 @@ h3 {
   }
 
   .ga-actions {
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .searchBox.open {
