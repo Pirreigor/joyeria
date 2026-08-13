@@ -115,6 +115,7 @@ const ALL_PERMISSIONS = [
   { key: "slides", label: "Slides" },
   { key: "flyers", label: "Flyers" },
   { key: "orders", label: "Pedidos" },
+  { key: "historial", label: "Historial" },
   { key: "settings", label: "Branding" },
 ];
 
@@ -465,7 +466,14 @@ export default function App() {
     const perms = user?.permisos || [];
     if (role === "ADMINISTRADOR" && !perms.length) return sections;
     return sections
-      .map((s) => ({ ...s, items: s.items.filter((i) => (i.key === "orders" || i.key === "historial") ? ORDERS_MENU_KEYS.some((k) => perms.includes(k)) : perms.includes(i.key)) }))
+      .map((s) => ({
+        ...s,
+        items: s.items.filter((i) => {
+          if (i.key === "orders") return ORDERS_MENU_KEYS.some((k) => perms.includes(k));
+          if (i.key === "historial") return perms.includes("historial") || ORDERS_MENU_KEYS.some((k) => perms.includes(k));
+          return perms.includes(i.key);
+        }),
+      }))
       .filter((s) => s.items.length > 0);
   }, [role, user]);
   const roleMenu = useMemo(
@@ -774,7 +782,7 @@ export default function App() {
         fetchOrFallback(can("products"), "/api/admin/products", { products: [] }),
         fetchOrFallback(can("slides"), "/api/admin/slides", { slides: [] }),
         fetchOrFallback(can("flyers"), "/api/admin/flyers", { flyers: [] }),
-        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios"), "/api/admin/orders", { orders: [] }),
+        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios") || can("historial"), "/api/admin/orders", { orders: [] }),
         fetchOrFallback(can("settings"), "/api/admin/settings", null),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/tipos-pieza", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/materiales", { items: [] }),

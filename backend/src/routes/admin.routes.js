@@ -113,8 +113,8 @@ router.post("/origenes-gema", requirePermission("atributos"), createOrigenGema);
 router.patch("/origenes-gema/:id", requirePermission("atributos"), updateOrigenGema);
 router.delete("/origenes-gema/:id", requirePermission("atributos"), deleteOrigenGema);
 
-router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios"), listOrders);
-router.get("/orders/export", requireAnyPermission("orders", "despacho", "clientes", "envios"), exportOrders);
+router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), listOrders);
+router.get("/orders/export", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), exportOrders);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
 router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios"), updateOrderStatus);
 router.get("/orders/:id/dedicatorias", requireAnyPermission("orders", "despacho", "envios"), listOrderDedicatorias);
