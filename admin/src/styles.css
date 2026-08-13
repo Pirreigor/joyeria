@@ -546,26 +546,38 @@ button:disabled {
   min-width: 200px;
 }
 
-.historialDateBar {
+.dateRangeBar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 10px;
   margin-bottom: 12px;
-  font-size: 0.85rem;
 }
 
-.historialDateBar label {
+.dateField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dateField label {
+  font-size: 0.78rem;
   color: var(--muted);
 }
 
-.historialDateBar input[type="date"] {
+.dateField input[type="date"] {
+  width: auto;
+  max-width: 150px;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 7px 10px;
   font: inherit;
   font-size: 0.85rem;
   background: #fff;
+}
+
+.dateRangeBar > button {
+  padding: 8px 14px;
 }
 
 .historialRow {

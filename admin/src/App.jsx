@@ -8,6 +8,22 @@ const TOKEN_KEY = "admin_token";
 const USER_KEY = "admin_user";
 const LIST_PAGE_SIZE = 12;
 
+function daysAgoISO(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function filterByDateRange(items, dateFrom, dateTo) {
+  const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+  const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
+  if (!fromTime && !toTime) return items;
+  return items.filter((o) => {
+    const created = new Date(o.createdAt).getTime();
+    return (!fromTime || created >= fromTime) && (!toTime || created <= toTime);
+  });
+}
+
 const initialForm = {
   id: null,
   name: "",
@@ -272,6 +288,22 @@ function MenuIcon({ tabKey }) {
   );
 }
 
+function DateRangeBar({ idPrefix, from, to, onFrom, onTo, onClear }) {
+  return (
+    <div className="dateRangeBar">
+      <div className="dateField">
+        <label htmlFor={`${idPrefix}-desde`}>Desde</label>
+        <input id={`${idPrefix}-desde`} type="date" value={from} onChange={(e) => onFrom(e.target.value)} />
+      </div>
+      <div className="dateField">
+        <label htmlFor={`${idPrefix}-hasta`}>Hasta</label>
+        <input id={`${idPrefix}-hasta`} type="date" value={to} onChange={(e) => onTo(e.target.value)} />
+      </div>
+      {(from || to) && <button type="button" className="ghost" onClick={onClear}>Limpiar fechas</button>}
+    </div>
+  );
+}
+
 function DedicationQrLabel({ url, label }) {
   const qrCanvasRef = useRef(null);
 
@@ -393,8 +425,10 @@ export default function App() {
   const [ordersFilter, setOrdersFilter] = useState("preparar");
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const [exportingOrders, setExportingOrders] = useState(false);
-  const [historialDateFrom, setHistorialDateFrom] = useState("");
-  const [historialDateTo, setHistorialDateTo] = useState("");
+  const [ordersDateFrom, setOrdersDateFrom] = useState(() => daysAgoISO(30));
+  const [ordersDateTo, setOrdersDateTo] = useState(() => daysAgoISO(0));
+  const [historialDateFrom, setHistorialDateFrom] = useState(() => daysAgoISO(30));
+  const [historialDateTo, setHistorialDateTo] = useState(() => daysAgoISO(0));
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
   const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
@@ -515,23 +549,15 @@ export default function App() {
       else if (listSort === "name_asc") items.sort((a, b) => a.title.localeCompare(b.title));
     } else if (activeTab === "orders") {
       const stage = ORDER_STAGES.find((s) => s.key === ordersFilter) || ORDER_STAGES[0];
-      const base = orders.filter((o) => stage.estados.includes(o.estado));
+      const base = filterByDateRange(orders.filter((o) => stage.estados.includes(o.estado)), ordersDateFrom, ordersDateTo);
       items = base.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
       if (listSort === "newest") items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
       else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
     } else if (activeTab === "historial") {
-      const fromTime = historialDateFrom ? new Date(`${historialDateFrom}T00:00:00`).getTime() : null;
-      const toTime = historialDateTo ? new Date(`${historialDateTo}T23:59:59.999`).getTime() : null;
-      items = orders.filter((o) => {
-        if (!q && !fromTime && !toTime) return true;
-        const matchesSearch = !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q);
-        const created = new Date(o.createdAt).getTime();
-        const matchesFrom = !fromTime || created >= fromTime;
-        const matchesTo = !toTime || created <= toTime;
-        return matchesSearch && matchesFrom && matchesTo;
-      });
+      const base = filterByDateRange(orders, historialDateFrom, historialDateTo);
+      items = base.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
       if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
       else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
@@ -563,18 +589,19 @@ export default function App() {
     }
 
     return items;
-  }, [activeTab, users, categories, products, slides, flyers, orders, ordersFilter, listSearch, listSort, historialDateFrom, historialDateTo]);
+  }, [activeTab, users, categories, products, slides, flyers, orders, ordersFilter, listSearch, listSort, ordersDateFrom, ordersDateTo, historialDateFrom, historialDateTo]);
 
   const listTotalPages = Math.ceil(filteredList.length / LIST_PAGE_SIZE);
   const pagedList = filteredList.slice((listPage - 1) * LIST_PAGE_SIZE, listPage * LIST_PAGE_SIZE);
 
   const orderStageCounts = useMemo(() => {
+    const inRange = filterByDateRange(orders, ordersDateFrom, ordersDateTo);
     const counts = {};
     ORDER_STAGES.forEach((stage) => {
-      counts[stage.key] = orders.filter((o) => stage.estados.includes(o.estado)).length;
+      counts[stage.key] = inRange.filter((o) => stage.estados.includes(o.estado)).length;
     });
     return counts;
-  }, [orders]);
+  }, [orders, ordersDateFrom, ordersDateTo]);
   const orderStagesTotal = ORDER_STAGES.reduce((sum, stage) => sum + orderStageCounts[stage.key], 0);
 
   useEffect(() => {
@@ -2025,19 +2052,26 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              <DateRangeBar
+                idPrefix="orders"
+                from={ordersDateFrom}
+                to={ordersDateTo}
+                onFrom={(v) => { setOrdersDateFrom(v); setListPage(1); }}
+                onTo={(v) => { setOrdersDateTo(v); setListPage(1); }}
+                onClear={() => { setOrdersDateFrom(""); setOrdersDateTo(""); setListPage(1); }}
+              />
             </div>
           )}
 
           {activeTab === "historial" && (
-            <div className="historialDateBar">
-              <label htmlFor="historial-desde">Desde</label>
-              <input id="historial-desde" type="date" value={historialDateFrom} onChange={(e) => { setHistorialDateFrom(e.target.value); setListPage(1); }} />
-              <label htmlFor="historial-hasta">Hasta</label>
-              <input id="historial-hasta" type="date" value={historialDateTo} onChange={(e) => { setHistorialDateTo(e.target.value); setListPage(1); }} />
-              {(historialDateFrom || historialDateTo) && (
-                <button type="button" className="ghost" onClick={() => { setHistorialDateFrom(""); setHistorialDateTo(""); setListPage(1); }}>Limpiar fechas</button>
-              )}
-            </div>
+            <DateRangeBar
+              idPrefix="historial"
+              from={historialDateFrom}
+              to={historialDateTo}
+              onFrom={(v) => { setHistorialDateFrom(v); setListPage(1); }}
+              onTo={(v) => { setHistorialDateTo(v); setListPage(1); }}
+              onClear={() => { setHistorialDateFrom(""); setHistorialDateTo(""); setListPage(1); }}
+            />
           )}
 
           {!["dashboard", "settings", "atributos"].includes(activeTab) && (
