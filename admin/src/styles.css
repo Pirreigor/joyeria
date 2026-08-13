@@ -358,6 +358,143 @@ h3 {
   margin-top: 12px;
 }
 
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.chartCard {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+  background: #f8f9fa;
+}
+
+.chartTitle {
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-bottom: 10px;
+}
+
+.chartSvg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chartGrid {
+  stroke: #e1e0d9;
+  stroke-width: 1;
+}
+
+.chartAxisLabel {
+  fill: #898781;
+  font-size: 10px;
+}
+
+.chartArea {
+  fill: #2a78d6;
+  fill-opacity: 0.12;
+  stroke: none;
+}
+
+.chartLine {
+  fill: none;
+  stroke: #2a78d6;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chartCrosshair {
+  stroke: #c3c2b7;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.chartDot {
+  fill: #2a78d6;
+  stroke: #f8f9fa;
+  stroke-width: 2;
+}
+
+.chartTooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  display: grid;
+  gap: 2px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+}
+
+.chartLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.chartLegendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hBarChart {
+  display: grid;
+  gap: 8px;
+}
+
+.hBarRow {
+  display: grid;
+  grid-template-columns: 100px 1fr 50px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.hBarLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.hBarTrack {
+  background: #ece9e4;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.hBarFill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.hBarValue {
+  text-align: right;
+  font-weight: 700;
+}
+
 .miniPanel {
   border: 1px solid var(--line);
   border-radius: 16px;

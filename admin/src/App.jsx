@@ -194,6 +194,22 @@ const ORDER_STAGES = [
 
 const ORDERS_MENU_KEYS = ["orders", "despacho", "envios"];
 
+const PAID_ORDER_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
+
+// Paleta categorica validada (ver skill dataviz) — orden fijo, no se reordena por valor.
+const CATEGORICAL_PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+const PAYMENT_METHOD_ORDER = ["Transferencia BCP", "YAPE", "Transferencia BN", "PLIN", "BBVA", "Interbank"];
+
+function paymentMethodColor(method) {
+  const idx = PAYMENT_METHOD_ORDER.indexOf(method);
+  return CATEGORICAL_PALETTE[idx >= 0 ? idx : CATEGORICAL_PALETTE.length - 1];
+}
+
+function formatChartDate(iso) {
+  const [, m, d] = iso.split("-");
+  return `${d}/${m}`;
+}
+
 const TAB_LIST_TITLES = {
   dashboard: "Resumen general",
   users: "Listado usuarios",
@@ -300,6 +316,135 @@ function DateRangeBar({ idPrefix, from, to, onFrom, onTo, onClear }) {
         <input id={`${idPrefix}-hasta`} type="date" value={to} onChange={(e) => onTo(e.target.value)} />
       </div>
       {(from || to) && <button type="button" className="ghost" onClick={onClear}>Limpiar fechas</button>}
+    </div>
+  );
+}
+
+function RevenueChart({ data }) {
+  const width = 600;
+  const height = 220;
+  const padding = { top: 16, right: 16, bottom: 24, left: 60 };
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+  const [hoverIdx, setHoverIdx] = useState(null);
+
+  const maxValue = Math.max(1, ...data.map((d) => d.total));
+  const points = data.map((d, i) => ({
+    ...d,
+    x: padding.left + (data.length > 1 ? (i / (data.length - 1)) * innerW : innerW / 2),
+    y: padding.top + innerH - (d.total / maxValue) * innerH,
+  }));
+
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  const areaPath = points.length > 0
+    ? `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${(padding.top + innerH).toFixed(1)} L ${points[0].x.toFixed(1)} ${(padding.top + innerH).toFixed(1)} Z`
+    : "";
+
+  const gridLines = Array.from({ length: 5 }, (_, i) => {
+    const v = (maxValue / 4) * i;
+    return { y: padding.top + innerH - (v / maxValue) * innerH, v };
+  });
+
+  function handleMove(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * width;
+    let closest = 0;
+    let minDist = Infinity;
+    points.forEach((p, i) => {
+      const dist = Math.abs(p.x - x);
+      if (dist < minDist) { minDist = dist; closest = i; }
+    });
+    setHoverIdx(closest);
+  }
+
+  const hovered = hoverIdx !== null ? points[hoverIdx] : null;
+  const labelIdxs = points.length > 0 ? [0, Math.floor((points.length - 1) / 2), points.length - 1] : [];
+
+  return (
+    <div className="chartCard">
+      <div className="chartTitle">Ingresos — ultimos 30 dias</div>
+      {points.length === 0 ? (
+        <p className="subtle">Sin pedidos pagados todavia.</p>
+      ) : (
+        <>
+          <svg viewBox={`0 0 ${width} ${height}`} className="chartSvg" onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
+            {gridLines.map((g, i) => (
+              <g key={i}>
+                <line x1={padding.left} x2={width - padding.right} y1={g.y} y2={g.y} className="chartGrid" />
+                <text x={padding.left - 8} y={g.y + 3} textAnchor="end" className="chartAxisLabel">${Math.round(g.v)}</text>
+              </g>
+            ))}
+            <path d={areaPath} className="chartArea" />
+            <path d={linePath} className="chartLine" />
+            {labelIdxs.map((i) => (
+              <text key={i} x={points[i].x} y={height - 6} textAnchor="middle" className="chartAxisLabel">
+                {formatChartDate(points[i].date)}
+              </text>
+            ))}
+            {hovered && (
+              <>
+                <line x1={hovered.x} x2={hovered.x} y1={padding.top} y2={padding.top + innerH} className="chartCrosshair" />
+                <circle cx={hovered.x} cy={hovered.y} r={4} className="chartDot" />
+              </>
+            )}
+          </svg>
+          {hovered && (
+            <div className="chartTooltip" style={{ left: `${(hovered.x / width) * 100}%` }}>
+              <strong>{formatChartDate(hovered.date)}</strong>
+              <span>${hovered.total.toFixed(2)}</span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StageBarChart({ stages }) {
+  const total = stages.reduce((sum, s) => sum + s.count, 0);
+  return (
+    <div className="chartCard">
+      <div className="chartTitle">Pedidos por etapa</div>
+      <div className="orderProgressBar">
+        {total === 0 ? (
+          <div className="orderProgressSegment" style={{ width: "100%", background: "var(--line)" }} />
+        ) : (
+          stages.map((s) => s.count > 0 && (
+            <div
+              key={s.key}
+              className="orderProgressSegment"
+              style={{ width: `${(s.count / total) * 100}%`, background: s.color }}
+              title={`${s.label}: ${s.count}`}
+            />
+          ))
+        )}
+      </div>
+      <div className="chartLegend">
+        {stages.map((s) => (
+          <div className="chartLegendItem" key={s.key}>
+            <span className="chartLegendDot" style={{ background: s.color }} />
+            {s.label} <strong>{s.count}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HorizontalBarChart({ items, valueFormatter }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div className="hBarChart">
+      {items.length === 0 && <p className="subtle">Sin datos todavia.</p>}
+      {items.map((item) => (
+        <div className="hBarRow" key={item.label}>
+          <span className="hBarLabel">{item.label}</span>
+          <div className="hBarTrack">
+            <div className="hBarFill" style={{ width: `${(item.value / max) * 100}%`, background: item.color || "#2a78d6" }} />
+          </div>
+          <span className="hBarValue">{valueFormatter ? valueFormatter(item.value) : item.value}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -603,6 +748,53 @@ export default function App() {
     return counts;
   }, [orders, ordersDateFrom, ordersDateTo]);
   const orderStagesTotal = ORDER_STAGES.reduce((sum, stage) => sum + orderStageCounts[stage.key], 0);
+
+  const dashboardCharts = useMemo(() => {
+    const paidOrders = orders.filter((o) => PAID_ORDER_STATES.includes(o.estado));
+
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - 29);
+    const dayMap = new Map();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(since);
+      d.setDate(d.getDate() + i);
+      dayMap.set(d.toISOString().slice(0, 10), 0);
+    }
+    paidOrders.forEach((o) => {
+      const key = new Date(o.createdAt).toISOString().slice(0, 10);
+      if (dayMap.has(key)) dayMap.set(key, dayMap.get(key) + Number(o.total || 0));
+    });
+    const revenueByDay = Array.from(dayMap.entries()).map(([date, total]) => ({ date, total }));
+
+    const stageCounts = ORDER_STAGES.map((stage) => ({
+      ...stage,
+      count: orders.filter((o) => stage.estados.includes(o.estado)).length,
+    }));
+
+    const methodMap = new Map();
+    paidOrders.forEach((o) => {
+      const key = o.metodoPago || "Sin especificar";
+      methodMap.set(key, (methodMap.get(key) || 0) + 1);
+    });
+    const paymentMethods = Array.from(methodMap.entries())
+      .map(([label, count]) => ({ label, value: count, color: paymentMethodColor(label) }))
+      .sort((a, b) => b.value - a.value);
+
+    const productMap = new Map();
+    paidOrders.forEach((o) => {
+      (o.items || []).forEach((item) => {
+        const key = item.producto?.name || `Producto #${item.productoId}`;
+        productMap.set(key, (productMap.get(key) || 0) + item.quantity);
+      });
+    });
+    const topProducts = Array.from(productMap.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+
+    return { revenueByDay, stageCounts, paymentMethods, topProducts };
+  }, [orders]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -1946,21 +2138,20 @@ export default function App() {
               </article>
             </div>
 
-            <div className="dashboardBlocks">
-              <section className="miniPanel">
-                <h3>Usuarios recientes</h3>
-                {dashboard.recentUsers.length === 0 ? (
-                  <p className="subtle">No hay usuarios recientes.</p>
-                ) : (
-                  dashboard.recentUsers.map((recentUser) => (
-                    <div key={recentUser.id} className="miniRow">
-                      <strong>{recentUser.name}</strong>
-                      <small>{recentUser.email}</small>
-                    </div>
-                  ))
-                )}
-              </section>
+            <div className="chartsGrid">
+              <RevenueChart data={dashboardCharts.revenueByDay} />
+              <StageBarChart stages={dashboardCharts.stageCounts} />
+              <div className="chartCard">
+                <div className="chartTitle">Metodos de pago</div>
+                <HorizontalBarChart items={dashboardCharts.paymentMethods} />
+              </div>
+              <div className="chartCard">
+                <div className="chartTitle">Productos mas vendidos</div>
+                <HorizontalBarChart items={dashboardCharts.topProducts} />
+              </div>
+            </div>
 
+            <div className="dashboardBlocks">
               <section className="miniPanel">
                 <h3>Pedidos recientes</h3>
                 {dashboard.recentOrders.length === 0 ? (
