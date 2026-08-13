@@ -88,10 +88,107 @@ function DedicationPage({ token }) {
   );
 }
 
-function youtubeEmbedUrl(url) {
+function extractYoutubeId(url) {
   if (!url) return null;
   const match = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
-  return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0` : null;
+  return match ? match[1] : null;
+}
+
+function youtubeEmbedUrl(url) {
+  const id = extractYoutubeId(url);
+  return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : null;
+}
+
+let youtubeApiPromise = null;
+function loadYoutubeApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+  if (youtubeApiPromise) return youtubeApiPromise;
+  youtubeApiPromise = new Promise((resolve) => {
+    const prevCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (prevCallback) prevCallback();
+      resolve(window.YT);
+    };
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(script);
+  });
+  return youtubeApiPromise;
+}
+
+function YoutubeAvailabilityCheck({ url, onStatusChange }) {
+  const [status, setStatus] = useState(null);
+  const containerRef = useRef(null);
+  const playerRef = useRef(null);
+  const videoId = extractYoutubeId(url);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function report(next) {
+      if (cancelled) return;
+      setStatus(next);
+      onStatusChange?.(next);
+    }
+
+    if (playerRef.current) {
+      playerRef.current.destroy();
+      playerRef.current = null;
+    }
+
+    if (!videoId) {
+      report(null);
+      return;
+    }
+
+    report("checking");
+    const timer = setTimeout(async () => {
+      const YT = await loadYoutubeApi();
+      if (cancelled || !containerRef.current) return;
+      playerRef.current = new YT.Player(containerRef.current, {
+        videoId,
+        width: "100%",
+        height: "100%",
+        playerVars: { autoplay: 0, controls: 0, modestbranding: 1 },
+        events: {
+          onReady: () => report("ok"),
+          onError: (e) => {
+            if (e.data === 101 || e.data === 150) report("blocked");
+            else if (e.data === 100) report("notfound");
+            else report("invalid");
+          },
+        },
+      });
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoId]);
+
+  if (!videoId) return null;
+
+  return (
+    <div className="youtubeCheck">
+      <div ref={containerRef} className="youtubeCheckPlayerHidden" />
+      {status === "checking" && <p className="youtubeCheckStatus checking">Comprobando el video...</p>}
+      {status === "ok" && (
+        <>
+          <p className="youtubeCheckStatus ok">✓ El video se puede reproducir aca</p>
+          <DedicationVideo url={url} />
+        </>
+      )}
+      {status === "blocked" && <p className="youtubeCheckStatus warn">⚠ Este video esta bloqueado para insertarse en otros sitios (restriccion del dueño del contenido). Probá con otro enlace.</p>}
+      {status === "notfound" && <p className="youtubeCheckStatus warn">⚠ No encontramos ese video — puede ser privado o haber sido eliminado.</p>}
+      {status === "invalid" && <p className="youtubeCheckStatus warn">⚠ No se pudo cargar ese enlace.</p>}
+    </div>
+  );
 }
 
 function DedicationVideo({ url }) {
@@ -185,8 +282,10 @@ function OrderDedicationSearchPage() {
   const [para, setPara] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeStatus, setYoutubeStatus] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const youtubeBlocked = youtubeUrl.trim() && ["blocked", "notfound", "invalid"].includes(youtubeStatus);
 
   async function handleSearch(event) {
     event.preventDefault();
@@ -272,7 +371,8 @@ function OrderDedicationSearchPage() {
               <textarea id="dedic-mensaje" rows={4} value={mensaje} onChange={(e) => setMensaje(e.target.value)} required />
               <label htmlFor="dedic-youtube">Enlace de YouTube (opcional)</label>
               <input id="dedic-youtube" type="url" placeholder="https://youtube.com/..." value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
-              <button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar dedicatoria"}</button>
+              <YoutubeAvailabilityCheck url={youtubeUrl} onStatusChange={setYoutubeStatus} />
+              <button type="submit" disabled={saving || youtubeBlocked}>{saving ? "Guardando..." : "Guardar dedicatoria"}</button>
             </form>
           )}
           <button type="button" className="ghostBtn" onClick={reset}>Buscar otro pedido</button>

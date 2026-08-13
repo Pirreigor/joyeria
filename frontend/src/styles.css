@@ -1502,6 +1502,43 @@ h3 {
   cursor: pointer;
 }
 
+.dedicationForm button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.youtubeCheck {
+  margin-top: -6px;
+}
+
+.youtubeCheckPlayerHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.youtubeCheckStatus {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+}
+
+.youtubeCheckStatus.checking {
+  color: var(--ink);
+  opacity: 0.6;
+}
+
+.youtubeCheckStatus.ok {
+  color: #1b7a3d;
+}
+
+.youtubeCheckStatus.warn {
+  color: #9a2c2c;
+  font-weight: 600;
+}
+
 .dedicationText {
   margin-top: 12px;
 }
