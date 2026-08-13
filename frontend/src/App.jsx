@@ -877,34 +877,18 @@ export default function App() {
   return (
     <div className="page">
       <header className="topHeader">
-        <a href="#" className="brand" onClick={() => setSelectedCategory("todas") }>
-          <div className="brandCenter">
+        <div className="headerGrid">
+          <a href="#" className="ga-logo" onClick={() => setSelectedCategory("todas")} aria-label={settings.brandName || "Don Joyero"}>
             {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="logo" /> : <span className="logoFallback">DJ</span>}
-            <span>{settings.brandName || "Don Joyero"}</span>
-          </div>
-        </a>
+          </a>
 
-        <div className="headerActions">
-          <div className="searchBox">
-            <input
-              type="text"
-              placeholder="Buscar"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-
-          <a href="/dedicatoria" className="ghostBtn">Mi dedicatoria</a>
-
-          {user && (
-            <button type="button" className="ghostBtn" onClick={logout}>
-              {user.name ? `Salir (${user.name})` : "Cerrar sesion"}
-            </button>
-          )}
+          <a href="#" className="ga-name brandName" onClick={() => setSelectedCategory("todas")}>
+            {settings.brandName || "Don Joyero"}
+          </a>
 
           <button
             type="button"
-            className="cartBtn icon"
+            className="ga-cart cartBtn icon"
             onClick={() => setCartOpen((prev) => !prev)}
             aria-label={`Abrir carrito con ${cartCount} productos`}
             title="Abrir carrito"
@@ -916,51 +900,70 @@ export default function App() {
             </svg>
             <span>{cartCount}</span>
           </button>
-        </div>
 
-        <nav className="categoryRibbon">
-          <div className="categoryScroll">
-            <button
-              type="button"
-              className={selectedCategory === "todas" ? "menuItem active" : "menuItem"}
-              onClick={() => setSelectedCategory("todas")}
-            >
-              Inicio
-            </button>
+          <div className="ga-actions">
+            <div className="searchBox">
+              <input
+                type="text"
+                placeholder="Buscar"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
 
-            {menuTree.map((category) => (
-              <button
-                type="button"
-                key={category.id}
-                className={selectedCategory === category.slug ? "menuItem active" : "menuItem"}
-                onClick={() => {
-                  setSelectedCategory(category.slug);
-                  document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" });
-                }}
-              >
-                {category.name}
+            <a href="/dedicatoria" className="ghostBtn">Mi dedicatoria</a>
+
+            {user && (
+              <button type="button" className="ghostBtn" onClick={logout}>
+                {user.name ? `Salir (${user.name})` : "Cerrar sesion"}
               </button>
-            ))}
+            )}
           </div>
 
-          {activeSubcategories.length > 0 && (
-            <div className="subcategoryRow">
-              {activeSubcategories.map((sub) => (
+          <nav className="ga-nav categoryRibbon">
+            <div className="categoryScroll">
+              <button
+                type="button"
+                className={selectedCategory === "todas" ? "menuItem active" : "menuItem"}
+                onClick={() => setSelectedCategory("todas")}
+              >
+                Inicio
+              </button>
+
+              {menuTree.map((category) => (
                 <button
                   type="button"
-                  key={`sub-${sub.slug || sub}`}
-                  className={selectedCategory === (sub.slug || sub) ? "subItem active" : "subItem"}
+                  key={category.id}
+                  className={selectedCategory === category.slug ? "menuItem active" : "menuItem"}
                   onClick={() => {
-                    setSelectedCategory(sub.slug || sub);
+                    setSelectedCategory(category.slug);
                     document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" });
                   }}
                 >
-                  {sub.name || sub}
+                  {category.name}
                 </button>
               ))}
             </div>
-          )}
-        </nav>
+
+            {activeSubcategories.length > 0 && (
+              <div className="subcategoryRow">
+                {activeSubcategories.map((sub) => (
+                  <button
+                    type="button"
+                    key={`sub-${sub.slug || sub}`}
+                    className={selectedCategory === (sub.slug || sub) ? "subItem active" : "subItem"}
+                    onClick={() => {
+                      setSelectedCategory(sub.slug || sub);
+                      document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                  >
+                    {sub.name || sub}
+                  </button>
+                ))}
+              </div>
+            )}
+          </nav>
+        </div>
       </header>
 
       {cartOpen && (

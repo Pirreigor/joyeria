@@ -36,59 +36,79 @@ h3 {
   position: sticky;
   top: 0;
   z-index: 40;
-  display: grid;
-  gap: 12px;
   background: rgba(247, 247, 247, 0.96);
   backdrop-filter: blur(5px);
   border-bottom: 1px solid rgba(34, 29, 25, 0.12);
-  padding: 10px 30px 0;
+  padding: 14px 30px;
   margin-bottom: 0;
 }
 
-.brand {
-  display: block;
-  text-decoration: none;
-  color: var(--ink);
-  text-align: center;
-  margin: 8px 0;
+.headerGrid {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas:
+    "logo name   actions cart"
+    "logo nav    actions cart";
+  align-items: center;
+  column-gap: 20px;
+  row-gap: 8px;
 }
 
-.brandCenter {
-  display: inline-flex;
+.ga-logo {
+  grid-area: logo;
+  display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: clamp(1.2rem, 2vw, 1.75rem);
+}
+
+.ga-name {
+  grid-area: name;
+  text-decoration: none;
+}
+
+.ga-cart {
+  grid-area: cart;
+  align-self: center;
+}
+
+.ga-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ga-nav {
+  grid-area: nav;
+}
+
+.brandName {
+  color: var(--ink);
+  font-family: "Cinzel", serif;
+  font-size: clamp(1.15rem, 2vw, 1.6rem);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 
 .logo {
-  width: 42px;
-  height: 42px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid rgba(34, 29, 25, 0.2);
 }
 
 .logoFallback {
-  width: 42px;
-  height: 42px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: linear-gradient(100deg, #7f552f, #b98347);
   color: #fff;
-  font-size: 0.84rem;
+  font-size: 0.9rem;
   font-weight: 700;
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: -48px;
 }
 
 .searchBox input {
@@ -166,15 +186,14 @@ h3 {
   padding: 0;
   margin-bottom: 0;
   background: transparent;
-  border-top: 1px solid rgba(34, 29, 25, 0.1);
 }
 
 .categoryScroll {
   display: flex;
   gap: 18px;
   overflow-x: auto;
-  justify-content: center;
-  padding: 14px 10px 12px;
+  justify-content: flex-start;
+  padding: 0;
 }
 
 .menuItem {
@@ -194,13 +213,12 @@ h3 {
 }
 
 .subcategoryRow {
-  margin: 0;
+  margin: 8px 0 0;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: center;
-  padding: 0 10px 12px;
-  border-bottom: 1px solid rgba(34, 29, 25, 0.08);
+  justify-content: flex-start;
+  padding: 0;
 }
 
 .subItem {
@@ -1314,16 +1332,38 @@ h3 {
   }
 
   .topHeader {
-    padding: 10px 14px 0;
+    padding: 12px 14px;
   }
 
-  .headerActions {
-    margin-top: 0;
-    justify-content: center;
+  .headerGrid {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "logo name cart"
+      "actions actions actions"
+      "nav nav nav";
+    row-gap: 10px;
+    column-gap: 10px;
+  }
+
+  .logo,
+  .logoFallback {
+    width: 40px;
+    height: 40px;
+  }
+
+  .ga-actions {
+    justify-content: flex-start;
+  }
+
+  .searchBox input {
+    width: 100%;
+  }
+
+  .searchBox {
+    flex: 1 1 160px;
   }
 
   .subcategoryRow {
-    padding: 0 14px 10px;
     overflow-x: auto;
     flex-wrap: nowrap;
     justify-content: flex-start;
