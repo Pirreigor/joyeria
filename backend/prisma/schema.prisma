@@ -222,6 +222,7 @@ model Pedido {
   dedicatoriaDe          String?
   dedicatoriaPara        String?
   dedicatoriaMensaje     String?
+  dedicatoriaMotivo      String?
   dedicatoriaYoutubeUrl  String?
   dedicatoriaEscrita     Boolean   @default(false)
   dedicatoriaEscritaAt   DateTime?

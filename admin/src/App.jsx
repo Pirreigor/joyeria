@@ -196,6 +196,8 @@ const ORDERS_MENU_KEYS = ["orders", "despacho", "envios"];
 
 const PAID_ORDER_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
 
+const MOTIVOS_DEDICATORIA = ["Aniversario", "Compromiso", "Cumpleaños", "San Valentin", "Graduacion", "Otro"];
+
 // Paleta categorica validada (ver skill dataviz) — orden fijo, no se reordena por valor.
 const CATEGORICAL_PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
 const PAYMENT_METHOD_ORDER = ["Transferencia BCP", "YAPE", "Transferencia BN", "PLIN", "BBVA", "Interbank"];
@@ -574,6 +576,7 @@ export default function App() {
   const [ordersDateTo, setOrdersDateTo] = useState(() => daysAgoISO(0));
   const [historialDateFrom, setHistorialDateFrom] = useState(() => daysAgoISO(30));
   const [historialDateTo, setHistorialDateTo] = useState(() => daysAgoISO(0));
+  const [clientesMotivoFilter, setClientesMotivoFilter] = useState("todos");
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
   const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
@@ -708,8 +711,11 @@ export default function App() {
       else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
       else items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     } else if (activeTab === "clientes") {
+      const clientesBaseOrders = clientesMotivoFilter === "todos"
+        ? orders
+        : orders.filter((o) => o.dedicatoriaMotivo === clientesMotivoFilter);
       const map = new Map();
-      for (const o of orders) {
+      for (const o of clientesBaseOrders) {
         const key = o.usuarioId ? `u-${o.usuarioId}` : `c-${(o.clienteEmail || o.clienteTelefono || o.clienteNombre || "?").toLowerCase()}`;
         if (!map.has(key)) {
           map.set(key, {
@@ -734,7 +740,7 @@ export default function App() {
     }
 
     return items;
-  }, [activeTab, users, categories, products, slides, flyers, orders, ordersFilter, listSearch, listSort, ordersDateFrom, ordersDateTo, historialDateFrom, historialDateTo]);
+  }, [activeTab, users, categories, products, slides, flyers, orders, ordersFilter, listSearch, listSort, ordersDateFrom, ordersDateTo, historialDateFrom, historialDateTo, clientesMotivoFilter]);
 
   const listTotalPages = Math.ceil(filteredList.length / LIST_PAGE_SIZE);
   const pagedList = filteredList.slice((listPage - 1) * LIST_PAGE_SIZE, listPage * LIST_PAGE_SIZE);
@@ -2278,6 +2284,16 @@ export default function App() {
             />
           )}
 
+          {activeTab === "clientes" && (
+            <div className="listToolbar">
+              <label htmlFor="clientes-motivo" className="inlineFilterLabel">Motivo</label>
+              <select id="clientes-motivo" className="listSortSelect" value={clientesMotivoFilter} onChange={(e) => { setClientesMotivoFilter(e.target.value); setListPage(1); }}>
+                <option value="todos">Todos</option>
+                {MOTIVOS_DEDICATORIA.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          )}
+
           {!["dashboard", "settings", "atributos", "orders"].includes(activeTab) && (
             <div className="listToolbar">
               <input
@@ -2581,7 +2597,7 @@ export default function App() {
                       </div>
                       {pedido.dedicatoriaEscrita ? (
                         <div className="clienteDedicatoria">
-                          <small>De: {pedido.dedicatoriaDe} — Para: {pedido.dedicatoriaPara}</small>
+                          <small>De: {pedido.dedicatoriaDe} — Para: {pedido.dedicatoriaPara}{pedido.dedicatoriaMotivo ? ` (${pedido.dedicatoriaMotivo})` : ""}</small>
                           <small className="clienteDedicatoriaMensaje">"{pedido.dedicatoriaMensaje}"</small>
                           {pedido.dedicatoriaToken && (
                             <div className="clienteDedicatoriaLink">

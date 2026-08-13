@@ -11,6 +11,8 @@ const PLACEHOLDER = "https://images.unsplash.com/photo-1515562141207-7a88fb7ce33
 
 const initialAuthForm = { name: "", email: "", password: "" };
 
+const MOTIVOS_DEDICATORIA = ["Aniversario", "Compromiso", "Cumpleaños", "San Valentin", "Graduacion", "Otro"];
+
 function DedicationPage({ token }) {
   const [state, setState] = useState({ loading: true, error: "", dedicatoria: null });
   const [para, setPara] = useState("");
@@ -191,7 +193,7 @@ function YoutubeAvailabilityCheck({ url, onStatusChange }) {
   );
 }
 
-function DedicationDisplay({ de, para, mensaje, youtubeUrl }) {
+function DedicationDisplay({ de, para, mensaje, motivo, youtubeUrl }) {
   return (
     <div className="dedicationText">
       <p className="dedicationFrom">De {de}</p>
@@ -199,6 +201,7 @@ function DedicationDisplay({ de, para, mensaje, youtubeUrl }) {
         <path d="M12 20.7 2.7 11.4c-2.3-2.3-2.3-6.1 0-8.4 2.3-2.3 6.1-2.3 8.4 0l.9.9.9-.9c2.3-2.3 6.1-2.3 8.4 0 2.3 2.3 2.3 6.1 0 8.4L12 20.7z" />
       </svg>
       <h2 className="dedicationTo">Para {para}</h2>
+      {motivo && <p className="dedicationMotivo">Por su {motivo}</p>}
       <blockquote className="dedicationMensaje">{mensaje}</blockquote>
       <DedicationVideo url={youtubeUrl} />
     </div>
@@ -277,6 +280,7 @@ function SharedDedicationPage({ token }) {
             de={state.dedicatoria.de}
             para={state.dedicatoria.para}
             mensaje={state.dedicatoria.mensaje}
+            motivo={state.dedicatoria.motivo}
             youtubeUrl={state.dedicatoria.youtubeUrl}
           />
         )}
@@ -295,6 +299,7 @@ function OrderDedicationSearchPage() {
   const [de, setDe] = useState("");
   const [para, setPara] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [motivo, setMotivo] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [youtubeStatus, setYoutubeStatus] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -328,7 +333,7 @@ function OrderDedicationSearchPage() {
       const response = await fetch(`${API_URL}/api/dedicatorias/pedido/${encodeURIComponent(pedidoId.trim())}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contacto: contacto.trim(), de, para, mensaje, youtubeUrl }),
+        body: JSON.stringify({ contacto: contacto.trim(), de, para, mensaje, motivo, youtubeUrl }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || "No se pudo guardar la dedicatoria");
@@ -367,7 +372,7 @@ function OrderDedicationSearchPage() {
           <h1 className="dedicationTitle">Pedido #{pedidoId}</h1>
           {dedicatoria.escrita ? (
             <>
-              <DedicationDisplay de={dedicatoria.de} para={dedicatoria.para} mensaje={dedicatoria.mensaje} youtubeUrl={dedicatoria.youtubeUrl} />
+              <DedicationDisplay de={dedicatoria.de} para={dedicatoria.para} mensaje={dedicatoria.mensaje} motivo={dedicatoria.motivo} youtubeUrl={dedicatoria.youtubeUrl} />
               {shareUrl && <ShareQr url={shareUrl} />}
             </>
           ) : (
@@ -380,6 +385,11 @@ function OrderDedicationSearchPage() {
               <input id="dedic-para" type="text" value={para} onChange={(e) => setPara(e.target.value)} required />
               <label htmlFor="dedic-mensaje">Dedicatoria</label>
               <textarea id="dedic-mensaje" rows={4} value={mensaje} onChange={(e) => setMensaje(e.target.value)} required />
+              <label htmlFor="dedic-motivo">Motivo (opcional)</label>
+              <select id="dedic-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+                <option value="">Seleccionar...</option>
+                {MOTIVOS_DEDICATORIA.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
               <label htmlFor="dedic-youtube">Enlace de YouTube (opcional)</label>
               <input id="dedic-youtube" type="url" placeholder="https://youtube.com/..." value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} />
               <YoutubeAvailabilityCheck url={youtubeUrl} onStatusChange={setYoutubeStatus} />

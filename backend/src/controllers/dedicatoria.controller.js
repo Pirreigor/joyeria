@@ -30,6 +30,7 @@ async function getDedicatoria(req, res) {
 }
 
 const ESTADOS_CON_DEDICATORIA = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
+const MOTIVOS_VALIDOS = ["Aniversario", "Compromiso", "Cumpleaños", "San Valentin", "Graduacion", "Otro"];
 
 async function findPedidoByContacto(pedidoId, contacto) {
   const pedido = await prisma.pedido.findUnique({
@@ -54,6 +55,7 @@ function serializePedidoDedicatoria(pedido) {
     de: pedido.dedicatoriaDe,
     para: pedido.dedicatoriaPara,
     mensaje: pedido.dedicatoriaMensaje,
+    motivo: pedido.dedicatoriaMotivo,
     youtubeUrl: pedido.dedicatoriaYoutubeUrl,
     escrita: pedido.dedicatoriaEscrita,
     token: pedido.dedicatoriaToken,
@@ -82,13 +84,16 @@ async function buscarPedido(req, res) {
 
 async function guardarDedicatoriaPedido(req, res) {
   const { pedidoId } = req.params;
-  const { contacto, de, para, mensaje, youtubeUrl } = req.body;
+  const { contacto, de, para, mensaje, motivo, youtubeUrl } = req.body;
 
   if (!contacto || !String(contacto).trim()) {
     return res.status(400).json({ message: "Ingresa el email o telefono usado en la compra" });
   }
   if (!de || !para || !mensaje) {
     return res.status(400).json({ message: "De, Para y Dedicatoria son obligatorios" });
+  }
+  if (motivo && !MOTIVOS_VALIDOS.includes(motivo)) {
+    return res.status(400).json({ message: "Motivo invalido" });
   }
 
   const pedido = await findPedidoByContacto(pedidoId, contacto);
@@ -110,6 +115,7 @@ async function guardarDedicatoriaPedido(req, res) {
       dedicatoriaDe: String(de).trim(),
       dedicatoriaPara: String(para).trim(),
       dedicatoriaMensaje: String(mensaje).trim(),
+      dedicatoriaMotivo: motivo || null,
       dedicatoriaYoutubeUrl: youtubeUrl ? String(youtubeUrl).trim() : null,
       dedicatoriaEscrita: true,
       dedicatoriaEscritaAt: new Date(),
@@ -133,6 +139,7 @@ async function verDedicatoriaCompartida(req, res) {
       de: pedido.dedicatoriaDe,
       para: pedido.dedicatoriaPara,
       mensaje: pedido.dedicatoriaMensaje,
+      motivo: pedido.dedicatoriaMotivo,
       youtubeUrl: pedido.dedicatoriaYoutubeUrl,
     },
   });

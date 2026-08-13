@@ -1446,16 +1446,31 @@ h3 {
   display: grid;
   place-items: center;
   padding: 40px 16px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(159, 116, 66, 0.16), transparent 55%),
+    radial-gradient(circle at 8% 90%, rgba(159, 116, 66, 0.14), transparent 50%),
+    radial-gradient(circle at 92% 85%, rgba(159, 116, 66, 0.14), transparent 50%),
+    var(--bg);
 }
 
 .dedicationCard {
+  position: relative;
   width: min(480px, 100%);
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid var(--line);
   border-radius: 20px;
-  padding: 28px;
+  padding: 32px;
   text-align: center;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.dedicationCard::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1px solid rgba(159, 116, 66, 0.3);
+  border-radius: 13px;
+  pointer-events: none;
 }
 
 .dedicationTitle {
@@ -1483,12 +1498,14 @@ h3 {
 }
 
 .dedicationForm input,
+.dedicationForm select,
 .dedicationForm textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px 12px;
   font: inherit;
+  background: #fff;
 }
 
 .dedicationForm button {
@@ -1560,11 +1577,20 @@ h3 {
 }
 
 .dedicationTo {
-  margin: 0 0 18px;
+  margin: 0 0 6px;
   font-family: "Cinzel", serif;
   font-size: 2rem;
   line-height: 1.15;
   color: var(--ink);
+}
+
+.dedicationMotivo {
+  margin: 0 0 18px;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.85;
 }
 
 .dedicationMensaje {
