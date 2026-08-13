@@ -2014,31 +2014,32 @@ export default function App() {
               )}
               {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}
               {activeTab === "flyers" && <button onClick={() => { resetFlyerForm(); setFormModal("flyer"); }}>+ Nuevo flyer</button>}
-              {activeTab === "orders" && (
-                <>
-                  <DateRangeBar
-                    idPrefix="orders"
-                    from={ordersDateFrom}
-                    to={ordersDateTo}
-                    onFrom={(v) => { setOrdersDateFrom(v); setListPage(1); }}
-                    onTo={(v) => { setOrdersDateTo(v); setListPage(1); }}
-                    onClear={() => { setOrdersDateFrom(""); setOrdersDateTo(""); setListPage(1); }}
-                  />
-                  <input
-                    type="text"
-                    className="listSearchInput"
-                    placeholder="Buscar..."
-                    value={listSearch}
-                    onChange={(e) => { setListSearch(e.target.value); setListPage(1); }}
-                  />
-                  <span className="listCount">{filteredList.length} resultado{filteredList.length !== 1 ? "s" : ""}</span>
-                  <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); setFormModal("manualOrder"); }}>+ Pedido manual</button>
-                </>
-              )}
+              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
               {activeTab === "historial" && <button className="ghost" onClick={handleExportOrders} disabled={exportingOrders}>{exportingOrders ? "Descargando..." : "Descargar Excel"}</button>}
               <button className="ghost" onClick={loadData} disabled={listLoading}>{listLoading ? "Actualizando..." : "Recargar"}</button>
             </div>
           </div>
+
+          {activeTab === "orders" && (
+            <div className="listToolbar">
+              <DateRangeBar
+                idPrefix="orders"
+                from={ordersDateFrom}
+                to={ordersDateTo}
+                onFrom={(v) => { setOrdersDateFrom(v); setListPage(1); }}
+                onTo={(v) => { setOrdersDateTo(v); setListPage(1); }}
+                onClear={() => { setOrdersDateFrom(""); setOrdersDateTo(""); setListPage(1); }}
+              />
+              <input
+                type="text"
+                className="listSearchInput"
+                placeholder="Buscar..."
+                value={listSearch}
+                onChange={(e) => { setListSearch(e.target.value); setListPage(1); }}
+              />
+              <span className="listCount">{filteredList.length} resultado{filteredList.length !== 1 ? "s" : ""}</span>
+            </div>
+          )}
 
           {activeTab === "orders" && (
             <div className="orderPipeline">
