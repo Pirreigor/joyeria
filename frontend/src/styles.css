@@ -96,10 +96,8 @@ h3 {
 
 .logo {
   width: 74px;
-  height: 74px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid rgba(34, 29, 25, 0.2);
+  height: auto;
+  object-fit: contain;
 }
 
 .logoFallback {
@@ -1389,7 +1387,11 @@ h3 {
     column-gap: 10px;
   }
 
-  .logo,
+  .logo {
+    width: 52px;
+    height: auto;
+  }
+
   .logoFallback {
     width: 52px;
     height: 52px;
