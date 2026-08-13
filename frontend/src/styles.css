@@ -52,6 +52,8 @@ h3 {
   align-items: center;
   column-gap: 20px;
   row-gap: 8px;
+  max-width: 1180px;
+  margin: 0 auto;
 }
 
 .ga-logo {
@@ -92,32 +94,73 @@ h3 {
 }
 
 .logo {
-  width: 56px;
-  height: 56px;
+  width: 74px;
+  height: 74px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid rgba(34, 29, 25, 0.2);
 }
 
 .logoFallback {
-  width: 56px;
-  height: 56px;
+  width: 74px;
+  height: 74px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: linear-gradient(100deg, #7f552f, #b98347);
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: 700;
 }
 
+.searchBox {
+  display: flex;
+  align-items: center;
+  flex-direction: row-reverse;
+  gap: 0;
+}
+
 .searchBox input {
-  width: min(220px, 70vw);
-  border: 1px solid var(--line);
+  width: 0;
+  min-width: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 9px 12px;
+  padding: 9px 0;
   font: inherit;
   background: rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  transition: width 0.2s ease, opacity 0.2s ease, padding 0.2s ease, border-color 0.2s ease, margin 0.2s ease;
+}
+
+.searchBox.open input {
+  width: min(200px, 55vw);
+  opacity: 1;
+  padding: 9px 12px;
+  border-color: var(--line);
+  margin-right: 8px;
+}
+
+.searchToggle {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(159, 116, 66, 0.36);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.searchToggle svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 .ghostBtn,
@@ -1347,20 +1390,20 @@ h3 {
 
   .logo,
   .logoFallback {
-    width: 40px;
-    height: 40px;
+    width: 52px;
+    height: 52px;
   }
 
   .ga-actions {
     justify-content: flex-start;
   }
 
-  .searchBox input {
-    width: 100%;
+  .searchBox.open {
+    flex: 1 1 160px;
   }
 
-  .searchBox {
-    flex: 1 1 160px;
+  .searchBox.open input {
+    width: 100%;
   }
 
   .subcategoryRow {

@@ -427,6 +427,8 @@ export default function App() {
   const [error, setError] = useState("");
 
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef(null);
   const [selectedCategory, setSelectedCategory] = useState("todas");
   const [sortBy, setSortBy] = useState("recommended");
   const [recommendedOnly, setRecommendedOnly] = useState(false);
@@ -902,13 +904,31 @@ export default function App() {
           </button>
 
           <div className="ga-actions">
-            <div className="searchBox">
+            <div className={`searchBox ${searchOpen ? "open" : ""}`}>
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Buscar"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onBlur={() => { if (!query) setSearchOpen(false); }}
               />
+              <button
+                type="button"
+                className="searchToggle"
+                aria-label={searchOpen ? "Cerrar busqueda" : "Buscar"}
+                onClick={() => setSearchOpen((prev) => {
+                  const next = !prev;
+                  if (next) setTimeout(() => searchInputRef.current?.focus(), 0);
+                  else setQuery("");
+                  return next;
+                })}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </button>
             </div>
 
             <a href="/dedicatoria" className="ghostBtn">Mi dedicatoria</a>
