@@ -150,6 +150,7 @@ const STAFF_MENU = [
     label: "Ventas",
     items: [
       { key: "orders", label: "Pedidos", short: "PE" },
+      { key: "historial", label: "Historial", short: "HI" },
     ],
   },
   {
@@ -173,7 +174,6 @@ const ORDER_STAGES = [
   { key: "listo", label: "Listo para envio", estados: ["LISTO_PARA_ENVIO"], color: "#dd6b20" },
   { key: "enviado", label: "Enviado", estados: ["ENVIADO"], color: "#805ad5" },
   { key: "entregado", label: "Entregado", estados: ["ENTREGADO"], color: "#2f855a" },
-  { key: "cancelado", label: "Cancelado", estados: ["CANCELADO"], color: "#9a2c2c" },
 ];
 
 const ORDERS_MENU_KEYS = ["orders", "despacho", "envios"];
@@ -187,6 +187,7 @@ const TAB_LIST_TITLES = {
   slides: "Listado slides",
   flyers: "Listado flyers",
   orders: "Listado pedidos",
+  historial: "Historial de pedidos",
   settings: "Preview branding",
   atributos: "Atributos del catalogo",
 };
@@ -252,6 +253,14 @@ function MenuIcon({ tabKey }) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 14-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z" />
+      </svg>
+    );
+  }
+
+  if (tabKey === "historial") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M13 3a9 9 0 1 0 8.94 10h-2.02A7 7 0 1 1 13 5v4l5-4-5-4v2zm-1 6v5l4 2.5-.9 1.6L11 15V9h1z" />
       </svg>
     );
   }
@@ -382,6 +391,8 @@ export default function App() {
   const [flyers, setFlyers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [ordersFilter, setOrdersFilter] = useState("todos");
+  const [expandedOrders, setExpandedOrders] = useState(() => new Set());
+  const [exportingOrders, setExportingOrders] = useState(false);
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
   const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
@@ -453,7 +464,7 @@ export default function App() {
     const perms = user?.permisos || [];
     if (role === "ADMINISTRADOR" && !perms.length) return sections;
     return sections
-      .map((s) => ({ ...s, items: s.items.filter((i) => i.key === "orders" ? ORDERS_MENU_KEYS.some((k) => perms.includes(k)) : perms.includes(i.key)) }))
+      .map((s) => ({ ...s, items: s.items.filter((i) => (i.key === "orders" || i.key === "historial") ? ORDERS_MENU_KEYS.some((k) => perms.includes(k)) : perms.includes(i.key)) }))
       .filter((s) => s.items.length > 0);
   }, [role, user]);
   const roleMenu = useMemo(
@@ -501,6 +512,12 @@ export default function App() {
       else if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
       else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
+    } else if (activeTab === "historial") {
+      items = orders.filter((o) => !q || `${o.id} ${o.clienteNombre || ""} ${o.clienteEmail || ""} ${o.usuario?.name || ""} ${o.usuario?.email || ""}`.toLowerCase().includes(q));
+      if (listSort === "oldest") items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      else if (listSort === "total_desc") items.sort((a, b) => b.total - a.total);
+      else if (listSort === "total_asc") items.sort((a, b) => a.total - b.total);
+      else items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     } else if (activeTab === "clientes") {
       const map = new Map();
       for (const o of orders) {
@@ -1517,6 +1534,41 @@ export default function App() {
     }
   }
 
+  function toggleOrderExpanded(orderId) {
+    setExpandedOrders((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  }
+
+  async function handleExportOrders() {
+    setExportingOrders(true);
+    setListError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/orders/export`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "No se pudo exportar el Excel");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "pedidos.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setListError(error.message || "No se pudo exportar el Excel");
+    } finally {
+      setExportingOrders(false);
+    }
+  }
+
   async function handleUpdateOrderStatus(orderId, newStatus) {
     setListError("");
     try {
@@ -1917,6 +1969,7 @@ export default function App() {
               {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}
               {activeTab === "flyers" && <button onClick={() => { resetFlyerForm(); setFormModal("flyer"); }}>+ Nuevo flyer</button>}
               {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
+              {activeTab === "historial" && <button className="ghost" onClick={handleExportOrders} disabled={exportingOrders}>{exportingOrders ? "Descargando..." : "Descargar Excel"}</button>}
               <button className="ghost" onClick={loadData} disabled={listLoading}>{listLoading ? "Actualizando..." : "Recargar"}</button>
             </div>
           </div>
@@ -1966,8 +2019,8 @@ export default function App() {
                 onChange={(e) => { setListSearch(e.target.value); setListPage(1); }}
               />
               <select className="listSortSelect" value={listSort} onChange={(e) => { setListSort(e.target.value); setListPage(1); }}>
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "clientes") && <option value="newest">Mas recientes</option>}
-                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "clientes") && <option value="oldest">Mas antiguos</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "historial" || activeTab === "clientes") && <option value="newest">Mas recientes</option>}
+                {(activeTab === "users" || activeTab === "products" || activeTab === "orders" || activeTab === "historial" || activeTab === "clientes") && <option value="oldest">Mas antiguos</option>}
                 {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_asc">Nombre A-Z</option>}
                 {(activeTab === "users" || activeTab === "categories" || activeTab === "products" || activeTab === "clientes") && <option value="name_desc">Nombre Z-A</option>}
                 {activeTab === "products" && <option value="price_asc">Precio menor</option>}
@@ -1975,8 +2028,8 @@ export default function App() {
                 {activeTab === "products" && <option value="stock_asc">Menor stock</option>}
                 {(activeTab === "slides" || activeTab === "flyers") && <option value="order">Por orden</option>}
                 {(activeTab === "slides" || activeTab === "flyers") && <option value="name_asc">Nombre A-Z</option>}
-                {activeTab === "orders" && <option value="total_desc">Mayor total</option>}
-                {activeTab === "orders" && <option value="total_asc">Menor total</option>}
+                {(activeTab === "orders" || activeTab === "historial") && <option value="total_desc">Mayor total</option>}
+                {(activeTab === "orders" || activeTab === "historial") && <option value="total_asc">Menor total</option>}
               </select>
               <span className="listCount">{filteredList.length} resultado{filteredList.length !== 1 ? "s" : ""}</span>
             </div>
@@ -2208,6 +2261,40 @@ export default function App() {
                 </div>
               </article>
             ))}
+
+            {activeTab === "historial" && pagedList.map((order) => {
+              const isExpanded = expandedOrders.has(order.id);
+              return (
+                <article className="card card-vertical historialRow" key={order.id}>
+                  <button type="button" className="historialRowHeader" onClick={() => toggleOrderExpanded(order.id)}>
+                    <span className={`historialChevron ${isExpanded ? "open" : ""}`} aria-hidden="true">›</span>
+                    <span className="historialRowMain">
+                      <strong>Pedido #{order.id}</strong>
+                      <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {new Date(order.createdAt).toLocaleDateString()}</small>
+                    </span>
+                    <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                    <span className="historialRowTotal">${Number(order.total || 0).toFixed(2)}</span>
+                  </button>
+                  {isExpanded && (
+                    <div className="card-info historialRowDetail">
+                      <small>{order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
+                      {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
+                      {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                      {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
+                      {order.confirmedBy && <small>Pago confirmado por: {order.confirmedBy.name}</small>}
+                      {order.dispatchedBy && <small>Despachado por: {order.dispatchedBy.name}</small>}
+                      {order.dedicatoriaEscrita && <small>Dedicatoria: De {order.dedicatoriaDe} — Para {order.dedicatoriaPara}</small>}
+                      {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
+                      {order.items?.length > 0 && (
+                        <ul className="orderItems">
+                          {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
 
             {activeTab === "clientes" && pagedList.map((cliente) => (
               <article className="card card-vertical" key={cliente.key}>

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const XLSX = require("xlsx");
 const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/hash");
 const { buildBaseCode, generateUniqueSku } = require("../utils/sku");
@@ -724,6 +725,51 @@ async function listOrders(req, res) {
   return res.json({ orders });
 }
 
+async function exportOrders(req, res) {
+  const orders = await prisma.pedido.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      usuario: { select: { name: true, email: true } },
+      items: { include: { producto: true } },
+    },
+  });
+
+  const headers = [
+    "ID", "Fecha", "Cliente", "Email", "Telefono", "Estado", "Total",
+    "Metodo de pago", "N Comprobante", "Direccion de envio", "Courier", "N Guia",
+    "Items", "Dedicatoria De", "Dedicatoria Para",
+  ];
+
+  const rows = orders.map((o) => [
+    o.id,
+    new Date(o.createdAt).toLocaleString("es-PE"),
+    o.clienteNombre || o.usuario?.name || "",
+    o.clienteEmail || o.usuario?.email || "",
+    o.clienteTelefono || "",
+    o.estado,
+    Number(o.total || 0),
+    o.metodoPago || "",
+    o.numeroComprobante || "",
+    o.direccionEnvio || "",
+    o.courierEnvio || "",
+    o.numeroGuia || "",
+    o.items.map((item) => `${item.quantity}x ${item.producto?.name || `Producto #${item.productoId}`}`).join("; "),
+    o.dedicatoriaDe || "",
+    o.dedicatoriaPara || "",
+  ]);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length + 4, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws, "Pedidos");
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", "attachment; filename=pedidos.xlsx");
+  return res.send(buffer);
+}
+
 async function updateOrderStatus(req, res) {
   const { id } = req.params;
   const { status, courierEnvio, numeroGuia } = req.body;
@@ -873,6 +919,7 @@ module.exports = {
   updateUser,
   deleteUser,
   listOrders,
+  exportOrders,
   updateOrderStatus,
   confirmPayment,
   listOrderDedicatorias,

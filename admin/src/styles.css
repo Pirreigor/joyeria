@@ -546,6 +546,67 @@ button:disabled {
   min-width: 200px;
 }
 
+.historialRow {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.historialRowHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  text-align: left;
+}
+
+.historialRowMain small {
+  color: var(--muted);
+}
+
+.historialRowHeader:hover {
+  background: rgba(163, 117, 63, 0.04);
+}
+
+.historialChevron {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.historialChevron.open {
+  transform: rotate(90deg);
+}
+
+.historialRowMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.historialRowTotal {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.historialRowDetail {
+  padding: 0 18px 16px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .imageLink {
   color: #6f4a24;
   font-size: 0.82rem;
