@@ -452,8 +452,13 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin-bottom: 10px;
+}
+
+.listHeader h2 {
+  white-space: nowrap;
 }
 
 .list {
