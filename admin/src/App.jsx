@@ -562,6 +562,7 @@ export default function App() {
     stats: { users: 0, products: 0, categories: 0, orders: 0 },
     recentOrders: [],
     recentUsers: [],
+    stockSummary: null,
   });
   const [users, setUsers] = useState([]);
   const [invitations, setInvitations] = useState([]);
@@ -572,6 +573,7 @@ export default function App() {
   const [ordersFilter, setOrdersFilter] = useState("preparar");
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const [exportingOrders, setExportingOrders] = useState(false);
+  const [exportingInventory, setExportingInventory] = useState(false);
   const [ordersDateFrom, setOrdersDateFrom] = useState(() => daysAgoISO(30));
   const [ordersDateTo, setOrdersDateTo] = useState(() => daysAgoISO(0));
   const [historialDateFrom, setHistorialDateFrom] = useState(() => daysAgoISO(30));
@@ -825,6 +827,7 @@ export default function App() {
         stats: { users: 0, products: 0, categories: 0, orders: 0 },
         recentOrders: [],
         recentUsers: [],
+        stockSummary: null,
       });
       setUsers([]);
       setCategories([]);
@@ -1018,6 +1021,7 @@ export default function App() {
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
         recentOrders: dashboardData?.recentOrders || [],
         recentUsers: dashboardData?.recentUsers || [],
+        stockSummary: dashboardData?.stockSummary || null,
       });
       setUsers(usersData.users || []);
       setInvitations(invitationsData.invitations || []);
@@ -1813,6 +1817,32 @@ export default function App() {
     }
   }
 
+  async function handleExportInventory() {
+    setExportingInventory(true);
+    setListError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/products/export-inventory`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "No se pudo exportar el inventario");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "inventario.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setListError(error.message || "No se pudo exportar el inventario");
+    } finally {
+      setExportingInventory(false);
+    }
+  }
+
   async function handleUpdateOrderStatus(orderId, newStatus) {
     setListError("");
     try {
@@ -2173,6 +2203,33 @@ export default function App() {
                   ))
                 )}
               </section>
+
+              {role === "ADMINISTRADOR" && dashboard.stockSummary && (
+                <section className="miniPanel">
+                  <h3>Cuadre de stock</h3>
+                  <div className="statsGrid">
+                    <article className="statCard">
+                      <span className="eyebrow">Unidades en stock</span>
+                      <strong>{dashboard.stockSummary.totalUnidades}</strong>
+                    </article>
+                    <article className="statCard">
+                      <span className="eyebrow">Valor de inventario</span>
+                      <strong>S/ {dashboard.stockSummary.valorInventario.toFixed(2)}</strong>
+                    </article>
+                  </div>
+                  <h4>Stock bajo (≤ {dashboard.stockSummary.umbral} unidades)</h4>
+                  {dashboard.stockSummary.bajoStock.length === 0 ? (
+                    <p className="subtle">Ningun producto con stock bajo.</p>
+                  ) : (
+                    dashboard.stockSummary.bajoStock.map((p) => (
+                      <div key={p.id} className="miniRow">
+                        <strong>{p.name}</strong>
+                        <small>{p.sku || "Sin SKU"} | Stock: {p.stock}</small>
+                      </div>
+                    ))
+                  )}
+                </section>
+              )}
             </div>
           </article>
         )}
@@ -2207,6 +2264,11 @@ export default function App() {
                 <>
                   <button onClick={() => { resetProductForm(); setFormModal("product"); }}>+ Nuevo producto</button>
                   <button className="ghost" onClick={() => setFormModal("import")}>Importar Excel</button>
+                  {role === "ADMINISTRADOR" && (
+                    <button className="ghost" onClick={handleExportInventory} disabled={exportingInventory}>
+                      {exportingInventory ? "Descargando..." : "Descargar inventario"}
+                    </button>
+                  )}
                 </>
               )}
               {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}

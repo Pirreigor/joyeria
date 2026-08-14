@@ -519,6 +519,36 @@ async function deleteProduct(req, res) {
   return res.json({ product });
 }
 
+async function exportInventory(req, res) {
+  const products = await prisma.producto.findMany({
+    orderBy: { name: "asc" },
+  });
+
+  const headers = ["ID", "SKU", "Nombre", "Categoria", "Precio (S/)", "Stock", "Valor en stock (S/)", "Activo"];
+
+  const rows = products.map((p) => [
+    p.id,
+    p.sku || "",
+    p.name,
+    p.category || "",
+    Number(p.price || 0),
+    p.stock,
+    Number(p.price || 0) * p.stock,
+    p.active ? "Si" : "No",
+  ]);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length + 4, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", "attachment; filename=inventario.xlsx");
+  return res.send(buffer);
+}
+
 async function getDashboard(req, res) {
   const [usersCount, productsCount, categoriesCount, ordersCount, recentOrders, recentUsers] = await Promise.all([
     prisma.usuario.count(),
@@ -547,6 +577,24 @@ async function getDashboard(req, res) {
     }),
   ]);
 
+  let stockSummary = null;
+  if (req.user?.rol === "ADMINISTRADOR") {
+    const LOW_STOCK_THRESHOLD = 3;
+    const activeProducts = await prisma.producto.findMany({
+      where: { active: true },
+      select: { id: true, name: true, sku: true, price: true, stock: true },
+    });
+
+    const totalUnidades = activeProducts.reduce((sum, p) => sum + p.stock, 0);
+    const valorInventario = activeProducts.reduce((sum, p) => sum + Number(p.price || 0) * p.stock, 0);
+    const bajoStock = activeProducts
+      .filter((p) => p.stock <= LOW_STOCK_THRESHOLD)
+      .sort((a, b) => a.stock - b.stock)
+      .slice(0, 10);
+
+    stockSummary = { totalUnidades, valorInventario, bajoStock, umbral: LOW_STOCK_THRESHOLD };
+  }
+
   return res.json({
     stats: {
       users: usersCount,
@@ -556,6 +604,7 @@ async function getDashboard(req, res) {
     },
     recentOrders,
     recentUsers,
+    stockSummary,
   });
 }
 
@@ -913,6 +962,7 @@ module.exports = {
   updateProduct,
   listProducts,
   deleteProduct,
+  exportInventory,
   getDashboard,
   listUsers,
   createUser,

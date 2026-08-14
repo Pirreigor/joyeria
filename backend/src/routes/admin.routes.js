@@ -19,6 +19,7 @@ const {
   updateProduct,
   listProducts,
   deleteProduct,
+  exportInventory,
   getDashboard,
   listUsers,
   createUser,
@@ -91,6 +92,7 @@ router.get("/products/by-sku/:sku", requirePermission("products"), findProductBy
 
 router.post("/upload-image", requirePermission("products"), uploadImageMiddleware, uploadImage);
 router.get("/products/export-template", requirePermission("products"), exportTemplate);
+router.get("/products/export-inventory", requireRole("ADMINISTRADOR"), exportInventory);
 router.post("/products/import", requirePermission("products"), uploadImportFiles, importProducts);
 
 router.get("/tipos-pieza", requirePermission("atributos"), listTiposPieza);

@@ -354,6 +354,7 @@ h3 {
 
 .dashboardBlocks {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
