@@ -1136,14 +1136,27 @@ h3 {
   border-radius: 12px;
   overflow: hidden;
   background: #100e0d;
+  aspect-ratio: 4 / 3;
+}
+
+.zoomableImage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: zoom-in;
 }
 
 .productModalImage {
   width: 100%;
-  max-height: 380px;
+  height: 100%;
   border-radius: 12px;
   object-fit: cover;
   display: block;
+  transition: transform 0.35s ease;
+}
+
+.zoomableImage:hover .productModalImage {
+  transform: scale(1.6);
 }
 
 .thumbStrip {
@@ -1156,6 +1169,7 @@ h3 {
 }
 
 .thumbBtn {
+  position: relative;
   flex-shrink: 0;
   width: 64px;
   height: 64px;
@@ -1166,6 +1180,30 @@ h3 {
   cursor: pointer;
   transition: border-color 0.15s;
   background: none;
+}
+
+.thumbPlayBadge {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 10, 0.35);
+  pointer-events: none;
+}
+
+.thumbPlayBadge svg {
+  width: 22px;
+  height: 22px;
+}
+
+.thumbPlayBadge svg circle {
+  fill: rgba(255, 255, 255, 0.22);
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 1.3;
+}
+
+.thumbPlayBadge svg polygon {
+  fill: rgba(255, 255, 255, 0.95);
 }
 
 .thumbBtn img {
@@ -1257,49 +1295,6 @@ h3 {
   gap: 10px;
   flex-wrap: wrap;
   padding-top: 4px;
-}
-
-.modalPlayOverlay {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  background: linear-gradient(180deg, rgba(10, 10, 10, 0.18), rgba(10, 10, 10, 0.58));
-  color: #fff;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.modalPlayOverlay span {
-  font-size: 0.92rem;
-  letter-spacing: 0.02em;
-}
-
-.playBadge {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  backdrop-filter: blur(2px);
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.playBadge svg {
-  width: 38px;
-  height: 38px;
-}
-
-.playBadge svg circle {
-  fill: rgba(255, 255, 255, 0.24);
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 1.3;
-}
-
-.playBadge svg polygon {
-  fill: rgba(255, 255, 255, 0.95);
 }
 
 .modalVideoOverlay {

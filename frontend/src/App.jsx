@@ -448,7 +448,6 @@ export default function App() {
 
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showProductVideo, setShowProductVideo] = useState(false);
   const [shareToast, setShareToast] = useState(false);
   const [page, setPage] = useState(1);
   const [modalGalleryIndex, setModalGalleryIndex] = useState(0);
@@ -565,14 +564,13 @@ export default function App() {
       const found = products.find((p) => String(p.id) === pid);
       if (found) {
         setSelectedProduct(found);
-        setShowProductVideo(false);
+        setModalGalleryIndex(0);
       }
     }
   }, [products]);
 
   function openProduct(product) {
     setSelectedProduct(product);
-    setShowProductVideo(false);
     setModalGalleryIndex(0);
     const url = new URL(window.location.href);
     url.searchParams.set("p", product.id);
@@ -581,7 +579,6 @@ export default function App() {
 
   function closeProduct() {
     setSelectedProduct(null);
-    setShowProductVideo(false);
     const url = new URL(window.location.href);
     url.searchParams.delete("p");
     window.history.replaceState({}, "", url.toString());
@@ -1347,9 +1344,15 @@ export default function App() {
 
       {selectedProduct && (() => {
         const galleryImages = [selectedProduct.imageUrl, ...(selectedProduct.imagenes || [])].filter(Boolean);
-        const currentImg = galleryImages[modalGalleryIndex] || galleryImages[0] || PLACEHOLDER;
         const hasDetails = selectedProduct.materiales || selectedProduct.dimensiones || selectedProduct.cuidados;
         const productVideoUrl = getEmbedVideoUrl(selectedProduct.videoUrl || "") || embedPromoVideoUrl;
+        const productVideoTitle = selectedProduct.videoUrl ? "Video del producto" : (settings.promoVideoTitle || "Video promocional");
+
+        const mediaItems = [
+          ...galleryImages.map((img) => ({ type: "image", src: img })),
+          ...(productVideoUrl ? [{ type: "video", src: productVideoUrl, thumb: galleryImages[0] || PLACEHOLDER, title: productVideoTitle }] : []),
+        ];
+        const currentMedia = mediaItems[modalGalleryIndex] || mediaItems[0] || { type: "image", src: PLACEHOLDER };
 
         return (
           <div className="modalBackdrop" onClick={closeProduct}>
@@ -1380,43 +1383,41 @@ export default function App() {
 
               <div className="modalGallery">
                 <div className="modalMedia">
-                  <img className="productModalImage" src={currentImg} alt={selectedProduct.name} />
-
-                  {productVideoUrl && !showProductVideo && (
-                    <button type="button" className="modalPlayOverlay" onClick={() => setShowProductVideo(true)}>
-                      <span className="playBadge" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" role="presentation">
-                          <circle cx="12" cy="12" r="11" />
-                          <polygon points="10,8.5 17,12 10,15.5" />
-                        </svg>
-                      </span>
-                      <span>{selectedProduct.videoUrl ? "Ver video del producto" : (settings.promoVideoTitle || "Ver video promocional")}</span>
-                    </button>
-                  )}
-
-                  {productVideoUrl && showProductVideo && (
+                  {currentMedia.type === "video" ? (
                     <div className="modalVideoOverlay">
                       <iframe
-                        src={appendAutoplay(productVideoUrl)}
-                        title={selectedProduct.videoUrl ? "Video del producto" : (settings.promoVideoTitle || "Video promocional")}
+                        src={appendAutoplay(currentMedia.src)}
+                        title={currentMedia.title}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
                     </div>
+                  ) : (
+                    <div className="zoomableImage">
+                      <img className="productModalImage" src={currentMedia.src} alt={selectedProduct.name} />
+                    </div>
                   )}
                 </div>
 
-                {galleryImages.length > 1 && (
+                {mediaItems.length > 1 && (
                   <div className="thumbStrip">
-                    {galleryImages.map((img, i) => (
+                    {mediaItems.map((item, i) => (
                       <button
-                        key={img}
+                        key={`${item.type}-${item.src}`}
                         type="button"
                         className={`thumbBtn${i === modalGalleryIndex ? " active" : ""}`}
-                        onClick={() => { setModalGalleryIndex(i); setShowProductVideo(false); }}
-                        aria-label={`Imagen ${i + 1}`}
+                        onClick={() => setModalGalleryIndex(i)}
+                        aria-label={item.type === "video" ? "Ver video" : `Imagen ${i + 1}`}
                       >
-                        <img src={img} alt="" loading="lazy" />
+                        <img src={item.type === "video" ? item.thumb : item.src} alt="" loading="lazy" />
+                        {item.type === "video" && (
+                          <span className="thumbPlayBadge" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation">
+                              <circle cx="12" cy="12" r="11" />
+                              <polygon points="10,8.5 17,12 10,15.5" />
+                            </svg>
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
