@@ -835,7 +835,7 @@ export default function App() {
 
       const orderId = data.order?.id;
       const resumen = cartItems.map((item) => `${item.quantity}x ${item.name}`).join(", ");
-      const mensaje = `Hola! Soy ${checkoutForm.nombre.trim()}. Acabo de realizar el pedido #${orderId} por $${cartTotal.toFixed(2)}. Detalle: ${resumen}. Mi telefono: ${checkoutForm.telefono.trim()}`;
+      const mensaje = `Hola! Soy ${checkoutForm.nombre.trim()}. Acabo de realizar el pedido #${orderId} por S/ ${cartTotal.toFixed(2)}. Detalle: ${resumen}. Mi telefono: ${checkoutForm.telefono.trim()}. (Precio en soles peruanos, sujeto a la conversion de tu moneda local si pagas desde el extranjero)`;
       const whatsappUrl = `https://wa.me/51941445104?text=${encodeURIComponent(mensaje)}`;
 
       setCartItems([]);
@@ -999,7 +999,7 @@ export default function App() {
               {cartItems.map((item) => (
                 <article className="cartItem" key={item.id}>
                   <strong>{item.name}</strong>
-                  <span>${item.price.toFixed(2)}</span>
+                  <span>S/ {item.price.toFixed(2)}</span>
                   <div className="qtyRow">
                     <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
                       -
@@ -1014,7 +1014,7 @@ export default function App() {
             </div>
           )}
 
-          <p className="cartTotal">Total: ${cartTotal.toFixed(2)}</p>
+          <p className="cartTotal">Total: S/ {cartTotal.toFixed(2)}</p>
 
           {cartItems.length > 0 && !checkoutOpen && (
             <button type="button" className="ctaBtn checkoutBtn" onClick={() => { setCheckoutOpen(true); setCheckoutError(""); }}>
@@ -1222,7 +1222,7 @@ export default function App() {
                 <div className="cardBody">
                   <span className="pill">{product.category || "Joyeria"}</span>
                   <h3 className="cardName">{product.name}</h3>
-                  <strong className="cardPrice">${Number(product.price).toFixed(2)}</strong>
+                  <strong className="cardPrice">S/ {Number(product.price).toFixed(2)}</strong>
                 </div>
               </article>
             ))}
@@ -1427,7 +1427,7 @@ export default function App() {
               <div className="modalInfo">
                 <div className="modalMeta">
                   <span className="pill">{selectedProduct.category || "Joyeria"}</span>
-                  <strong className="modalPrice">${Number(selectedProduct.price).toFixed(2)}</strong>
+                  <strong className="modalPrice">S/ {Number(selectedProduct.price).toFixed(2)}</strong>
                   {selectedProduct.grabado && (
                     <span className="grabadoBadge">
                       <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -735,7 +735,7 @@ async function exportOrders(req, res) {
   });
 
   const headers = [
-    "ID", "Fecha", "Cliente", "Email", "Telefono", "Estado", "Total",
+    "ID", "Fecha", "Cliente", "Email", "Telefono", "Estado", "Total (S/)",
     "Metodo de pago", "N Comprobante", "Direccion de envio", "Courier", "N Guia",
     "Items", "Dedicatoria De", "Dedicatoria Para",
   ];

@@ -373,7 +373,7 @@ function RevenueChart({ data }) {
             {gridLines.map((g, i) => (
               <g key={i}>
                 <line x1={padding.left} x2={width - padding.right} y1={g.y} y2={g.y} className="chartGrid" />
-                <text x={padding.left - 8} y={g.y + 3} textAnchor="end" className="chartAxisLabel">${Math.round(g.v)}</text>
+                <text x={padding.left - 8} y={g.y + 3} textAnchor="end" className="chartAxisLabel">S/ {Math.round(g.v)}</text>
               </g>
             ))}
             <path d={areaPath} className="chartArea" />
@@ -393,7 +393,7 @@ function RevenueChart({ data }) {
           {hovered && (
             <div className="chartTooltip" style={{ left: `${(hovered.x / width) * 100}%` }}>
               <strong>{formatChartDate(hovered.date)}</strong>
-              <span>${hovered.total.toFixed(2)}</span>
+              <span>S/ {hovered.total.toFixed(2)}</span>
             </div>
           )}
         </>
@@ -2167,7 +2167,7 @@ export default function App() {
                     <div key={order.id} className="miniRow">
                       <strong>Pedido #{order.id}</strong>
                       <small>
-                        {order.user?.name || order.user?.email || "Cliente"} | {order.status} | ${Number(order.total || 0).toFixed(2)}
+                        {order.user?.name || order.user?.email || "Cliente"} | {order.status} | S/ {Number(order.total || 0).toFixed(2)}
                       </small>
                     </div>
                   ))
@@ -2454,7 +2454,7 @@ export default function App() {
                 {p.imageUrl && <img className="card-thumb" src={p.imageUrl} alt="" />}
                 <div className="card-info">
                   <strong>{p.name}</strong>
-                  <small>{p.category || "Sin categoria"} — ${Number(p.price || 0).toFixed(2)} — Stock: {p.stock}</small>
+                  <small>{p.category || "Sin categoria"} — S/ {Number(p.price || 0).toFixed(2)} — Stock: {p.stock}</small>
                   {p.sku && <small>SKU: {p.sku}</small>}
                   {p.createdBy && <small>Registrado por: {p.createdBy.name}</small>}
                 </div>
@@ -2517,7 +2517,7 @@ export default function App() {
                     <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
                   </div>
                   <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
-                  <small>Total: ${Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
+                  <small>Total: S/ {Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
                   {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
                   {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
                   {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
@@ -2527,7 +2527,7 @@ export default function App() {
                 </div>
                 {order.items?.length > 0 && (
                   <ul className="orderItems">
-                    {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>)}
+                    {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
                   </ul>
                 )}
                 <div className="actions">
@@ -2558,7 +2558,7 @@ export default function App() {
                       <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {new Date(order.createdAt).toLocaleDateString()}</small>
                     </span>
                     <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
-                    <span className="historialRowTotal">${Number(order.total || 0).toFixed(2)}</span>
+                    <span className="historialRowTotal">S/ {Number(order.total || 0).toFixed(2)}</span>
                   </button>
                   {isExpanded && (
                     <div className="card-info historialRowDetail">
@@ -2572,7 +2572,7 @@ export default function App() {
                       {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
                       {order.items?.length > 0 && (
                         <ul className="orderItems">
-                          {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — ${Number(item.unitPrice).toFixed(2)}</li>)}
+                          {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
                         </ul>
                       )}
                     </div>
@@ -3130,7 +3130,7 @@ export default function App() {
                 {productSearch.length >= 2 || productSearchCat !== "todas" ? (
                   <ul className="productPickerResults">
                     {products.filter((p) => p.active).filter((p) => productSearchCat === "todas" || p.category === productSearchCat).filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase())).slice(0, 20).map((p) => (
-                      <li key={p.id}><button type="button" onClick={() => { addManualOrderItem(p.id); setProductSearch(""); }}><span>{p.name}</span><small>{p.category || "Sin categoria"} — ${Number(p.price).toFixed(2)}</small></button></li>
+                      <li key={p.id}><button type="button" onClick={() => { addManualOrderItem(p.id); setProductSearch(""); }}><span>{p.name}</span><small>{p.category || "Sin categoria"} — S/ {Number(p.price).toFixed(2)}</small></button></li>
                     ))}
                     {products.filter((p) => p.active).filter((p) => productSearchCat === "todas" || p.category === productSearchCat).filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase())).length === 0 && <li className="noResults">Sin resultados</li>}
                   </ul>
@@ -3142,11 +3142,11 @@ export default function App() {
                 <ul className="manualOrderItems">
                   {manualOrderForm.items.map((item) => (
                     <li key={item.productId}>
-                      <span>{item.quantity}x {item.name} — ${(item.price * item.quantity).toFixed(2)}</span>
+                      <span>{item.quantity}x {item.name} — S/ {(item.price * item.quantity).toFixed(2)}</span>
                       <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.productId)}>x</button>
                     </li>
                   ))}
-                  <li className="manualOrderTotal"><strong>Total: ${manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong></li>
+                  <li className="manualOrderTotal"><strong>Total: S/ {manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong></li>
                 </ul>
               )}
               <div className="actions">
