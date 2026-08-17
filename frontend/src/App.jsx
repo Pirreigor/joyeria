@@ -403,6 +403,43 @@ function OrderDedicationSearchPage() {
   );
 }
 
+function DetailAccordion({ sections }) {
+  const [openKeys, setOpenKeys] = useState(() => new Set());
+
+  function toggle(key) {
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  return (
+    <div className="detailAccordion">
+      {sections.map((section) => {
+        const isOpen = openKeys.has(section.key);
+        return (
+          <div key={section.key} className={`accordionItem${isOpen ? " open" : ""}`}>
+            <button
+              type="button"
+              className="accordionTrigger"
+              onClick={() => toggle(section.key)}
+              aria-expanded={isOpen}
+            >
+              <span>{section.label}</span>
+              <svg className="accordionChevron" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {isOpen && <div className="accordionContent">{section.content}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function App() {
   const [sharedDedicationToken] = useState(() => {
     const match = window.location.pathname.match(/^\/dedicatoria\/ver\/([^/]+)\/?$/);
@@ -1344,7 +1381,13 @@ export default function App() {
 
       {selectedProduct && (() => {
         const galleryImages = [selectedProduct.imageUrl, ...(selectedProduct.imagenes || [])].filter(Boolean);
-        const hasDetails = selectedProduct.materiales || selectedProduct.dimensiones || selectedProduct.cuidados;
+        const detailSections = [
+          { key: "descripcion", label: "Descripcion", content: selectedProduct.description || "Sin descripcion" },
+          ...(selectedProduct.materiales ? [{ key: "materiales", label: "Materiales", content: selectedProduct.materiales }] : []),
+          ...(selectedProduct.dimensiones ? [{ key: "dimensiones", label: "Dimensiones", content: selectedProduct.dimensiones }] : []),
+          ...(selectedProduct.cuidados ? [{ key: "cuidados", label: "Cuidados", content: selectedProduct.cuidados }] : []),
+          { key: "grabado", label: "Grabado", content: selectedProduct.grabado ? "Disponible" : "No disponible" },
+        ];
         const productVideoUrl = getEmbedVideoUrl(selectedProduct.videoUrl || "") || embedPromoVideoUrl;
         const productVideoTitle = selectedProduct.videoUrl ? "Video del producto" : (settings.promoVideoTitle || "Video promocional");
 
@@ -1428,40 +1471,9 @@ export default function App() {
                 <div className="modalMeta">
                   <span className="pill">{selectedProduct.category || "Joyeria"}</span>
                   <strong className="modalPrice">S/ {Number(selectedProduct.price).toFixed(2)}</strong>
-                  {selectedProduct.grabado && (
-                    <span className="grabadoBadge">
-                      <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                      </svg>
-                      Grabado disponible
-                    </span>
-                  )}
                 </div>
 
-                <p className="modalDescription">{selectedProduct.description || "Sin descripcion"}</p>
-
-                {hasDetails && (
-                  <dl className="productDetails">
-                    {selectedProduct.materiales && (
-                      <div className="detailRow">
-                        <dt>Materiales</dt>
-                        <dd>{selectedProduct.materiales}</dd>
-                      </div>
-                    )}
-                    {selectedProduct.dimensiones && (
-                      <div className="detailRow">
-                        <dt>Dimensiones</dt>
-                        <dd>{selectedProduct.dimensiones}</dd>
-                      </div>
-                    )}
-                    {selectedProduct.cuidados && (
-                      <div className="detailRow">
-                        <dt>Cuidados</dt>
-                        <dd>{selectedProduct.cuidados}</dd>
-                      </div>
-                    )}
-                  </dl>
-                )}
+                <DetailAccordion sections={detailSections} />
 
                 {(selectedProduct.videoUrl || settings.promoVideoUrl) && !productVideoUrl && (
                   <div className="videoMeta">
