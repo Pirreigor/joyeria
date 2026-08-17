@@ -90,7 +90,7 @@ router.patch("/products/:id", requirePermission("products"), updateProduct);
 router.delete("/products/:id", requirePermission("products"), deleteProduct);
 router.get("/products/by-sku/:sku", requirePermission("products"), findProductBySku);
 
-router.post("/upload-image", requirePermission("products"), uploadImageMiddleware, uploadImage);
+router.post("/upload-image", requireAnyPermission("products", "categories", "slides", "flyers"), uploadImageMiddleware, uploadImage);
 router.get("/products/export-template", requirePermission("products"), exportTemplate);
 router.get("/products/export-inventory", requireRole("ADMINISTRADOR"), exportInventory);
 router.post("/products/import", requirePermission("products"), uploadImportFiles, importProducts);

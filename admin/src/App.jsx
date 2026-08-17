@@ -1676,14 +1676,14 @@ export default function App() {
     }
   }
 
-  async function handleImageUpload(event, target = "imageUrl") {
+  async function handleImageUpload(event, target, folder) {
     const file = event.target.files?.[0];
     if (!file) return;
     setUploadingImage(true);
     try {
       const formData = new FormData();
       formData.append("image", file);
-      if (productForm.category) formData.append("category", productForm.category);
+      if (folder) formData.append("category", folder);
       const response = await fetch(`${API_URL}/api/admin/upload-image`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -1691,13 +1691,19 @@ export default function App() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Error al subir imagen");
-      if (target === "imageUrl") {
+      if (target === "product-main") {
         setProductForm((prev) => ({ ...prev, imageUrl: data.url }));
-      } else if (target === "gallery") {
+      } else if (target === "product-gallery") {
         setProductForm((prev) => ({
           ...prev,
           imagenesRaw: prev.imagenesRaw ? prev.imagenesRaw + ", " + data.url : data.url,
         }));
+      } else if (target === "slide") {
+        setSlideForm((prev) => ({ ...prev, imageUrl: data.url }));
+      } else if (target === "flyer") {
+        setFlyerForm((prev) => ({ ...prev, imageUrl: data.url }));
+      } else if (target === "category-banner") {
+        setForm((prev) => ({ ...prev, bannerImageUrl: data.url }));
       }
     } catch (error) {
       setListError(error.message || "Error al subir imagen");
@@ -2819,7 +2825,14 @@ export default function App() {
               <label htmlFor="description">Descripcion</label>
               <textarea id="description" rows={3} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
               <label htmlFor="bannerImageUrl">URL imagen categoria</label>
-              <input id="bannerImageUrl" type="url" value={form.bannerImageUrl} onChange={(e) => setForm((p) => ({ ...p, bannerImageUrl: e.target.value }))} />
+              <div className="imageUploadRow">
+                <input id="bannerImageUrl" type="url" placeholder="URL o sube una imagen" value={form.bannerImageUrl} onChange={(e) => setForm((p) => ({ ...p, bannerImageUrl: e.target.value }))} style={{ flex: 1 }} />
+                <label className="uploadBtn">
+                  {uploadingImage ? "Subiendo..." : "Subir"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "category-banner", "categorias")} disabled={uploadingImage} />
+                </label>
+              </div>
+              {form.bannerImageUrl && <img src={form.bannerImageUrl} alt="preview" className="imagePreviewThumb" />}
               <label htmlFor="parentId">Categoria padre</label>
               <select id="parentId" value={form.parentId} onChange={(e) => setForm((p) => ({ ...p, parentId: e.target.value }))}>
                 <option value="">Ninguna (categoria principal)</option>
@@ -2915,7 +2928,7 @@ export default function App() {
                     <input id="product-image" type="url" placeholder="URL o sube una imagen" value={productForm.imageUrl} onChange={(e) => setProductForm((p) => ({ ...p, imageUrl: e.target.value }))} style={{ flex: 1 }} required />
                     <label className="uploadBtn">
                       {uploadingImage ? "Subiendo..." : "Subir"}
-                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "imageUrl")} disabled={uploadingImage} />
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "product-main", productForm.category)} disabled={uploadingImage} />
                     </label>
                   </div>
                   {productForm.imageUrl && <img src={productForm.imageUrl} alt="preview" className="imagePreviewThumb" />}
@@ -2926,7 +2939,7 @@ export default function App() {
                     <textarea id="product-imagenes" rows={2} placeholder="URLs separadas por coma" value={productForm.imagenesRaw} onChange={(e) => setProductForm((p) => ({ ...p, imagenesRaw: e.target.value }))} style={{ flex: 1 }} />
                     <label className="uploadBtn" style={{ alignSelf: "flex-start" }}>
                       {uploadingImage ? "Subiendo..." : "+ Imagen"}
-                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "gallery")} disabled={uploadingImage} />
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "product-gallery", productForm.category)} disabled={uploadingImage} />
                     </label>
                   </div>
                   {productForm.imagenesRaw && (
@@ -3125,7 +3138,14 @@ export default function App() {
               <label htmlFor="slide-subtitle">Subtitulo</label>
               <input id="slide-subtitle" type="text" value={slideForm.subtitle} onChange={(e) => setSlideForm((p) => ({ ...p, subtitle: e.target.value }))} />
               <label htmlFor="slide-image">URL imagen</label>
-              <input id="slide-image" type="url" value={slideForm.imageUrl} onChange={(e) => setSlideForm((p) => ({ ...p, imageUrl: e.target.value }))} required />
+              <div className="imageUploadRow">
+                <input id="slide-image" type="url" placeholder="URL o sube una imagen" value={slideForm.imageUrl} onChange={(e) => setSlideForm((p) => ({ ...p, imageUrl: e.target.value }))} style={{ flex: 1 }} required />
+                <label className="uploadBtn">
+                  {uploadingImage ? "Subiendo..." : "Subir"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "slide", "slides")} disabled={uploadingImage} />
+                </label>
+              </div>
+              {slideForm.imageUrl && <img src={slideForm.imageUrl} alt="preview" className="imagePreviewThumb" />}
               <label htmlFor="slide-cta-label">Texto CTA</label>
               <input id="slide-cta-label" type="text" value={slideForm.ctaLabel} onChange={(e) => setSlideForm((p) => ({ ...p, ctaLabel: e.target.value }))} />
               <label htmlFor="slide-cta-url">URL CTA</label>
@@ -3153,7 +3173,14 @@ export default function App() {
               <label htmlFor="flyer-subtitle">Subtitulo</label>
               <input id="flyer-subtitle" type="text" value={flyerForm.subtitle} onChange={(e) => setFlyerForm((p) => ({ ...p, subtitle: e.target.value }))} />
               <label htmlFor="flyer-image">URL imagen</label>
-              <input id="flyer-image" type="url" value={flyerForm.imageUrl} onChange={(e) => setFlyerForm((p) => ({ ...p, imageUrl: e.target.value }))} required />
+              <div className="imageUploadRow">
+                <input id="flyer-image" type="url" placeholder="URL o sube una imagen" value={flyerForm.imageUrl} onChange={(e) => setFlyerForm((p) => ({ ...p, imageUrl: e.target.value }))} style={{ flex: 1 }} required />
+                <label className="uploadBtn">
+                  {uploadingImage ? "Subiendo..." : "Subir"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "flyer", "flyers")} disabled={uploadingImage} />
+                </label>
+              </div>
+              {flyerForm.imageUrl && <img src={flyerForm.imageUrl} alt="preview" className="imagePreviewThumb" />}
               <label htmlFor="flyer-link">URL destino (opcional)</label>
               <input id="flyer-link" type="text" value={flyerForm.linkUrl} onChange={(e) => setFlyerForm((p) => ({ ...p, linkUrl: e.target.value }))} />
               <label htmlFor="flyer-order">Orden</label>
