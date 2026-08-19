@@ -1386,7 +1386,13 @@ export default function App() {
           ...(selectedProduct.materiales ? [{ key: "materiales", label: "Materiales", content: selectedProduct.materiales }] : []),
           ...(selectedProduct.dimensiones ? [{ key: "dimensiones", label: "Dimensiones", content: selectedProduct.dimensiones }] : []),
           ...(selectedProduct.cuidados ? [{ key: "cuidados", label: "Cuidados", content: selectedProduct.cuidados }] : []),
-          { key: "grabado", label: "Grabado", content: selectedProduct.grabado ? "Disponible" : "No disponible" },
+          {
+            key: "grabado",
+            label: "Grabado",
+            content: selectedProduct.grabado
+              ? "Como parte de nuestro servicio, en Don Joyero incluimos el grabado de tu anillo sin costo adicional.\n\nPorque sabemos que hay palabras que merecen quedarse para siempre, queremos que puedas llevar en tu anillo un mensaje que represente su historia, su amor y ese momento tan especial.\n\nHazlo aun mas especial: graba en el una fecha, un nombre, una palabra o esa pequena frase que solo ustedes entienden, que cada vez que lo mires, recuerdes no solo el anillo, sino todo lo que significa."
+              : "No disponible",
+          },
         ];
         const productVideoUrl = getEmbedVideoUrl(selectedProduct.videoUrl || "") || embedPromoVideoUrl;
         const productVideoTitle = selectedProduct.videoUrl ? "Video del producto" : (settings.promoVideoTitle || "Video promocional");
