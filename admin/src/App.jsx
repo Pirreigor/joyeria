@@ -8,6 +8,17 @@ const TOKEN_KEY = "admin_token";
 const USER_KEY = "admin_user";
 const LIST_PAGE_SIZE = 12;
 
+// Sirve una version comprimida/redimensionada desde Cloudinary en vez del original,
+// para no gastar cuota de ancho de banda de mas. No modifica el archivo subido.
+function cdnImg(url, width) {
+  if (!url || !url.includes("res.cloudinary.com")) return url;
+  const marker = "/upload/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return url;
+  const transform = width ? `f_auto,q_auto,w_${width},c_limit` : "f_auto,q_auto";
+  return url.slice(0, idx + marker.length) + transform + "/" + url.slice(idx + marker.length);
+}
+
 function daysAgoISO(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
@@ -2519,7 +2530,7 @@ export default function App() {
 
             {activeTab === "products" && pagedList.map((p) => (
               <article key={p.id} className="card">
-                {p.imageUrl && <img className="card-thumb" src={p.imageUrl} alt="" />}
+                {p.imageUrl && <img className="card-thumb" src={cdnImg(p.imageUrl, 100)} alt="" />}
                 <div className="card-info">
                   <strong>{p.name}</strong>
                   <small>{p.category || "Sin categoria"} — S/ {Number(p.price || 0).toFixed(2)} — Stock: {p.stock}</small>
@@ -2544,7 +2555,7 @@ export default function App() {
 
             {activeTab === "slides" && pagedList.map((s) => (
               <article key={s.id} className="card">
-                <img className="card-thumb" src={s.imageUrl} alt="" />
+                <img className="card-thumb" src={cdnImg(s.imageUrl, 100)} alt="" />
                 <div className="card-info">
                   <strong>{s.title}</strong>
                   <small>{s.subtitle || "Sin subtitulo"} — Orden: {s.displayOrder}</small>
@@ -2561,7 +2572,7 @@ export default function App() {
 
             {activeTab === "flyers" && pagedList.map((f) => (
               <article key={f.id} className="card">
-                <img className="card-thumb" src={f.imageUrl} alt="" />
+                <img className="card-thumb" src={cdnImg(f.imageUrl, 100)} alt="" />
                 <div className="card-info">
                   <strong>{f.title}</strong>
                   <small>{f.subtitle || "Sin subtitulo"} — Orden: {f.displayOrder}</small>
@@ -2832,7 +2843,7 @@ export default function App() {
                   <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "category-banner", "categorias")} disabled={uploadingImage} />
                 </label>
               </div>
-              {form.bannerImageUrl && <img src={form.bannerImageUrl} alt="preview" className="imagePreviewThumb" />}
+              {form.bannerImageUrl && <img src={cdnImg(form.bannerImageUrl, 150)} alt="preview" className="imagePreviewThumb" />}
               <label htmlFor="parentId">Categoria padre</label>
               <select id="parentId" value={form.parentId} onChange={(e) => setForm((p) => ({ ...p, parentId: e.target.value }))}>
                 <option value="">Ninguna (categoria principal)</option>
@@ -2931,7 +2942,7 @@ export default function App() {
                       <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "product-main", productForm.category)} disabled={uploadingImage} />
                     </label>
                   </div>
-                  {productForm.imageUrl && <img src={productForm.imageUrl} alt="preview" className="imagePreviewThumb" />}
+                  {productForm.imageUrl && <img src={cdnImg(productForm.imageUrl, 150)} alt="preview" className="imagePreviewThumb" />}
                 </div>
                 <div className="formField">
                   <label htmlFor="product-imagenes">Galeria</label>
@@ -2946,7 +2957,7 @@ export default function App() {
                     <div className="imagePreviewGrid">
                       {productForm.imagenesRaw.split(",").map((u) => u.trim()).filter(Boolean).map((url, idx, arr) => (
                         <div className="imagePreviewItem" key={`${url}-${idx}`}>
-                          <img src={url} alt="" className="imagePreviewThumb" />
+                          <img src={cdnImg(url, 150)} alt="" className="imagePreviewThumb" />
                           <button
                             type="button"
                             className="imagePreviewRemove"
@@ -3145,7 +3156,7 @@ export default function App() {
                   <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "slide", "slides")} disabled={uploadingImage} />
                 </label>
               </div>
-              {slideForm.imageUrl && <img src={slideForm.imageUrl} alt="preview" className="imagePreviewThumb" />}
+              {slideForm.imageUrl && <img src={cdnImg(slideForm.imageUrl, 150)} alt="preview" className="imagePreviewThumb" />}
               <label htmlFor="slide-cta-label">Texto CTA</label>
               <input id="slide-cta-label" type="text" value={slideForm.ctaLabel} onChange={(e) => setSlideForm((p) => ({ ...p, ctaLabel: e.target.value }))} />
               <label htmlFor="slide-cta-url">URL CTA</label>
@@ -3180,7 +3191,7 @@ export default function App() {
                   <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "flyer", "flyers")} disabled={uploadingImage} />
                 </label>
               </div>
-              {flyerForm.imageUrl && <img src={flyerForm.imageUrl} alt="preview" className="imagePreviewThumb" />}
+              {flyerForm.imageUrl && <img src={cdnImg(flyerForm.imageUrl, 150)} alt="preview" className="imagePreviewThumb" />}
               <label htmlFor="flyer-link">URL destino (opcional)</label>
               <input id="flyer-link" type="text" value={flyerForm.linkUrl} onChange={(e) => setFlyerForm((p) => ({ ...p, linkUrl: e.target.value }))} />
               <label htmlFor="flyer-order">Orden</label>

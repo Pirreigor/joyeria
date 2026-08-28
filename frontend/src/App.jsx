@@ -9,6 +9,17 @@ const USER_KEY = "shop_user";
 const PAGE_SIZE = 24;
 const PLACEHOLDER = "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=80";
 
+// Sirve una version comprimida/redimensionada desde Cloudinary en vez del original,
+// para no gastar cuota de ancho de banda de mas. No modifica el archivo subido.
+function cdnImg(url, width) {
+  if (!url || !url.includes("res.cloudinary.com")) return url;
+  const marker = "/upload/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return url;
+  const transform = width ? `f_auto,q_auto,w_${width},c_limit` : "f_auto,q_auto";
+  return url.slice(0, idx + marker.length) + transform + "/" + url.slice(idx + marker.length);
+}
+
 const initialAuthForm = { name: "", email: "", password: "" };
 
 const MOTIVOS_DEDICATORIA = ["Aniversario", "Compromiso", "Cumpleaños", "San Valentin", "Graduacion", "Otro"];
@@ -63,7 +74,7 @@ function DedicationPage({ token }) {
           <>
             <img
               className="productModalImage"
-              src={state.dedicatoria.producto?.imageUrl || PLACEHOLDER}
+              src={cdnImg(state.dedicatoria.producto?.imageUrl, 1400) || PLACEHOLDER}
               alt={state.dedicatoria.producto?.name || ""}
             />
             <h1 className="dedicationTitle">{state.dedicatoria.producto?.name}</h1>
@@ -915,7 +926,7 @@ export default function App() {
       <header className="topHeader">
         <div className="headerGrid">
           <a href="#" className="ga-logo" onClick={() => setSelectedCategory("todas")} aria-label={settings.brandName || "Don Joyero"}>
-            {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className="logo" /> : <span className="logoFallback">DJ</span>}
+            {settings.logoUrl ? <img src={cdnImg(settings.logoUrl, 150)} alt="Logo" className="logo" /> : <span className="logoFallback">DJ</span>}
           </a>
 
           <a href="#" className="ga-name brandName" onClick={() => setSelectedCategory("todas")}>
@@ -1110,7 +1121,7 @@ export default function App() {
         {selectedCategoryData ? (
           <>
             <img
-              src={selectedCategoryData.bannerImageUrl || currentSlide?.imageUrl}
+              src={cdnImg(selectedCategoryData.bannerImageUrl || currentSlide?.imageUrl, 1600)}
               alt={selectedCategoryData.name}
             />
             <div className="overlay compact">
@@ -1120,7 +1131,7 @@ export default function App() {
           </>
         ) : currentSlide ? (
           <>
-            <img src={currentSlide.imageUrl} alt={currentSlide.title} />
+            <img src={cdnImg(currentSlide.imageUrl, 1600)} alt={currentSlide.title} />
             <div className={isHomeView ? "overlay home" : "overlay"}>
               <p className="eyebrow">{settings.brandName || "Don Joyero"}</p>
               <h1>{isHomeView ? (currentSlide.title || "Coleccion principal") : currentSlide.title}</h1>
@@ -1228,7 +1239,7 @@ export default function App() {
                 <div className="cardImgWrap">
                   <img
                     className="cardImg"
-                    src={product.imageUrl || PLACEHOLDER}
+                    src={cdnImg(product.imageUrl, 700) || PLACEHOLDER}
                     alt={product.name}
                     loading="lazy"
                   />
@@ -1317,7 +1328,7 @@ export default function App() {
 
               return (
                 <Wrapper key={flyer.id} {...wrapperProps}>
-                  <img src={flyer.imageUrl} alt={flyer.title} />
+                  <img src={cdnImg(flyer.imageUrl, 900)} alt={flyer.title} />
                   <div className="flyerOverlay">
                     <h3>{flyer.title}</h3>
                     {flyer.subtitle && <p>{flyer.subtitle}</p>}
@@ -1443,7 +1454,7 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="zoomableImage">
-                      <img className="productModalImage" src={currentMedia.src} alt={selectedProduct.name} />
+                      <img className="productModalImage" src={cdnImg(currentMedia.src, 1400)} alt={selectedProduct.name} />
                     </div>
                   )}
                 </div>
@@ -1458,7 +1469,7 @@ export default function App() {
                         onClick={() => setModalGalleryIndex(i)}
                         aria-label={item.type === "video" ? "Ver video" : `Imagen ${i + 1}`}
                       >
-                        <img src={item.type === "video" ? item.thumb : item.src} alt="" loading="lazy" />
+                        <img src={cdnImg(item.type === "video" ? item.thumb : item.src, 150)} alt="" loading="lazy" />
                         {item.type === "video" && (
                           <span className="thumbPlayBadge" aria-hidden="true">
                             <svg viewBox="0 0 24 24" role="presentation">
