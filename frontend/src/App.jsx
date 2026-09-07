@@ -477,7 +477,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef(null);
-  const [selectedCategory, setSelectedCategory] = useState("todas");
+  const [selectedCategory, setSelectedCategory] = useState("anillos");
   const [sortBy, setSortBy] = useState("recommended");
   const [recommendedOnly, setRecommendedOnly] = useState(false);
   const [priceMin, setPriceMin] = useState("");
@@ -497,7 +497,7 @@ export default function App() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [shareToast, setShareToast] = useState(false);
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [modalGalleryIndex, setModalGalleryIndex] = useState(0);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -708,11 +708,11 @@ export default function App() {
   }, [products, query, selectedCategory, recommendedOnly, priceMin, priceMax, sortBy]);
 
   useEffect(() => {
-    setPage(1);
+    setVisibleCount(PAGE_SIZE);
   }, [query, selectedCategory, sortBy, recommendedOnly, priceMin, priceMax]);
 
-  const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
-  const pagedProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pagedProducts = filteredProducts.slice(0, visibleCount);
+  const hasMoreProducts = visibleCount < filteredProducts.length;
 
   const cartCount = useMemo(
     () => cartItems.reduce((total, item) => total + item.quantity, 0),
@@ -1276,42 +1276,16 @@ export default function App() {
             ))}
           </section>
 
-          {totalPages > 1 && (
-            <nav className="pagination" aria-label="Paginas del catalogo">
+          {hasMoreProducts && (
+            <div className="loadMoreWrap">
               <button
                 type="button"
-                disabled={page === 1}
-                onClick={() => { setPage((p) => p - 1); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" }); }}
-                aria-label="Pagina anterior"
+                className="ghostBtn loadMoreBtn"
+                onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
               >
-                ‹
+                Ver mas ({filteredProducts.length - visibleCount} restantes)
               </button>
-
-              {buildPageNums(totalPages, page).map((item, i) =>
-                item === "…" ? (
-                  <span key={`ellipsis-${i}`} className="paginationEllipsis">…</span>
-                ) : (
-                  <button
-                    key={item}
-                    type="button"
-                    className={item === page ? "active" : ""}
-                    onClick={() => { setPage(item); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" }); }}
-                    aria-current={item === page ? "page" : undefined}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
-
-              <button
-                type="button"
-                disabled={page === totalPages}
-                onClick={() => { setPage((p) => p + 1); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" }); }}
-                aria-label="Pagina siguiente"
-              >
-                ›
-              </button>
-            </nav>
+            </div>
           )}
         </>
       )}
@@ -1629,14 +1603,3 @@ function appendAutoplay(url) {
   return url.includes("?") ? `${url}&autoplay=1` : `${url}?autoplay=1`;
 }
 
-function buildPageNums(total, current) {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-  const set = new Set([1, total, current, current - 1, current + 1].filter((p) => p >= 1 && p <= total));
-  const sorted = [...set].sort((a, b) => a - b);
-  const result = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push("…");
-    result.push(sorted[i]);
-  }
-  return result;
-}
