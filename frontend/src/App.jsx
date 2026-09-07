@@ -7,16 +7,7 @@ const CART_KEY = "shop_cart";
 const TOKEN_KEY = "shop_token";
 const USER_KEY = "shop_user";
 const PAGE_SIZE = 24;
-const RECOMMENDED_VIEW = "recomendados";
-const RECOMMENDED_PAGE_SIZE = 10;
-const RECOMMENDED_CATEGORY = {
-  id: "recomendados",
-  name: "Recomendados",
-  slug: RECOMMENDED_VIEW,
-  description: "Piezas seleccionadas por el equipo de Don Joyero.",
-  bannerImageUrl: null,
-  children: [],
-};
+const HOME_PAGE_SIZE = 10;
 const PLACEHOLDER = "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=80";
 
 // Sirve una version comprimida/redimensionada desde Cloudinary en vez del original,
@@ -487,7 +478,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef(null);
-  const [selectedCategory, setSelectedCategory] = useState(RECOMMENDED_VIEW);
+  const [selectedCategory, setSelectedCategory] = useState("todas");
   const [sortBy, setSortBy] = useState("recommended");
   const [recommendedOnly, setRecommendedOnly] = useState(false);
   const [priceMin, setPriceMin] = useState("");
@@ -507,7 +498,7 @@ export default function App() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [shareToast, setShareToast] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(RECOMMENDED_PAGE_SIZE);
+  const [visibleCount, setVisibleCount] = useState(HOME_PAGE_SIZE);
   const [modalGalleryIndex, setModalGalleryIndex] = useState(0);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -680,7 +671,7 @@ export default function App() {
   );
 
   const categorySlugsForFilter = useMemo(() => {
-    if (selectedCategory === "todas" || selectedCategory === RECOMMENDED_VIEW) return null;
+    if (selectedCategory === "todas") return null;
     const slugs = [selectedCategory];
     const parent = menuTree.find((c) => c.slug === selectedCategory);
     if (parent && parent.subcategories) {
@@ -693,14 +684,13 @@ export default function App() {
     const normalized = query.trim().toLowerCase();
     const min = priceMin ? Number(priceMin) : null;
     const max = priceMax ? Number(priceMax) : null;
-    const requireRecommended = recommendedOnly || selectedCategory === RECOMMENDED_VIEW;
 
     let list = products.filter((product) => {
       const categorySlug = slugify(product.category || "sin-categoria");
       const matchCategory = !categorySlugsForFilter || categorySlugsForFilter.includes(categorySlug);
       const haystack = `${product.name} ${product.description || ""} ${product.category || ""}`.toLowerCase();
       const matchSearch = !normalized || haystack.includes(normalized);
-      const matchRecommended = !requireRecommended || Boolean(product.recommended);
+      const matchRecommended = !recommendedOnly || Boolean(product.recommended);
       const matchMin = min === null || Number(product.price) >= min;
       const matchMax = max === null || Number(product.price) <= max;
 
@@ -718,21 +708,13 @@ export default function App() {
     return list;
   }, [products, query, selectedCategory, recommendedOnly, priceMin, priceMax, sortBy]);
 
-  const pageSize = selectedCategory === RECOMMENDED_VIEW ? RECOMMENDED_PAGE_SIZE : PAGE_SIZE;
+  // En Inicio mostramos pocos de entrada (los recomendados quedan primero por el
+  // orden por defecto); en una categoria puntual se mantiene la pagina completa.
+  const pageSize = selectedCategory === "todas" ? HOME_PAGE_SIZE : PAGE_SIZE;
 
   useEffect(() => {
     setVisibleCount(pageSize);
   }, [query, selectedCategory, sortBy, recommendedOnly, priceMin, priceMax, pageSize]);
-
-  // Si todavia no hay productos marcados como recomendados en el ERP,
-  // no tiene sentido aterrizar en una vitrina vacia: mostramos el catalogo completo.
-  useEffect(() => {
-    if (loading || selectedCategory !== RECOMMENDED_VIEW) return;
-    const anyRecommended = products.some((product) => product.recommended);
-    if (!anyRecommended) {
-      setSelectedCategory("todas");
-    }
-  }, [loading, products, selectedCategory]);
 
   const pagedProducts = filteredProducts.slice(0, visibleCount);
   const hasMoreProducts = visibleCount < filteredProducts.length;
@@ -754,10 +736,6 @@ export default function App() {
   const selectedCategoryData = useMemo(() => {
     if (selectedCategory === "todas") {
       return null;
-    }
-
-    if (selectedCategory === RECOMMENDED_VIEW) {
-      return RECOMMENDED_CATEGORY;
     }
 
     const parent = categories.find((category) => category.slug === selectedCategory);
@@ -1234,16 +1212,14 @@ export default function App() {
               Max $
               <input type="number" min="0" value={priceMax} onChange={(event) => setPriceMax(event.target.value)} />
             </label>
-            {selectedCategory !== RECOMMENDED_VIEW && (
-              <label className="checkInline">
-                <input
-                  type="checkbox"
-                  checked={recommendedOnly}
-                  onChange={(event) => setRecommendedOnly(event.target.checked)}
-                />
-                Solo recomendados
-              </label>
-            )}
+            <label className="checkInline">
+              <input
+                type="checkbox"
+                checked={recommendedOnly}
+                onChange={(event) => setRecommendedOnly(event.target.checked)}
+              />
+              Solo recomendados
+            </label>
           </section>
         </section>
       ) : (
