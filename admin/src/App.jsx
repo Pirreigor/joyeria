@@ -276,8 +276,12 @@ function buildCotizacionPdf({ order, form, logo }) {
   doc.save(`cotizacion-pedido-${order.id}.pdf`);
 }
 
+function notaPedidoEffectiveFoto(order, form) {
+  return form.notaFotoUrl || order?.items?.[0]?.producto?.imageUrl || "";
+}
+
 async function buildNotaPedidoPdf({ order, form, logo }) {
-  const foto = await fetchImageForPdf(form.notaFotoUrl, { width: 500, format: "JPEG" });
+  const foto = await fetchImageForPdf(notaPedidoEffectiveFoto(order, form), { width: 500, format: "JPEG" });
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = 210;
@@ -4046,7 +4050,12 @@ export default function App() {
                   </label>
                 </div>
               )}
-              {notaPedidoForm.notaFotoUrl && <img src={cdnImg(notaPedidoForm.notaFotoUrl, 200)} alt="preview" className="imagePreviewThumb" />}
+              {!notaPedidoForm.notaFotoUrl && notaPedidoModal?.items?.[0]?.producto?.imageUrl && (
+                <p className="subtle">Sin foto propia: se va a usar la foto del producto de la web.</p>
+              )}
+              {notaPedidoEffectiveFoto(notaPedidoModal, notaPedidoForm) && (
+                <img src={cdnImg(notaPedidoEffectiveFoto(notaPedidoModal, notaPedidoForm), 200)} alt="preview" className="imagePreviewThumb" />
+              )}
 
               <div className="actions">
                 <button type="submit" disabled={notaPedidoSaving}>
