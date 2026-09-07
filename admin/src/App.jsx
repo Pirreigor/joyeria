@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import { jsPDF } from "jspdf";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || "https://donjoyero.com";
 const TOKEN_KEY = "admin_token";
 const USER_KEY = "admin_user";
 const LIST_PAGE_SIZE = 12;
+const BUSINESS_PHONE = "+51 941445104";
+const BUSINESS_EMAIL = "donjoyerotujoyerodeconfianza@gmail.com";
 
 // Sirve una version comprimida/redimensionada desde Cloudinary en vez del original,
 // para no gastar cuota de ancho de banda de mas. No modifica el archivo subido.
@@ -33,6 +36,241 @@ function filterByDateRange(items, dateFrom, dateTo) {
     const created = new Date(o.createdAt).getTime();
     return (!fromTime || created >= fromTime) && (!toTime || created <= toTime);
   });
+}
+
+async function fetchLogoForPdf() {
+  try {
+    const res = await fetch(`${API_URL}/api/store/settings`);
+    const data = await res.json();
+    const logoUrl = data?.settings?.logoUrl;
+    if (!logoUrl) return null;
+
+    const optimizedUrl = cdnImg(logoUrl, 300).replace("f_auto,q_auto", "f_png,q_auto");
+    const imgRes = await fetch(optimizedUrl);
+    const blob = await imgRes.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+    const ratio = await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img.naturalWidth / img.naturalHeight || 1);
+      img.onerror = () => resolve(1);
+      img.src = dataUrl;
+    });
+
+    return { dataUrl, ratio, format: "PNG" };
+  } catch {
+    return null;
+  }
+}
+
+function pdfMoney(n) {
+  return Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function pdfDate(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}-${m}-${y}`;
+}
+
+function buildCotizacionPdf({ order, form, logo }) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageWidth = 210;
+  const marginX = 15;
+  const contentWidth = pageWidth - marginX * 2;
+  const blue = [61, 79, 158];
+  const gray = [120, 120, 120];
+  const lineGray = [160, 160, 160];
+
+  let y = 22;
+
+  if (logo?.dataUrl) {
+    const logoW = 26;
+    const logoH = logo.ratio ? logoW / logo.ratio : 26;
+    try {
+      doc.addImage(logo.dataUrl, logo.format || "PNG", marginX, y - 10, logoW, logoH);
+    } catch {
+      // formato de imagen no soportado por jsPDF (raro, Cloudinary sirve jpg/png/webp)
+    }
+  }
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(...blue);
+  doc.text("Orden de pedido", pageWidth - marginX, y - 4, { align: "right" });
+
+  const boxW = 55;
+  const boxX = pageWidth - marginX - boxW;
+  let boxY = y + 4;
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(boxX, boxY, boxW, 8);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text("FECHA:", boxX + boxW / 2, boxY + 5.5, { align: "center" });
+  doc.rect(boxX, boxY + 8, boxW, 9);
+  doc.setFont("helvetica", "normal");
+  doc.text(pdfDate(form.fecha), boxX + boxW / 2, boxY + 14, { align: "center" });
+
+  y = boxY + 8 + 9 + 12;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...blue);
+  doc.text("Cotizacion para:", marginX, y);
+  y += 8;
+
+  const half = contentWidth / 2;
+  function labelValue(label, value, x, yy, w) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const labelW = doc.getTextWidth(label + " ");
+    doc.text(label, x, yy);
+    doc.setFont("helvetica", "normal");
+    doc.text(String(value || ""), x + labelW + 1, yy);
+    doc.setDrawColor(...lineGray);
+    doc.line(x + labelW + 1, yy + 1, x + w, yy + 1);
+  }
+
+  labelValue("Cliente:", form.cliente, marginX, y, half - 5);
+  labelValue("Celular:", form.celular, marginX + half, y, half - 2);
+  y += 9;
+  labelValue("DNI:", form.dni, marginX, y, half - 5);
+  labelValue("Correo:", form.correo, marginX + half, y, half - 2);
+  y += 11;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...blue);
+  doc.text("Descripcion de proyecto:", marginX, y);
+  y += 4;
+
+  const descLines = doc.splitTextToSize(form.descripcionProyecto || "", contentWidth - 8);
+  const descBoxH = Math.max(16, 8 + descLines.length * 5);
+  doc.setDrawColor(...lineGray);
+  doc.rect(marginX, y, contentWidth, descBoxH);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text("Descripcion del producto:", marginX + 4, y + 6);
+  doc.setFont("helvetica", "normal");
+  doc.text(descLines, marginX + 4, y + 12);
+  y += descBoxH + 6;
+
+  const colW = [22, 104, 27, contentWidth - 22 - 104 - 27];
+  const colX = [marginX, marginX + colW[0], marginX + colW[0] + colW[1], marginX + colW[0] + colW[1] + colW[2]];
+  const tableTop = y;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  const headerH = 8;
+  doc.text("Cantidad", colX[0] + colW[0] / 2, y + 5.5, { align: "center" });
+  doc.text("Descripcion", colX[1] + colW[1] / 2, y + 5.5, { align: "center" });
+  doc.text("Precio U", colX[2] + colW[2] / 2, y + 5.5, { align: "center" });
+  doc.text("Total", colX[3] + colW[3] / 2, y + 5.5, { align: "center" });
+  y += headerH;
+
+  doc.setFont("helvetica", "normal");
+  const rows = form.items.map((item) => {
+    const lines = doc.splitTextToSize(`- ${item.descripcion}`, colW[1] - 6);
+    return { item, lines, h: Math.max(9, lines.length * 5 + 3) };
+  });
+
+  rows.forEach(({ item, lines, h }) => {
+    doc.text(String(item.cantidad), colX[0] + colW[0] / 2, y + 6, { align: "center" });
+    doc.text(lines, colX[1] + 3, y + 6);
+    doc.text(`S/ ${pdfMoney(item.precioU)}`, colX[2] + colW[2] / 2, y + 6, { align: "center" });
+    doc.text(`S/ ${pdfMoney(item.cantidad * item.precioU)}`, colX[3] + colW[3] / 2, y + 6, { align: "center" });
+    y += h;
+  });
+
+  const tableBottom = y;
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(marginX, tableTop, contentWidth, tableBottom - tableTop);
+  doc.line(marginX, tableTop + headerH, marginX + contentWidth, tableTop + headerH);
+  [colX[1], colX[2], colX[3]].forEach((x) => doc.line(x, tableTop, x, tableBottom));
+
+  const subtotal = form.items.reduce((sum, it) => sum + it.cantidad * it.precioU, 0);
+  const adelanto = Number(form.adelanto || 0);
+  const saldo = subtotal - adelanto;
+
+  const summaryW = colW[2] + colW[3];
+  const summaryX = colX[2];
+  const summaryRowH = 8;
+  const summaryY = tableBottom;
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(...gray);
+  const validezLines = doc.splitTextToSize("Esta cotizacion es valida para los proximos 30 dias", colW[0] + colW[1] - 6);
+  doc.text(validezLines, marginX + 3, summaryY + summaryRowH * 1.5);
+
+  [
+    ["Subtotal", subtotal, false],
+    ["ADELANTO", adelanto, false],
+    ["Total", saldo, true],
+  ].forEach(([label, value, shaded], i) => {
+    const rowY = summaryY + i * summaryRowH;
+    if (shaded) {
+      doc.setFillColor(230, 230, 230);
+      doc.rect(summaryX + summaryW / 2, rowY, summaryW / 2, summaryRowH, "F");
+    }
+    doc.setDrawColor(0);
+    doc.rect(summaryX, rowY, summaryW / 2, summaryRowH);
+    doc.rect(summaryX + summaryW / 2, rowY, summaryW / 2, summaryRowH);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(0, 0, 0);
+    doc.text(label, summaryX + summaryW / 4, rowY + summaryRowH / 2 + 1.5, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text(`S/ ${pdfMoney(value)}`, summaryX + (summaryW * 3) / 4, rowY + summaryRowH / 2 + 1.5, { align: "center" });
+  });
+
+  y = summaryY + summaryRowH * 3 + 10;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...blue);
+  doc.text("Terminos:", marginX, y);
+  y += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  const terminosLines = doc.splitTextToSize(form.terminos || "", contentWidth);
+  doc.text(terminosLines, marginX, y);
+  y += terminosLines.length * 5 + 14;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...blue);
+  doc.text(form.firmaNombre || "", marginX, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...gray);
+  doc.text("Don Joyero", marginX, y);
+
+  const footerH = 16;
+  const footerY = 297 - footerH;
+  doc.setFillColor(31, 42, 120);
+  doc.rect(0, footerY, pageWidth, footerH, "F");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text(BUSINESS_PHONE, marginX, footerY + footerH / 2 + 1.5);
+  doc.text(BUSINESS_EMAIL, pageWidth - marginX, footerY + footerH / 2 + 1.5, { align: "right" });
+
+  doc.save(`cotizacion-pedido-${order.id}.pdf`);
 }
 
 const initialForm = {
@@ -130,6 +368,19 @@ const initialCatalogForm = {
   code: "",
   requiereQuilate: true,
   active: true,
+};
+
+const initialCotizacionForm = {
+  cliente: "",
+  celular: "",
+  correo: "",
+  dni: "",
+  fecha: "",
+  descripcionProyecto: "",
+  items: [],
+  adelanto: "",
+  terminos: "",
+  firmaNombre: "",
 };
 
 const ALL_PERMISSIONS = [
@@ -598,6 +849,10 @@ export default function App() {
   const [paymentModal, setPaymentModal] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
   const [paymentSaving, setPaymentSaving] = useState(false);
+
+  const [cotizacionModal, setCotizacionModal] = useState(null);
+  const [cotizacionForm, setCotizacionForm] = useState(initialCotizacionForm);
+  const [cotizacionGenerating, setCotizacionGenerating] = useState(false);
 
   const [shippingModal, setShippingModal] = useState(null);
   const [shippingForm, setShippingForm] = useState({ courierEnvio: "", numeroGuia: "" });
@@ -1775,6 +2030,36 @@ export default function App() {
     setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
   }
 
+  function openCotizacionModal(order) {
+    const items = order.items?.length
+      ? order.items.map((item) => ({
+          cantidad: item.quantity,
+          descripcion: item.producto?.name || `Producto #${item.productoId}`,
+          precioU: Number(item.unitPrice || 0),
+        }))
+      : [{ cantidad: 1, descripcion: "", precioU: Number(order.total || 0) }];
+
+    const subtotal = items.reduce((sum, it) => sum + it.cantidad * it.precioU, 0);
+    const primerItem = items[0]?.descripcion || "el producto";
+
+    setCotizacionModal(order);
+    setCotizacionForm({
+      cliente: order.clienteNombre || order.usuario?.name || "",
+      celular: order.clienteTelefono || "",
+      correo: order.clienteEmail || order.usuario?.email || "",
+      dni: "",
+      fecha: new Date().toISOString().slice(0, 10),
+      descripcionProyecto: items.map((it) => `${it.cantidad}x ${it.descripcion}`).join("\n"),
+      items,
+      adelanto: Math.round(subtotal * 0.7),
+      terminos:
+        "Se requiere 70% para cualquier pedido a realizar y con 1 semana de anticipacion.\n" +
+        "La fecha de entrega es a partir del abono 20 dias habiles.\n" +
+        `Fecha de entrega ${primerItem}: ___________.`,
+      firmaNombre: user?.name || "",
+    });
+  }
+
   function openShippingModal(orderId) {
     setShippingModal(orderId);
     setShippingForm({ courierEnvio: "", numeroGuia: "" });
@@ -1917,6 +2202,22 @@ export default function App() {
       setListError(error.message || "Error al confirmar pago");
     } finally {
       setPaymentSaving(false);
+    }
+  }
+
+  async function handleCotizacionSubmit(event) {
+    event.preventDefault();
+    setCotizacionGenerating(true);
+    setListError("");
+
+    try {
+      const logo = await fetchLogoForPdf();
+      buildCotizacionPdf({ order: cotizacionModal, form: cotizacionForm, logo });
+      setCotizacionModal(null);
+    } catch (error) {
+      setListError(error.message || "No se pudo generar la cotizacion");
+    } finally {
+      setCotizacionGenerating(false);
     }
   }
 
@@ -2612,6 +2913,9 @@ export default function App() {
                 <div className="actions">
                   {["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openDedicationView(order)}>Dedicatorias</button>
+                  )}
+                  {["PREPARAR", "NUEVO"].includes(order.estado) && (
+                    <button type="button" className="ghost" onClick={() => openCotizacionModal(order)}>Cotizacion</button>
                   )}
                   {order.estado === "PAGADO" ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
@@ -3311,6 +3615,101 @@ export default function App() {
                   {paymentSaving ? "Confirmando..." : "Confirmar pago"}
                 </button>
                 <button type="button" className="ghost" onClick={() => setPaymentModal(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {cotizacionModal !== null && (
+        <div className="modalOverlay" onClick={() => setCotizacionModal(null)}>
+          <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
+            <h2>Cotizacion — Pedido #{cotizacionModal.id}</h2>
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleCotizacionSubmit} className="categoryForm">
+              <label htmlFor="cot-cliente">Cliente</label>
+              <input id="cot-cliente" type="text" value={cotizacionForm.cliente} onChange={(e) => setCotizacionForm((p) => ({ ...p, cliente: e.target.value }))} required />
+
+              <label htmlFor="cot-celular">Celular</label>
+              <input id="cot-celular" type="text" value={cotizacionForm.celular} onChange={(e) => setCotizacionForm((p) => ({ ...p, celular: e.target.value }))} />
+
+              <label htmlFor="cot-dni">DNI</label>
+              <input id="cot-dni" type="text" value={cotizacionForm.dni} onChange={(e) => setCotizacionForm((p) => ({ ...p, dni: e.target.value }))} />
+
+              <label htmlFor="cot-correo">Correo</label>
+              <input id="cot-correo" type="email" value={cotizacionForm.correo} onChange={(e) => setCotizacionForm((p) => ({ ...p, correo: e.target.value }))} />
+
+              <label htmlFor="cot-fecha">Fecha</label>
+              <input id="cot-fecha" type="date" value={cotizacionForm.fecha} onChange={(e) => setCotizacionForm((p) => ({ ...p, fecha: e.target.value }))} required />
+
+              <label htmlFor="cot-descripcion">Descripcion del producto (personalizala, la web solo tiene fotos referenciales)</label>
+              <textarea
+                id="cot-descripcion"
+                rows={3}
+                value={cotizacionForm.descripcionProyecto}
+                onChange={(e) => setCotizacionForm((p) => ({ ...p, descripcionProyecto: e.target.value }))}
+                required
+              />
+
+              <label>Items de la cotizacion</label>
+              {cotizacionForm.items.map((item, idx) => (
+                <div className="cotizacionItemRow" key={idx}>
+                  <input
+                    type="number"
+                    min={1}
+                    value={item.cantidad}
+                    onChange={(e) => {
+                      const cantidad = Number(e.target.value || 1);
+                      setCotizacionForm((p) => ({ ...p, items: p.items.map((it, i) => (i === idx ? { ...it, cantidad } : it)) }));
+                    }}
+                    aria-label="Cantidad"
+                  />
+                  <input
+                    type="text"
+                    value={item.descripcion}
+                    onChange={(e) => {
+                      const descripcion = e.target.value;
+                      setCotizacionForm((p) => ({ ...p, items: p.items.map((it, i) => (i === idx ? { ...it, descripcion } : it)) }));
+                    }}
+                    placeholder="Descripcion del item"
+                    aria-label="Descripcion"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={item.precioU}
+                    onChange={(e) => {
+                      const precioU = Number(e.target.value || 0);
+                      setCotizacionForm((p) => ({ ...p, items: p.items.map((it, i) => (i === idx ? { ...it, precioU } : it)) }));
+                    }}
+                    aria-label="Precio unitario"
+                  />
+                </div>
+              ))}
+
+              <label htmlFor="cot-adelanto">Adelanto (sugerido 70% del subtotal)</label>
+              <input id="cot-adelanto" type="number" min={0} step="0.01" value={cotizacionForm.adelanto} onChange={(e) => setCotizacionForm((p) => ({ ...p, adelanto: e.target.value }))} required />
+
+              <p className="subtle">
+                Subtotal: S/ {pdfMoney(cotizacionForm.items.reduce((sum, it) => sum + it.cantidad * it.precioU, 0))}
+                {" — "}
+                Saldo pendiente: S/ {pdfMoney(cotizacionForm.items.reduce((sum, it) => sum + it.cantidad * it.precioU, 0) - Number(cotizacionForm.adelanto || 0))}
+              </p>
+
+              <label htmlFor="cot-terminos">Terminos (editable)</label>
+              <textarea id="cot-terminos" rows={4} value={cotizacionForm.terminos} onChange={(e) => setCotizacionForm((p) => ({ ...p, terminos: e.target.value }))} />
+
+              <label htmlFor="cot-firma">Firma (nombre)</label>
+              <input id="cot-firma" type="text" value={cotizacionForm.firmaNombre} onChange={(e) => setCotizacionForm((p) => ({ ...p, firmaNombre: e.target.value }))} required />
+
+              <div className="actions">
+                <button type="submit" disabled={cotizacionGenerating}>
+                  {cotizacionGenerating ? "Generando..." : "Descargar cotizacion (PDF)"}
+                </button>
+                <button type="button" className="ghost" onClick={() => setCotizacionModal(null)}>
                   Cancelar
                 </button>
               </div>
