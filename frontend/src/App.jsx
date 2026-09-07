@@ -724,6 +724,16 @@ export default function App() {
     setVisibleCount(pageSize);
   }, [query, selectedCategory, sortBy, recommendedOnly, priceMin, priceMax, pageSize]);
 
+  // Si todavia no hay productos marcados como recomendados en el ERP,
+  // no tiene sentido aterrizar en una vitrina vacia: mostramos el catalogo completo.
+  useEffect(() => {
+    if (loading || selectedCategory !== RECOMMENDED_VIEW) return;
+    const anyRecommended = products.some((product) => product.recommended);
+    if (!anyRecommended) {
+      setSelectedCategory("todas");
+    }
+  }, [loading, products, selectedCategory]);
+
   const pagedProducts = filteredProducts.slice(0, visibleCount);
   const hasMoreProducts = visibleCount < filteredProducts.length;
 
