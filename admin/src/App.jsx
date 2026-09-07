@@ -2033,11 +2033,12 @@ export default function App() {
   function openCotizacionModal(order) {
     const items = order.items?.length
       ? order.items.map((item) => ({
+          id: item.id,
           cantidad: item.quantity,
           descripcion: item.producto?.name || `Producto #${item.productoId}`,
           precioU: Number(item.unitPrice || 0),
         }))
-      : [{ cantidad: 1, descripcion: "", precioU: Number(order.total || 0) }];
+      : [{ id: null, cantidad: 1, descripcion: "", precioU: Number(order.total || 0) }];
 
     const subtotal = items.reduce((sum, it) => sum + it.cantidad * it.precioU, 0);
     const primerItem = items[0]?.descripcion || "el producto";
@@ -2211,6 +2212,15 @@ export default function App() {
     setListError("");
 
     try {
+      const priceUpdates = cotizacionForm.items.filter((it) => it.id != null).map((it) => ({ id: it.id, unitPrice: it.precioU }));
+      if (priceUpdates.length > 0) {
+        await request(`/api/admin/orders/${cotizacionModal.id}/items`, {
+          method: "PATCH",
+          body: JSON.stringify({ items: priceUpdates }),
+        });
+        await loadData();
+      }
+
       const logo = await fetchLogoForPdf();
       buildCotizacionPdf({ order: cotizacionModal, form: cotizacionForm, logo });
       setCotizacionModal(null);
@@ -3654,6 +3664,7 @@ export default function App() {
               />
 
               <label>Items de la cotizacion</label>
+              <p className="subtle">El precio unitario que pongas aca se guarda como el precio real del pedido. Ya no se puede editar una vez que el pedido este pagado.</p>
               {cotizacionForm.items.map((item, idx) => (
                 <div className="cotizacionItemRow" key={idx}>
                   <input
@@ -3707,7 +3718,7 @@ export default function App() {
 
               <div className="actions">
                 <button type="submit" disabled={cotizacionGenerating}>
-                  {cotizacionGenerating ? "Generando..." : "Descargar cotizacion (PDF)"}
+                  {cotizacionGenerating ? "Guardando..." : "Guardar precio y descargar (PDF)"}
                 </button>
                 <button type="button" className="ghost" onClick={() => setCotizacionModal(null)}>
                   Cancelar

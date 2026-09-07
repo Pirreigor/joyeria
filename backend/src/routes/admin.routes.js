@@ -28,6 +28,7 @@ const {
   listOrders,
   exportOrders,
   updateOrderStatus,
+  updateOrderItemPrices,
   confirmPayment,
   listOrderDedicatorias,
 } = require("../controllers/admin.controller");
@@ -119,6 +120,7 @@ router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "en
 router.get("/orders/export", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), exportOrders);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
 router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios"), updateOrderStatus);
+router.patch("/orders/:id/items", requirePermission("orders"), updateOrderItemPrices);
 router.get("/orders/:id/dedicatorias", requireAnyPermission("orders", "despacho", "envios"), listOrderDedicatorias);
 
 module.exports = router;

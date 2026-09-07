@@ -853,6 +853,57 @@ async function updateOrderStatus(req, res) {
   return res.json({ order });
 }
 
+const ESTADOS_PRECIO_EDITABLE = ["PREPARAR", "NUEVO"];
+
+async function updateOrderItemPrices(req, res) {
+  const { id } = req.params;
+  const { items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: "items debe ser un array con al menos un elemento" });
+  }
+
+  const existing = await prisma.pedido.findUnique({
+    where: { id: Number(id) },
+    include: { items: true },
+  });
+
+  if (!existing) {
+    return res.status(404).json({ message: "Pedido no encontrado" });
+  }
+
+  if (!ESTADOS_PRECIO_EDITABLE.includes(existing.estado)) {
+    return res.status(409).json({ message: "No se puede modificar el precio de un pedido que ya fue pagado" });
+  }
+
+  const existingIds = new Set(existing.items.map((item) => item.id));
+  for (const update of items) {
+    if (!existingIds.has(Number(update.id)) || !(Number(update.unitPrice) >= 0)) {
+      return res.status(400).json({ message: "items invalido" });
+    }
+  }
+
+  const order = await prisma.$transaction(async (tx) => {
+    for (const update of items) {
+      await tx.itemPedido.update({
+        where: { id: Number(update.id) },
+        data: { unitPrice: Number(update.unitPrice) },
+      });
+    }
+
+    const refreshedItems = await tx.itemPedido.findMany({ where: { pedidoId: Number(id) } });
+    const total = refreshedItems.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0);
+
+    return tx.pedido.update({
+      where: { id: Number(id) },
+      data: { total },
+      include: { items: { include: { producto: true } } },
+    });
+  });
+
+  return res.json({ order });
+}
+
 async function confirmPayment(req, res) {
   const { id } = req.params;
   const { metodoPago, numeroComprobante, direccionEnvio } = req.body;
@@ -971,6 +1022,7 @@ module.exports = {
   listOrders,
   exportOrders,
   updateOrderStatus,
+  updateOrderItemPrices,
   confirmPayment,
   listOrderDedicatorias,
 };
