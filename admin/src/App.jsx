@@ -81,7 +81,9 @@ function pdfDate(iso) {
   return `${d}-${m}-${y}`;
 }
 
-function buildCotizacionPdf({ order, form, logo }) {
+async function buildCotizacionPdf({ order, form, logo }) {
+  const foto = form.notaFotoUrl ? await fetchImageForPdf(form.notaFotoUrl, { width: 400, format: "JPEG" }) : null;
+
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = 210;
   const marginX = 15;
@@ -155,8 +157,10 @@ function buildCotizacionPdf({ order, form, logo }) {
   doc.text("Descripcion de proyecto:", marginX, y);
   y += 4;
 
-  const descLines = doc.splitTextToSize(form.descripcionProyecto || "", contentWidth - 8);
-  const descBoxH = Math.max(16, 8 + descLines.length * 5);
+  const photoW = foto?.dataUrl ? 38 : 0;
+  const descTextW = contentWidth - 8 - (photoW ? photoW + 4 : 0);
+  const descLines = doc.splitTextToSize(form.descripcionProyecto || "", descTextW);
+  const descBoxH = Math.max(16, photoW ? 42 : 0, 8 + descLines.length * 5);
   doc.setDrawColor(...lineGray);
   doc.rect(marginX, y, contentWidth, descBoxH);
   doc.setFont("helvetica", "bold");
@@ -165,6 +169,24 @@ function buildCotizacionPdf({ order, form, logo }) {
   doc.text("Descripcion del producto:", marginX + 4, y + 6);
   doc.setFont("helvetica", "normal");
   doc.text(descLines, marginX + 4, y + 12);
+
+  if (foto?.dataUrl) {
+    const maxW = photoW;
+    const maxH = descBoxH - 8;
+    let w = maxW;
+    let h = foto.ratio ? w / foto.ratio : maxH;
+    if (h > maxH) {
+      h = maxH;
+      w = foto.ratio ? h * foto.ratio : maxW;
+    }
+    const photoX = marginX + contentWidth - 4 - maxW + (maxW - w) / 2;
+    try {
+      doc.addImage(foto.dataUrl, foto.format || "JPEG", photoX, y + 4, w, h);
+    } catch {
+      // formato de imagen no soportado por jsPDF
+    }
+  }
+
   y += descBoxH + 6;
 
   const colW = [22, 104, 27, contentWidth - 22 - 104 - 27];
@@ -526,6 +548,7 @@ const initialCotizacionForm = {
   adelanto: "",
   terminos: "",
   firmaNombre: "",
+  notaFotoUrl: "",
 };
 
 const initialNotaPedidoForm = {
@@ -2153,6 +2176,8 @@ export default function App() {
         setManualOrderForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
       } else if (target === "nota-pedido-foto") {
         setNotaPedidoForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
+      } else if (target === "cotizacion-foto") {
+        setCotizacionForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
       }
     } catch (error) {
       setListError(error.message || "Error al subir imagen");
@@ -2241,6 +2266,7 @@ export default function App() {
         "La fecha de entrega es a partir del abono 20 dias habiles.\n" +
         `Fecha de entrega ${primerItem}: ___________.`,
       firmaNombre: user?.name || "",
+      notaFotoUrl: order.notaFotoUrl || "",
     });
   }
 
@@ -2399,13 +2425,13 @@ export default function App() {
       if (priceUpdates.length > 0) {
         await request(`/api/admin/orders/${cotizacionModal.id}/items`, {
           method: "PATCH",
-          body: JSON.stringify({ items: priceUpdates }),
+          body: JSON.stringify({ items: priceUpdates, notaFotoUrl: cotizacionForm.notaFotoUrl || null }),
         });
         await loadData();
       }
 
       const logo = await fetchLogoForPdf();
-      buildCotizacionPdf({ order: cotizacionModal, form: cotizacionForm, logo });
+      await buildCotizacionPdf({ order: cotizacionModal, form: cotizacionForm, logo });
       setCotizacionModal(null);
     } catch (error) {
       setListError(error.message || "No se pudo generar la cotizacion");
@@ -3898,6 +3924,15 @@ export default function App() {
                 onChange={(e) => setCotizacionForm((p) => ({ ...p, descripcionProyecto: e.target.value }))}
                 required
               />
+
+              <label htmlFor="cot-foto">Foto referencial (opcional, util si es un diseno personalizado)</label>
+              <div className="imageUploadRow">
+                <label className="uploadBtn">
+                  {uploadingImage ? "Subiendo..." : cotizacionForm.notaFotoUrl ? "Cambiar foto" : "Subir foto"}
+                  <input id="cot-foto" type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "cotizacion-foto", "notas-pedido")} disabled={uploadingImage} />
+                </label>
+              </div>
+              {cotizacionForm.notaFotoUrl && <img src={cdnImg(cotizacionForm.notaFotoUrl, 150)} alt="preview" className="imagePreviewThumb" />}
 
               <label>Items de la cotizacion</label>
               <p className="subtle">El precio unitario que pongas aca se guarda como el precio real del pedido. Ya no se puede editar una vez que el pedido este pagado.</p>

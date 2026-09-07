@@ -966,7 +966,7 @@ const ESTADOS_PRECIO_EDITABLE = ["PREPARAR", "NUEVO"];
 
 async function updateOrderItemPrices(req, res) {
   const { id } = req.params;
-  const { items } = req.body;
+  const { items, notaFotoUrl } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "items debe ser un array con al menos un elemento" });
@@ -1005,7 +1005,10 @@ async function updateOrderItemPrices(req, res) {
 
     return tx.pedido.update({
       where: { id: Number(id) },
-      data: { total },
+      data: {
+        total,
+        ...(notaFotoUrl !== undefined ? { notaFotoUrl: notaFotoUrl ? String(notaFotoUrl).trim() : null } : {}),
+      },
       include: { items: { include: { producto: true } } },
     });
   });
