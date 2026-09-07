@@ -752,6 +752,115 @@ async function deleteUser(req, res) {
   return res.status(204).send();
 }
 
+async function createManualOrder(req, res) {
+  const { nombre, email, telefono, items, notaFotoUrl } = req.body;
+
+  if (!nombre || !email || !telefono) {
+    return res.status(400).json({ message: "nombre, email y telefono son obligatorios" });
+  }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: "items debe ser un array con al menos un elemento" });
+  }
+
+  const normalizedItems = items.map((item) => ({
+    productId: Number(item.productId),
+    quantity: Number(item.quantity),
+  }));
+
+  if (normalizedItems.some((item) => !item.productId || !item.quantity || item.quantity < 1)) {
+    return res.status(400).json({ message: "Cada item requiere productId y quantity valido" });
+  }
+
+  const order = await prisma.$transaction(async (tx) => {
+    let total = 0;
+    const itemsData = [];
+
+    for (const item of normalizedItems) {
+      const product = await tx.producto.findUnique({ where: { id: item.productId } });
+
+      if (!product || !product.active) {
+        const error = new Error(`Producto ${item.productId} no disponible`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (product.stock < item.quantity) {
+        const error = new Error(`Stock insuficiente para ${product.name}`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      total += Number(product.price) * item.quantity;
+
+      itemsData.push({
+        productoId: product.id,
+        quantity: item.quantity,
+        unitPrice: product.price,
+      });
+
+      await tx.producto.update({
+        where: { id: product.id },
+        data: { stock: { decrement: item.quantity } },
+      });
+    }
+
+    return tx.pedido.create({
+      data: {
+        clienteNombre: String(nombre).trim(),
+        clienteEmail: String(email).trim().toLowerCase(),
+        clienteTelefono: String(telefono).trim(),
+        total,
+        estado: "PREPARAR",
+        notaFotoUrl: notaFotoUrl ? String(notaFotoUrl).trim() : null,
+        items: { create: itemsData },
+      },
+      include: {
+        items: { include: { producto: true } },
+      },
+    });
+  });
+
+  return res.status(201).json({ order });
+}
+
+const ESTADOS_NOTA_PEDIDO_EDITABLE = ["PAGADO"];
+const NOTA_PEDIDO_FIELDS = [
+  "notaNumero", "notaAsesor", "notaNumeroProforma", "notaJoya", "notaMetal", "notaColor",
+  "notaPiedraCentral", "notaPiedraCentralTamano", "notaPiedraLateral", "notaPiedraLateralTamano",
+  "notaCorteCentral", "notaCorteLateral", "notaTallaV", "notaTallaD", "notaAnchoV", "notaAnchoD",
+  "notaGrabadoV", "notaGrabadoD", "notaPesoTotal", "notaPrioridadFechaEntrega",
+  "notaFechaEnviadaTallerIda", "notaFechaEnviadaTallerRegreso", "notaDescripcion", "notaFotoUrl",
+];
+
+async function updateNotaPedido(req, res) {
+  const { id } = req.params;
+
+  const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
+  if (!existing) {
+    return res.status(404).json({ message: "Pedido no encontrado" });
+  }
+
+  if (!ESTADOS_NOTA_PEDIDO_EDITABLE.includes(existing.estado)) {
+    return res.status(409).json({ message: "La nota de pedido ya no se puede modificar en esta etapa" });
+  }
+
+  const data = {};
+  for (const field of NOTA_PEDIDO_FIELDS) {
+    if (req.body[field] !== undefined) {
+      data[field] = req.body[field] === null ? null : String(req.body[field]).trim();
+    }
+  }
+
+  const order = await prisma.pedido.update({
+    where: { id: Number(id) },
+    data,
+    include: { items: { include: { producto: true } } },
+  });
+
+  return res.json({ order });
+}
+
 async function listOrders(req, res) {
   const orders = await prisma.pedido.findMany({
     orderBy: { createdAt: "desc" },
@@ -1019,6 +1128,8 @@ module.exports = {
   createUser,
   updateUser,
   deleteUser,
+  createManualOrder,
+  updateNotaPedido,
   listOrders,
   exportOrders,
   updateOrderStatus,

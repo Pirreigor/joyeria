@@ -38,14 +38,11 @@ function filterByDateRange(items, dateFrom, dateTo) {
   });
 }
 
-async function fetchLogoForPdf() {
+async function fetchImageForPdf(url, { width = 400, format = "PNG" } = {}) {
   try {
-    const res = await fetch(`${API_URL}/api/store/settings`);
-    const data = await res.json();
-    const logoUrl = data?.settings?.logoUrl;
-    if (!logoUrl) return null;
-
-    const optimizedUrl = cdnImg(logoUrl, 300).replace("f_auto,q_auto", "f_png,q_auto");
+    if (!url) return null;
+    const transform = format === "PNG" ? "f_png,q_auto" : "f_auto,q_auto";
+    const optimizedUrl = cdnImg(url, width).replace("f_auto,q_auto", transform);
     const imgRes = await fetch(optimizedUrl);
     const blob = await imgRes.blob();
     const dataUrl = await new Promise((resolve, reject) => {
@@ -62,10 +59,16 @@ async function fetchLogoForPdf() {
       img.src = dataUrl;
     });
 
-    return { dataUrl, ratio, format: "PNG" };
+    return { dataUrl, ratio, format };
   } catch {
     return null;
   }
+}
+
+async function fetchLogoForPdf() {
+  const res = await fetch(`${API_URL}/api/store/settings`);
+  const data = await res.json();
+  return fetchImageForPdf(data?.settings?.logoUrl, { width: 300, format: "PNG" });
 }
 
 function pdfMoney(n) {
@@ -273,6 +276,144 @@ function buildCotizacionPdf({ order, form, logo }) {
   doc.save(`cotizacion-pedido-${order.id}.pdf`);
 }
 
+async function buildNotaPedidoPdf({ order, form, logo }) {
+  const foto = await fetchImageForPdf(form.notaFotoUrl, { width: 500, format: "JPEG" });
+
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageWidth = 210;
+  const marginX = 15;
+  const contentWidth = pageWidth - marginX * 2;
+  const leftW = 105;
+  const rightW = contentWidth - leftW;
+  const blue = [61, 79, 158];
+
+  let logoAreaH = 0;
+  if (logo?.dataUrl) {
+    const logoW = 18;
+    const logoH = logo.ratio ? logoW / logo.ratio : 18;
+    try {
+      doc.addImage(logo.dataUrl, logo.format || "PNG", pageWidth - marginX - logoW, 6, logoW, logoH);
+      logoAreaH = logoH + 4;
+    } catch {
+      // formato de imagen no soportado por jsPDF
+    }
+  }
+
+  let y = Math.max(15, 6 + logoAreaH);
+
+  const titleH = 14;
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(marginX, y, contentWidth - 45, titleH);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`NOTA DE PEDIDO N° - ${form.notaNumero || ""}`, marginX + (contentWidth - 45) / 2, y + titleH / 2 + 1.5, { align: "center" });
+
+  doc.rect(marginX + contentWidth - 45, y, 45, titleH / 2);
+  doc.setFontSize(9);
+  doc.text("Fecha de emision:", marginX + contentWidth - 45 + 22.5, y + titleH / 4 + 1, { align: "center" });
+  doc.rect(marginX + contentWidth - 45, y + titleH / 2, 45, titleH / 2);
+  doc.setFont("helvetica", "normal");
+  doc.text(new Date(order.createdAt).toLocaleDateString("es-PE"), marginX + contentWidth - 45 + 22.5, y + (titleH * 3) / 4 + 1, { align: "center" });
+
+  y += titleH;
+  const gridTop = y;
+
+  function row(cells, height = 8) {
+    const widths = cells.map((c) => c.w);
+    let x = marginX;
+    doc.setLineWidth(0.25);
+    doc.rect(marginX, y, leftW, height);
+    cells.forEach((cell, i) => {
+      if (i > 0) doc.line(x, y, x, y + height);
+      doc.setFont("helvetica", cell.bold ? "bold" : "normal");
+      doc.setFontSize(cell.size || 9);
+      doc.setTextColor(0, 0, 0);
+      const textY = y + height / 2 + 1.2;
+      if (cell.align === "center") {
+        doc.text(String(cell.text || ""), x + widths[i] / 2, textY, { align: "center" });
+      } else {
+        doc.text(String(cell.text || ""), x + 2, textY);
+      }
+      x += widths[i];
+    });
+    y += height;
+  }
+
+  function sectionHeader(label) {
+    doc.setLineWidth(0.25);
+    doc.rect(marginX, y, leftW, 6);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(marginX, y, leftW, 6, "F");
+    doc.rect(marginX, y, leftW, 6);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(label, marginX + leftW / 2, y + 4.2, { align: "center" });
+    y += 6;
+  }
+
+  row([{ text: "ASESOR:", w: 25, bold: true }, { text: form.notaAsesor, w: leftW - 25 }]);
+  row([{ text: "CLIENTE:", w: 25, bold: true }, { text: order.clienteNombre || order.usuario?.name || "", w: leftW - 25 }]);
+  row([{ text: "N Proforma:", w: 32, bold: true }, { text: form.notaNumeroProforma, w: leftW - 32 - 40 }, { text: "Tel: " + (order.clienteTelefono || ""), w: 40 }]);
+  row([{ text: "Joya:", w: 25, bold: true }, { text: form.notaJoya, w: leftW - 25 }]);
+  row([{ text: "Metal:", w: 25, bold: true }, { text: form.notaMetal, w: leftW - 25 }]);
+  row([{ text: "Color:", w: 25, bold: true }, { text: form.notaColor, w: leftW - 25 }]);
+
+  sectionHeader("PIEDRAS");
+  row([{ text: "Central:", w: 22, bold: true }, { text: form.notaPiedraCentral, w: 45 }, { text: "Tamano: " + (form.notaPiedraCentralTamano || ""), w: leftW - 22 - 45 }]);
+  row([{ text: "Lateral:", w: 22, bold: true }, { text: form.notaPiedraLateral, w: 45 }, { text: "Tamano: " + (form.notaPiedraLateralTamano || ""), w: leftW - 22 - 45 }]);
+
+  sectionHeader("CORTE");
+  row([{ text: "Central:", w: 25, bold: true }, { text: form.notaCorteCentral, w: leftW - 25 }]);
+  row([{ text: "Lateral:", w: 25, bold: true }, { text: form.notaCorteLateral, w: leftW - 25 }]);
+
+  row([{ text: "TALLA", w: 25, bold: true }, { text: "V: " + (form.notaTallaV || ""), w: (leftW - 25) / 2 }, { text: "D: " + (form.notaTallaD || ""), w: (leftW - 25) / 2 }]);
+  row([{ text: "ANCHO", w: 25, bold: true }, { text: "V: " + (form.notaAnchoV || ""), w: (leftW - 25) / 2 }, { text: "D: " + (form.notaAnchoD || ""), w: (leftW - 25) / 2 }]);
+  row([{ text: "GRABADO", w: 25, bold: true }, { text: "V: " + (form.notaGrabadoV || ""), w: (leftW - 25) / 2 }, { text: "D: " + (form.notaGrabadoD || ""), w: (leftW - 25) / 2 }]);
+  row([{ text: "Peso total:", w: 32, bold: true }, { text: form.notaPesoTotal, w: leftW - 32 }]);
+  row([{ text: "Prioridad (entrega):", w: 42, bold: true }, { text: form.notaPrioridadFechaEntrega, w: leftW - 42 }]);
+  row([{ text: "Envio a Taller:", w: 32, bold: true }, { text: "Ida: " + (form.notaFechaEnviadaTallerIda || ""), w: (leftW - 32) / 2 }, { text: "Regreso: " + (form.notaFechaEnviadaTallerRegreso || ""), w: (leftW - 32) / 2 }]);
+
+  const gridBottom = y;
+
+  const rightX = marginX + leftW;
+  doc.setLineWidth(0.3);
+  doc.rect(rightX, gridTop, rightW, gridBottom - gridTop);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Descripcion:", rightX + 3, gridTop + 6);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  const descLines = doc.splitTextToSize(form.notaDescripcion || "", rightW - 6);
+  doc.text(descLines, rightX + 3, gridTop + 12);
+
+  const fotoLabelY = gridTop + 12 + descLines.length * 4.5 + 6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("FOTO REFERENCIAL", rightX + rightW / 2, fotoLabelY, { align: "center" });
+
+  if (foto?.dataUrl) {
+    const maxW = rightW - 10;
+    const maxH = Math.max(30, gridBottom - fotoLabelY - 6);
+    let w = maxW;
+    let h = foto.ratio ? w / foto.ratio : maxH;
+    if (h > maxH) {
+      h = maxH;
+      w = foto.ratio ? h * foto.ratio : maxW;
+    }
+    try {
+      doc.addImage(foto.dataUrl, foto.format || "JPEG", rightX + (rightW - w) / 2, fotoLabelY + 4, w, h);
+    } catch {
+      // formato de imagen no soportado por jsPDF
+    }
+  }
+
+  doc.save(`nota-pedido-${order.id}.pdf`);
+}
+
 const initialForm = {
   id: null,
   name: "",
@@ -382,6 +523,35 @@ const initialCotizacionForm = {
   terminos: "",
   firmaNombre: "",
 };
+
+const initialNotaPedidoForm = {
+  notaNumero: "",
+  notaAsesor: "",
+  notaNumeroProforma: "",
+  notaJoya: "",
+  notaMetal: "",
+  notaColor: "",
+  notaPiedraCentral: "",
+  notaPiedraCentralTamano: "",
+  notaPiedraLateral: "",
+  notaPiedraLateralTamano: "",
+  notaCorteCentral: "",
+  notaCorteLateral: "",
+  notaTallaV: "",
+  notaTallaD: "",
+  notaAnchoV: "",
+  notaAnchoD: "",
+  notaGrabadoV: "",
+  notaGrabadoD: "",
+  notaPesoTotal: "",
+  notaPrioridadFechaEntrega: "",
+  notaFechaEnviadaTallerIda: "",
+  notaFechaEnviadaTallerRegreso: "",
+  notaDescripcion: "",
+  notaFotoUrl: "",
+};
+
+const NOTA_PEDIDO_FORM_FIELDS = Object.keys(initialNotaPedidoForm);
 
 const ALL_PERMISSIONS = [
   { key: "dashboard", label: "Dashboard" },
@@ -842,7 +1012,7 @@ export default function App() {
   const [historialDateTo, setHistorialDateTo] = useState(() => daysAgoISO(0));
   const [clientesMotivoFilter, setClientesMotivoFilter] = useState("todos");
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
-  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
+  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [productSearchCat, setProductSearchCat] = useState("todas");
@@ -853,6 +1023,11 @@ export default function App() {
   const [cotizacionModal, setCotizacionModal] = useState(null);
   const [cotizacionForm, setCotizacionForm] = useState(initialCotizacionForm);
   const [cotizacionGenerating, setCotizacionGenerating] = useState(false);
+
+  const [notaPedidoModal, setNotaPedidoModal] = useState(null);
+  const [notaPedidoForm, setNotaPedidoForm] = useState(initialNotaPedidoForm);
+  const [notaPedidoSaving, setNotaPedidoSaving] = useState(false);
+  const [notaPedidoReadOnly, setNotaPedidoReadOnly] = useState(false);
 
   const [shippingModal, setShippingModal] = useState(null);
   const [shippingForm, setShippingForm] = useState({ courierEnvio: "", numeroGuia: "" });
@@ -1970,6 +2145,10 @@ export default function App() {
         setFlyerForm((prev) => ({ ...prev, imageUrl: data.url }));
       } else if (target === "category-banner") {
         setForm((prev) => ({ ...prev, bannerImageUrl: data.url }));
+      } else if (target === "manual-order-foto") {
+        setManualOrderForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
+      } else if (target === "nota-pedido-foto") {
+        setNotaPedidoForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
       }
     } catch (error) {
       setListError(error.message || "Error al subir imagen");
@@ -2231,6 +2410,48 @@ export default function App() {
     }
   }
 
+  function openNotaPedidoModal(order, { readOnly = false } = {}) {
+    const prefill = {};
+    NOTA_PEDIDO_FORM_FIELDS.forEach((field) => {
+      prefill[field] = order[field] || "";
+    });
+    if (!prefill.notaNumero) {
+      const d = new Date(order.createdAt);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yy = String(d.getFullYear()).slice(-2);
+      prefill.notaNumero = `${String(order.id).padStart(3, "0")}-${mm}${yy}`;
+    }
+    if (!prefill.notaAsesor) prefill.notaAsesor = user?.name || "";
+
+    setNotaPedidoModal(order);
+    setNotaPedidoForm(prefill);
+    setNotaPedidoReadOnly(readOnly);
+  }
+
+  async function handleNotaPedidoSubmit(event) {
+    event.preventDefault();
+    setNotaPedidoSaving(true);
+    setListError("");
+
+    try {
+      if (!notaPedidoReadOnly) {
+        await request(`/api/admin/orders/${notaPedidoModal.id}/nota-pedido`, {
+          method: "PATCH",
+          body: JSON.stringify(notaPedidoForm),
+        });
+        await loadData();
+      }
+
+      const logo = await fetchLogoForPdf();
+      await buildNotaPedidoPdf({ order: notaPedidoModal, form: notaPedidoForm, logo });
+      setNotaPedidoModal(null);
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar la nota de pedido");
+    } finally {
+      setNotaPedidoSaving(false);
+    }
+  }
+
   function addManualOrderItem(productId) {
     const product = products.find((p) => p.id === Number(productId));
     if (!product) return;
@@ -2253,24 +2474,19 @@ export default function App() {
     setListError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/orders/checkout`, {
+      await request("/api/admin/orders/manual", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: manualOrderForm.nombre.trim(),
           email: manualOrderForm.email.trim(),
           telefono: manualOrderForm.telefono.trim(),
           items: manualOrderForm.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          notaFotoUrl: manualOrderForm.notaFotoUrl || null,
         }),
       });
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.message || "No se pudo crear el pedido");
-      }
-
       setFormModal("");
-      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] });
+      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" });
       await loadData();
     } catch (error) {
       setListError(error.message || "Error al crear pedido manual");
@@ -2601,7 +2817,7 @@ export default function App() {
               )}
               {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}
               {activeTab === "flyers" && <button onClick={() => { resetFlyerForm(); setFormModal("flyer"); }}>+ Nuevo flyer</button>}
-              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
+              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
               {activeTab === "historial" && <button className="ghost" onClick={handleExportOrders} disabled={exportingOrders}>{exportingOrders ? "Descargando..." : "Descargar Excel"}</button>}
               <button className="ghost" onClick={loadData} disabled={listLoading}>{listLoading ? "Actualizando..." : "Recargar"}</button>
             </div>
@@ -2926,6 +3142,12 @@ export default function App() {
                   )}
                   {["PREPARAR", "NUEVO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openCotizacionModal(order)}>Cotizacion</button>
+                  )}
+                  {order.estado === "PAGADO" && (
+                    <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order)}>Nota de pedido</button>
+                  )}
+                  {["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && order.notaJoya && (
+                    <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
                   )}
                   {order.estado === "PAGADO" ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
@@ -3521,7 +3743,7 @@ export default function App() {
       )}
 
       {formModal === "manualOrder" && (
-        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>
+        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" }); }}>
           <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
             <h2>Nuevo pedido manual</h2>
             {listError && <p className="error">{listError}</p>}
@@ -3563,9 +3785,19 @@ export default function App() {
                   <li className="manualOrderTotal"><strong>Total: S/ {manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong></li>
                 </ul>
               )}
+
+              <label htmlFor="mo-foto">Foto de stock (privada, no se muestra en la web)</label>
+              <div className="imageUploadRow">
+                <label className="uploadBtn">
+                  {uploadingImage ? "Subiendo..." : manualOrderForm.notaFotoUrl ? "Cambiar foto" : "Subir foto"}
+                  <input id="mo-foto" type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "manual-order-foto", "notas-pedido")} disabled={uploadingImage} />
+                </label>
+              </div>
+              {manualOrderForm.notaFotoUrl && <img src={cdnImg(manualOrderForm.notaFotoUrl, 150)} alt="preview" className="imagePreviewThumb" />}
+
               <div className="actions">
                 <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
-                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>Cancelar</button>
+                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" }); }}>Cancelar</button>
               </div>
             </form>
           </div>
@@ -3721,6 +3953,106 @@ export default function App() {
                   {cotizacionGenerating ? "Guardando..." : "Guardar precio y descargar (PDF)"}
                 </button>
                 <button type="button" className="ghost" onClick={() => setCotizacionModal(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {notaPedidoModal !== null && (
+        <div className="modalOverlay" onClick={() => setNotaPedidoModal(null)}>
+          <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
+            <h2>{notaPedidoReadOnly ? "Ver nota de pedido" : "Nota de pedido"} — Pedido #{notaPedidoModal.id}</h2>
+            {notaPedidoReadOnly && <p className="subtle">Este pedido ya paso de Pagado, la nota ya no se puede modificar.</p>}
+            {listError && <p className="error">{listError}</p>}
+            <form onSubmit={handleNotaPedidoSubmit} className="categoryForm">
+              <label htmlFor="np-numero">N° de nota</label>
+              <input id="np-numero" type="text" value={notaPedidoForm.notaNumero} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaNumero: e.target.value }))} required />
+
+              <label htmlFor="np-asesor">Asesor</label>
+              <input id="np-asesor" type="text" value={notaPedidoForm.notaAsesor} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaAsesor: e.target.value }))} required />
+
+              <p className="subtle">Cliente: {notaPedidoModal.clienteNombre || notaPedidoModal.usuario?.name || "-"} — Tel: {notaPedidoModal.clienteTelefono || "-"}</p>
+
+              <label htmlFor="np-proforma">N° de Proforma (venta por cita, opcional)</label>
+              <input id="np-proforma" type="text" value={notaPedidoForm.notaNumeroProforma} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaNumeroProforma: e.target.value }))} />
+
+              <label htmlFor="np-joya">Joya</label>
+              <input id="np-joya" type="text" value={notaPedidoForm.notaJoya} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaJoya: e.target.value }))} />
+
+              <label htmlFor="np-metal">Metal</label>
+              <input id="np-metal" type="text" value={notaPedidoForm.notaMetal} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaMetal: e.target.value }))} />
+
+              <label htmlFor="np-color">Color</label>
+              <input id="np-color" type="text" value={notaPedidoForm.notaColor} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaColor: e.target.value }))} />
+
+              <label>Piedras</label>
+              <div className="cotizacionItemRow" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <input type="text" placeholder="Central" value={notaPedidoForm.notaPiedraCentral} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaPiedraCentral: e.target.value }))} />
+                <input type="text" placeholder="Tamano central" value={notaPedidoForm.notaPiedraCentralTamano} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaPiedraCentralTamano: e.target.value }))} />
+              </div>
+              <div className="cotizacionItemRow" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <input type="text" placeholder="Lateral" value={notaPedidoForm.notaPiedraLateral} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaPiedraLateral: e.target.value }))} />
+                <input type="text" placeholder="Tamano lateral" value={notaPedidoForm.notaPiedraLateralTamano} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaPiedraLateralTamano: e.target.value }))} />
+              </div>
+
+              <label>Corte</label>
+              <div className="cotizacionItemRow" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <input type="text" placeholder="Central" value={notaPedidoForm.notaCorteCentral} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaCorteCentral: e.target.value }))} />
+                <input type="text" placeholder="Lateral" value={notaPedidoForm.notaCorteLateral} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaCorteLateral: e.target.value }))} />
+              </div>
+
+              <label>Talla (V / D)</label>
+              <div className="cotizacionItemRow" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <input type="text" placeholder="V" value={notaPedidoForm.notaTallaV} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaTallaV: e.target.value }))} />
+                <input type="text" placeholder="D" value={notaPedidoForm.notaTallaD} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaTallaD: e.target.value }))} />
+              </div>
+
+              <label>Ancho (V / D)</label>
+              <div className="cotizacionItemRow" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <input type="text" placeholder="V" value={notaPedidoForm.notaAnchoV} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaAnchoV: e.target.value }))} />
+                <input type="text" placeholder="D" value={notaPedidoForm.notaAnchoD} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaAnchoD: e.target.value }))} />
+              </div>
+
+              <label>Grabado (V / D)</label>
+              <div className="cotizacionItemRow" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <input type="text" placeholder="V" value={notaPedidoForm.notaGrabadoV} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaGrabadoV: e.target.value }))} />
+                <input type="text" placeholder="D" value={notaPedidoForm.notaGrabadoD} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaGrabadoD: e.target.value }))} />
+              </div>
+
+              <label htmlFor="np-peso">Peso total</label>
+              <input id="np-peso" type="text" placeholder="Ej. 3 GR" value={notaPedidoForm.notaPesoTotal} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaPesoTotal: e.target.value }))} />
+
+              <label htmlFor="np-prioridad">Prioridad (fecha de entrega)</label>
+              <input id="np-prioridad" type="text" value={notaPedidoForm.notaPrioridadFechaEntrega} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaPrioridadFechaEntrega: e.target.value }))} />
+
+              <label>Fecha enviada a Taller (Ida / Regreso)</label>
+              <div className="cotizacionItemRow" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <input type="text" placeholder="Ida" value={notaPedidoForm.notaFechaEnviadaTallerIda} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaFechaEnviadaTallerIda: e.target.value }))} />
+                <input type="text" placeholder="Regreso" value={notaPedidoForm.notaFechaEnviadaTallerRegreso} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaFechaEnviadaTallerRegreso: e.target.value }))} />
+              </div>
+
+              <label htmlFor="np-descripcion">Descripcion (se adjunta la foto referencial)</label>
+              <textarea id="np-descripcion" rows={3} value={notaPedidoForm.notaDescripcion} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaDescripcion: e.target.value }))} />
+
+              <label htmlFor="np-foto">Foto referencial</label>
+              {!notaPedidoReadOnly && (
+                <div className="imageUploadRow">
+                  <label className="uploadBtn">
+                    {uploadingImage ? "Subiendo..." : notaPedidoForm.notaFotoUrl ? "Cambiar foto" : "Subir foto"}
+                    <input id="np-foto" type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "nota-pedido-foto", "notas-pedido")} disabled={uploadingImage} />
+                  </label>
+                </div>
+              )}
+              {notaPedidoForm.notaFotoUrl && <img src={cdnImg(notaPedidoForm.notaFotoUrl, 200)} alt="preview" className="imagePreviewThumb" />}
+
+              <div className="actions">
+                <button type="submit" disabled={notaPedidoSaving}>
+                  {notaPedidoSaving ? "Generando..." : notaPedidoReadOnly ? "Descargar (PDF)" : "Guardar y descargar (PDF)"}
+                </button>
+                <button type="button" className="ghost" onClick={() => setNotaPedidoModal(null)}>
                   Cancelar
                 </button>
               </div>

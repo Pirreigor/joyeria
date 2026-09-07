@@ -25,6 +25,8 @@ const {
   createUser,
   updateUser,
   deleteUser,
+  createManualOrder,
+  updateNotaPedido,
   listOrders,
   exportOrders,
   updateOrderStatus,
@@ -118,9 +120,11 @@ router.delete("/origenes-gema/:id", requirePermission("atributos"), deleteOrigen
 
 router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), listOrders);
 router.get("/orders/export", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), exportOrders);
+router.post("/orders/manual", requirePermission("orders"), createManualOrder);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
 router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios"), updateOrderStatus);
 router.patch("/orders/:id/items", requirePermission("orders"), updateOrderItemPrices);
+router.patch("/orders/:id/nota-pedido", requirePermission("orders"), updateNotaPedido);
 router.get("/orders/:id/dedicatorias", requireAnyPermission("orders", "despacho", "envios"), listOrderDedicatorias);
 
 module.exports = router;
