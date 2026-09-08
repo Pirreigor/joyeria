@@ -261,8 +261,9 @@ model ItemPedido {
   id           Int           @id @default(autoincrement())
   pedidoId     Int
   pedido       Pedido        @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  productoId   Int
-  producto     Producto      @relation(fields: [productoId], references: [id])
+  productoId   Int?
+  producto     Producto?     @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  customNombre String?
   quantity     Int
   unitPrice    Float
   dedicatorias Dedicatoria[]

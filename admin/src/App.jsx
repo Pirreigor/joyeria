@@ -1260,7 +1260,7 @@ export default function App() {
     const productMap = new Map();
     paidOrders.forEach((o) => {
       (o.items || []).forEach((item) => {
-        const key = item.producto?.name || `Producto #${item.productoId}`;
+        const key = item.producto?.name || item.customNombre || `Producto #${item.productoId}`;
         productMap.set(key, (productMap.get(key) || 0) + item.quantity);
       });
     });
@@ -2243,7 +2243,7 @@ export default function App() {
       ? order.items.map((item) => ({
           id: item.id,
           cantidad: item.quantity,
-          descripcion: item.producto?.name || `Producto #${item.productoId}`,
+          descripcion: item.producto?.name || item.customNombre || `Producto #${item.productoId}`,
           precioU: Number(item.unitPrice || 0),
         }))
       : [{ id: null, cantidad: 1, descripcion: "", precioU: Number(order.total || 0) }];
@@ -2486,16 +2486,31 @@ export default function App() {
     const product = products.find((p) => p.id === Number(productId));
     if (!product) return;
     setManualOrderForm((prev) => {
-      const existing = prev.items.find((i) => i.productId === product.id);
+      const existing = prev.items.find((i) => !i.custom && i.productId === product.id);
       if (existing) {
-        return { ...prev, items: prev.items.map((i) => i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i) };
+        return { ...prev, items: prev.items.map((i) => (!i.custom && i.productId === product.id) ? { ...i, quantity: i.quantity + 1 } : i) };
       }
-      return { ...prev, items: [...prev.items, { productId: product.id, name: product.name, price: product.price, quantity: 1 }] };
+      return { ...prev, items: [...prev.items, { key: `p-${product.id}`, custom: false, productId: product.id, name: product.name, price: product.price, quantity: 1 }] };
     });
   }
 
-  function removeManualOrderItem(productId) {
-    setManualOrderForm((prev) => ({ ...prev, items: prev.items.filter((i) => i.productId !== productId) }));
+  function addCustomManualOrderItem() {
+    const key = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setManualOrderForm((prev) => ({
+      ...prev,
+      items: [...prev.items, { key, custom: true, name: "", price: 0, quantity: 1 }],
+    }));
+  }
+
+  function updateCustomManualOrderItem(key, field, value) {
+    setManualOrderForm((prev) => ({
+      ...prev,
+      items: prev.items.map((i) => (i.key === key ? { ...i, [field]: value } : i)),
+    }));
+  }
+
+  function removeManualOrderItem(key) {
+    setManualOrderForm((prev) => ({ ...prev, items: prev.items.filter((i) => i.key !== key) }));
   }
 
   async function handleManualOrderSubmit(event) {
@@ -2510,7 +2525,11 @@ export default function App() {
           nombre: manualOrderForm.nombre.trim(),
           email: manualOrderForm.email.trim(),
           telefono: manualOrderForm.telefono.trim(),
-          items: manualOrderForm.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          items: manualOrderForm.items.map((i) =>
+            i.custom
+              ? { custom: true, customNombre: i.name.trim(), quantity: i.quantity, unitPrice: i.price }
+              : { productId: i.productId, quantity: i.quantity }
+          ),
           notaFotoUrl: manualOrderForm.notaFotoUrl || null,
         }),
       });
@@ -3163,7 +3182,7 @@ export default function App() {
                 </div>
                 {order.items?.length > 0 && (
                   <ul className="orderItems">
-                    {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
+                    {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
                   </ul>
                 )}
                 <div className="actions">
@@ -3217,7 +3236,7 @@ export default function App() {
                       {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
                       {order.items?.length > 0 && (
                         <ul className="orderItems">
-                          {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
+                          {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
                         </ul>
                       )}
                     </div>
@@ -3804,14 +3823,47 @@ export default function App() {
                   <p className="subtle pickerHint">Escribe al menos 2 letras o selecciona una categoria</p>
                 )}
               </div>
+
+              <button type="button" className="ghost" onClick={addCustomManualOrderItem}>+ Item personalizado (sin stock, a medida)</button>
+              <p className="subtle">Para una pieza a medida que no esta en el catalogo. No descuenta stock de ningun producto.</p>
+
               {manualOrderForm.items.length > 0 && (
                 <ul className="manualOrderItems">
-                  {manualOrderForm.items.map((item) => (
-                    <li key={item.productId}>
-                      <span>{item.quantity}x {item.name} — S/ {(item.price * item.quantity).toFixed(2)}</span>
-                      <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.productId)}>x</button>
-                    </li>
-                  ))}
+                  {manualOrderForm.items.map((item) =>
+                    item.custom ? (
+                      <li key={item.key} className="manualOrderCustomItem">
+                        <input
+                          type="text"
+                          placeholder="Nombre de la pieza"
+                          value={item.name}
+                          onChange={(e) => updateCustomManualOrderItem(item.key, "name", e.target.value)}
+                          required
+                        />
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => updateCustomManualOrderItem(item.key, "quantity", Number(e.target.value || 1))}
+                          aria-label="Cantidad"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="Precio"
+                          value={item.price}
+                          onChange={(e) => updateCustomManualOrderItem(item.key, "price", Number(e.target.value || 0))}
+                          aria-label="Precio"
+                        />
+                        <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.key)}>x</button>
+                      </li>
+                    ) : (
+                      <li key={item.key}>
+                        <span>{item.quantity}x {item.name} — S/ {(item.price * item.quantity).toFixed(2)}</span>
+                        <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.key)}>x</button>
+                      </li>
+                    )
+                  )}
                   <li className="manualOrderTotal"><strong>Total: S/ {manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong></li>
                 </ul>
               )}
@@ -3826,7 +3878,7 @@ export default function App() {
               {manualOrderForm.notaFotoUrl && <img src={cdnImg(manualOrderForm.notaFotoUrl, 150)} alt="preview" className="imagePreviewThumb" />}
 
               <div className="actions">
-                <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
+                <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0 || manualOrderForm.items.some((i) => i.custom && (!i.name.trim() || !(i.price >= 0)))}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
                 <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" }); }}>Cancelar</button>
               </div>
             </form>

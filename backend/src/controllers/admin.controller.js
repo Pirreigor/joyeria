@@ -763,13 +763,32 @@ async function createManualOrder(req, res) {
     return res.status(400).json({ message: "items debe ser un array con al menos un elemento" });
   }
 
-  const normalizedItems = items.map((item) => ({
-    productId: Number(item.productId),
-    quantity: Number(item.quantity),
-  }));
+  const normalizedItems = items.map((item) =>
+    item.custom
+      ? {
+          custom: true,
+          customNombre: String(item.customNombre || "").trim(),
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+        }
+      : {
+          custom: false,
+          productId: Number(item.productId),
+          quantity: Number(item.quantity),
+        }
+  );
 
-  if (normalizedItems.some((item) => !item.productId || !item.quantity || item.quantity < 1)) {
-    return res.status(400).json({ message: "Cada item requiere productId y quantity valido" });
+  for (const item of normalizedItems) {
+    if (!item.quantity || item.quantity < 1) {
+      return res.status(400).json({ message: "Cada item requiere quantity valido" });
+    }
+    if (item.custom) {
+      if (!item.customNombre || !(item.unitPrice >= 0)) {
+        return res.status(400).json({ message: "Los items personalizados requieren nombre y precio validos" });
+      }
+    } else if (!item.productId) {
+      return res.status(400).json({ message: "Cada item requiere productId o ser personalizado" });
+    }
   }
 
   const order = await prisma.$transaction(async (tx) => {
@@ -777,6 +796,17 @@ async function createManualOrder(req, res) {
     const itemsData = [];
 
     for (const item of normalizedItems) {
+      if (item.custom) {
+        total += item.unitPrice * item.quantity;
+        itemsData.push({
+          productoId: null,
+          customNombre: item.customNombre,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        });
+        continue;
+      }
+
       const product = await tx.producto.findUnique({ where: { id: item.productId } });
 
       if (!product || !product.active) {
@@ -911,7 +941,7 @@ async function exportOrders(req, res) {
     o.direccionEnvio || "",
     o.courierEnvio || "",
     o.numeroGuia || "",
-    o.items.map((item) => `${item.quantity}x ${item.producto?.name || `Producto #${item.productoId}`}`).join("; "),
+    o.items.map((item) => `${item.quantity}x ${item.producto?.name || item.customNombre || `Producto #${item.productoId}`}`).join("; "),
     o.dedicatoriaDe || "",
     o.dedicatoriaPara || "",
   ]);

@@ -1152,6 +1152,17 @@ button:disabled {
   padding-top: 4px;
 }
 
+.manualOrderCustomItem {
+  display: grid !important;
+  grid-template-columns: 1fr 60px 90px auto;
+  gap: 6px;
+}
+
+.manualOrderCustomItem input {
+  font-size: 0.85rem;
+  padding: 4px 8px;
+}
+
 .productPicker {
   display: grid;
   gap: 6px;
