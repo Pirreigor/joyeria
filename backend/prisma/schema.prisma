@@ -250,7 +250,7 @@ model Pedido {
   notaFechaEnviadaTallerIda     String?
   notaFechaEnviadaTallerRegreso String?
   notaDescripcion               String?
-  notaFotoUrl                   String?
+  notaFotos                     String[] @default([])
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -264,6 +264,7 @@ model ItemPedido {
   productoId   Int?
   producto     Producto?     @relation(fields: [productoId], references: [id], onDelete: SetNull)
   customNombre String?
+  customFotoUrl String?
   quantity     Int
   unitPrice    Float
   dedicatorias Dedicatoria[]

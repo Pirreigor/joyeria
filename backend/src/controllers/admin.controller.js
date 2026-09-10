@@ -753,7 +753,7 @@ async function deleteUser(req, res) {
 }
 
 async function createManualOrder(req, res) {
-  const { nombre, email, telefono, items, notaFotoUrl } = req.body;
+  const { nombre, email, telefono, items } = req.body;
 
   if (!nombre || !email || !telefono) {
     return res.status(400).json({ message: "nombre, email y telefono son obligatorios" });
@@ -768,6 +768,7 @@ async function createManualOrder(req, res) {
       ? {
           custom: true,
           customNombre: String(item.customNombre || "").trim(),
+          customFotoUrl: String(item.customFotoUrl || "").trim(),
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice),
         }
@@ -786,6 +787,9 @@ async function createManualOrder(req, res) {
       if (!item.customNombre || !(item.unitPrice >= 0)) {
         return res.status(400).json({ message: "Los items personalizados requieren nombre y precio validos" });
       }
+      if (!item.customFotoUrl) {
+        return res.status(400).json({ message: "Los items personalizados requieren una foto de referencia" });
+      }
     } else if (!item.productId) {
       return res.status(400).json({ message: "Cada item requiere productId o ser personalizado" });
     }
@@ -801,6 +805,7 @@ async function createManualOrder(req, res) {
         itemsData.push({
           productoId: null,
           customNombre: item.customNombre,
+          customFotoUrl: item.customFotoUrl,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
         });
@@ -842,7 +847,6 @@ async function createManualOrder(req, res) {
         clienteTelefono: String(telefono).trim(),
         total,
         estado: "PREPARAR",
-        notaFotoUrl: notaFotoUrl ? String(notaFotoUrl).trim() : null,
         items: { create: itemsData },
       },
       include: {
@@ -860,11 +864,12 @@ const NOTA_PEDIDO_FIELDS = [
   "notaPiedraCentral", "notaPiedraCentralTamano", "notaPiedraLateral", "notaPiedraLateralTamano",
   "notaCorteCentral", "notaCorteLateral", "notaTallaV", "notaTallaD", "notaAnchoV", "notaAnchoD",
   "notaGrabadoV", "notaGrabadoD", "notaPesoTotal", "notaPrioridadFechaEntrega",
-  "notaFechaEnviadaTallerIda", "notaFechaEnviadaTallerRegreso", "notaDescripcion", "notaFotoUrl",
+  "notaFechaEnviadaTallerIda", "notaFechaEnviadaTallerRegreso", "notaDescripcion",
 ];
 
 async function updateNotaPedido(req, res) {
   const { id } = req.params;
+  const { notaFotos } = req.body;
 
   const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
   if (!existing) {
@@ -880,6 +885,9 @@ async function updateNotaPedido(req, res) {
     if (req.body[field] !== undefined) {
       data[field] = req.body[field] === null ? null : String(req.body[field]).trim();
     }
+  }
+  if (Array.isArray(notaFotos)) {
+    data.notaFotos = notaFotos.map((url) => String(url).trim()).filter(Boolean);
   }
 
   const order = await prisma.pedido.update({
@@ -996,7 +1004,7 @@ const ESTADOS_PRECIO_EDITABLE = ["PREPARAR", "NUEVO"];
 
 async function updateOrderItemPrices(req, res) {
   const { id } = req.params;
-  const { items, notaFotoUrl } = req.body;
+  const { items, notaFotos } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "items debe ser un array con al menos un elemento" });
@@ -1037,7 +1045,7 @@ async function updateOrderItemPrices(req, res) {
       where: { id: Number(id) },
       data: {
         total,
-        ...(notaFotoUrl !== undefined ? { notaFotoUrl: notaFotoUrl ? String(notaFotoUrl).trim() : null } : {}),
+        ...(Array.isArray(notaFotos) ? { notaFotos: notaFotos.map((url) => String(url).trim()).filter(Boolean) } : {}),
       },
       include: { items: { include: { producto: true } } },
     });

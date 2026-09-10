@@ -71,6 +71,43 @@ async function fetchLogoForPdf() {
   return fetchImageForPdf(data?.settings?.logoUrl, { width: 300, format: "PNG" });
 }
 
+async function fetchImagesForPdf(urls, opts) {
+  const results = await Promise.all((urls || []).map((u) => fetchImageForPdf(u, opts)));
+  return results.filter(Boolean);
+}
+
+// Acomoda una lista de fotos ya cargadas (dataUrl/ratio/format) en una grilla dentro
+// del rectangulo (x, y, maxW, maxH), en celdas cuadradas centradas.
+function drawImageGrid(doc, fotos, x, y, maxW, maxH, maxPerRow = 3) {
+  if (!fotos.length) return;
+  const gap = 3;
+  const perRow = Math.min(maxPerRow, fotos.length);
+  const rows = Math.ceil(fotos.length / perRow);
+  const cellW = (maxW - gap * (perRow - 1)) / perRow;
+  const cellH = Math.min((maxH - gap * (rows - 1)) / rows, cellW);
+
+  fotos.forEach((foto, i) => {
+    if (!foto?.dataUrl) return;
+    const col = i % perRow;
+    const row = Math.floor(i / perRow);
+    const cellX = x + col * (cellW + gap);
+    const cellY = y + row * (cellH + gap);
+    let w = cellW;
+    let h = foto.ratio ? w / foto.ratio : cellH;
+    if (h > cellH) {
+      h = cellH;
+      w = foto.ratio ? h * foto.ratio : cellW;
+    }
+    const ox = cellX + (cellW - w) / 2;
+    const oy = cellY + (cellH - h) / 2;
+    try {
+      doc.addImage(foto.dataUrl, foto.format || "JPEG", ox, oy, w, h);
+    } catch {
+      // formato de imagen no soportado por jsPDF
+    }
+  });
+}
+
 function pdfMoney(n) {
   return Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
@@ -82,10 +119,12 @@ function pdfDate(iso) {
 }
 
 async function buildCotizacionPdf({ order, form, logo }) {
-  const foto = form.notaFotoUrl ? await fetchImageForPdf(form.notaFotoUrl, { width: 400, format: "JPEG" }) : null;
+  const fotoUrls = gatherOrderImages(order, form.notaFotos);
+  const fotos = await fetchImagesForPdf(fotoUrls, { width: 400, format: "JPEG" });
 
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pageWidth = 210;
+  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
+  const pageWidth = 297;
+  const pageHeight = 210;
   const marginX = 15;
   const contentWidth = pageWidth - marginX * 2;
   const blue = [61, 79, 158];
@@ -123,13 +162,13 @@ async function buildCotizacionPdf({ order, form, logo }) {
   doc.setFont("helvetica", "normal");
   doc.text(pdfDate(form.fecha), boxX + boxW / 2, boxY + 14, { align: "center" });
 
-  y = boxY + 8 + 9 + 12;
+  y = boxY + 8 + 9 + 7;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...blue);
   doc.text("Cotizacion para:", marginX, y);
-  y += 8;
+  y += 7;
 
   const half = contentWidth / 2;
   function labelValue(label, value, x, yy, w) {
@@ -157,10 +196,14 @@ async function buildCotizacionPdf({ order, form, logo }) {
   doc.text("Descripcion de proyecto:", marginX, y);
   y += 4;
 
-  const photoW = foto?.dataUrl ? 38 : 0;
-  const descTextW = contentWidth - 8 - (photoW ? photoW + 4 : 0);
+  const cellSize = 22;
+  const perRow = 4;
+  const galleryW = fotos.length ? Math.min(cellSize * Math.min(fotos.length, perRow) + 3 * (Math.min(fotos.length, perRow) - 1), 140) : 0;
+  const descTextW = contentWidth - 8 - (galleryW ? galleryW + 4 : 0);
   const descLines = doc.splitTextToSize(form.descripcionProyecto || "", descTextW);
-  const descBoxH = Math.max(16, photoW ? 42 : 0, 8 + descLines.length * 5);
+  const galleryRows = fotos.length ? Math.ceil(fotos.length / perRow) : 0;
+  const galleryH = galleryRows * cellSize + (galleryRows - 1) * 3;
+  const descBoxH = Math.max(16, galleryH + 6, 8 + descLines.length * 5);
   doc.setDrawColor(...lineGray);
   doc.rect(marginX, y, contentWidth, descBoxH);
   doc.setFont("helvetica", "bold");
@@ -170,26 +213,14 @@ async function buildCotizacionPdf({ order, form, logo }) {
   doc.setFont("helvetica", "normal");
   doc.text(descLines, marginX + 4, y + 12);
 
-  if (foto?.dataUrl) {
-    const maxW = photoW;
-    const maxH = descBoxH - 8;
-    let w = maxW;
-    let h = foto.ratio ? w / foto.ratio : maxH;
-    if (h > maxH) {
-      h = maxH;
-      w = foto.ratio ? h * foto.ratio : maxW;
-    }
-    const photoX = marginX + contentWidth - 4 - maxW + (maxW - w) / 2;
-    try {
-      doc.addImage(foto.dataUrl, foto.format || "JPEG", photoX, y + 4, w, h);
-    } catch {
-      // formato de imagen no soportado por jsPDF
-    }
+  if (fotos.length) {
+    const galleryX = marginX + contentWidth - 4 - galleryW;
+    drawImageGrid(doc, fotos, galleryX, y + 4, galleryW, descBoxH - 8, perRow);
   }
 
-  y += descBoxH + 6;
+  y += descBoxH + 4;
 
-  const colW = [22, 104, 27, contentWidth - 22 - 104 - 27];
+  const colW = [25, contentWidth - 25 - 35 - 40, 35, 40];
   const colX = [marginX, marginX + colW[0], marginX + colW[0] + colW[1], marginX + colW[0] + colW[1] + colW[2]];
   const tableTop = y;
 
@@ -230,7 +261,7 @@ async function buildCotizacionPdf({ order, form, logo }) {
 
   const summaryW = colW[2] + colW[3];
   const summaryX = colX[2];
-  const summaryRowH = 8;
+  const summaryRowH = 7;
   const summaryY = tableBottom;
 
   doc.setFontSize(9);
@@ -260,7 +291,7 @@ async function buildCotizacionPdf({ order, form, logo }) {
     doc.text(`S/ ${pdfMoney(value)}`, summaryX + (summaryW * 3) / 4, rowY + summaryRowH / 2 + 1.5, { align: "center" });
   });
 
-  y = summaryY + summaryRowH * 3 + 10;
+  y = summaryY + summaryRowH * 3 + 7;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
@@ -273,7 +304,7 @@ async function buildCotizacionPdf({ order, form, logo }) {
   doc.setTextColor(0, 0, 0);
   const terminosLines = doc.splitTextToSize(form.terminos || "", contentWidth);
   doc.text(terminosLines, marginX, y);
-  y += terminosLines.length * 5 + 14;
+  y += terminosLines.length * 4.5 + 5;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -285,8 +316,8 @@ async function buildCotizacionPdf({ order, form, logo }) {
   doc.setTextColor(...gray);
   doc.text("Don Joyero", marginX, y);
 
-  const footerH = 16;
-  const footerY = 297 - footerH;
+  const footerH = 12;
+  const footerY = pageHeight - footerH;
   doc.setFillColor(31, 42, 120);
   doc.rect(0, footerY, pageWidth, footerH, "F");
   doc.setFont("helvetica", "normal");
@@ -298,18 +329,26 @@ async function buildCotizacionPdf({ order, form, logo }) {
   doc.save(`cotizacion-pedido-${order.id}.pdf`);
 }
 
-function notaPedidoEffectiveFoto(order, form) {
-  return form.notaFotoUrl || order?.items?.[0]?.producto?.imageUrl || "";
+// Junta las fotos de cada item (la propia si es personalizado, o la del catalogo web
+// si es un producto real) mas las fotos extra que se hayan subido en Cotizacion/Nota
+// de pedido, sin duplicados.
+function gatherOrderImages(order, extraFotos) {
+  const itemImages = (order?.items || [])
+    .map((item) => item.customFotoUrl || item.producto?.imageUrl)
+    .filter(Boolean);
+  const extras = (extraFotos || []).filter(Boolean);
+  return [...new Set([...itemImages, ...extras])];
 }
 
 async function buildNotaPedidoPdf({ order, form, logo }) {
-  const foto = await fetchImageForPdf(notaPedidoEffectiveFoto(order, form), { width: 500, format: "JPEG" });
+  const fotoUrls = gatherOrderImages(order, form.notaFotos);
+  const fotos = await fetchImagesForPdf(fotoUrls, { width: 500, format: "JPEG" });
 
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pageWidth = 210;
+  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
+  const pageWidth = 297;
   const marginX = 15;
   const contentWidth = pageWidth - marginX * 2;
-  const leftW = 105;
+  const leftW = 150;
   const rightW = contentWidth - leftW;
   const blue = [61, 79, 158];
 
@@ -421,20 +460,10 @@ async function buildNotaPedidoPdf({ order, form, logo }) {
   doc.setFontSize(10);
   doc.text("FOTO REFERENCIAL", rightX + rightW / 2, fotoLabelY, { align: "center" });
 
-  if (foto?.dataUrl) {
-    const maxW = rightW - 10;
-    const maxH = Math.max(30, gridBottom - fotoLabelY - 6);
-    let w = maxW;
-    let h = foto.ratio ? w / foto.ratio : maxH;
-    if (h > maxH) {
-      h = maxH;
-      w = foto.ratio ? h * foto.ratio : maxW;
-    }
-    try {
-      doc.addImage(foto.dataUrl, foto.format || "JPEG", rightX + (rightW - w) / 2, fotoLabelY + 4, w, h);
-    } catch {
-      // formato de imagen no soportado por jsPDF
-    }
+  if (fotos.length) {
+    const galleryW = rightW - 10;
+    const galleryH = Math.max(30, gridBottom - fotoLabelY - 6);
+    drawImageGrid(doc, fotos, rightX + 5, fotoLabelY + 4, galleryW, galleryH, 3);
   }
 
   doc.save(`nota-pedido-${order.id}.pdf`);
@@ -548,7 +577,7 @@ const initialCotizacionForm = {
   adelanto: "",
   terminos: "",
   firmaNombre: "",
-  notaFotoUrl: "",
+  notaFotos: [],
 };
 
 const initialNotaPedidoForm = {
@@ -575,10 +604,10 @@ const initialNotaPedidoForm = {
   notaFechaEnviadaTallerIda: "",
   notaFechaEnviadaTallerRegreso: "",
   notaDescripcion: "",
-  notaFotoUrl: "",
+  notaFotos: [],
 };
 
-const NOTA_PEDIDO_FORM_FIELDS = Object.keys(initialNotaPedidoForm);
+const NOTA_PEDIDO_FORM_FIELDS = Object.keys(initialNotaPedidoForm).filter((f) => f !== "notaFotos");
 
 const ALL_PERMISSIONS = [
   { key: "dashboard", label: "Dashboard" },
@@ -1039,7 +1068,7 @@ export default function App() {
   const [historialDateTo, setHistorialDateTo] = useState(() => daysAgoISO(0));
   const [clientesMotivoFilter, setClientesMotivoFilter] = useState("todos");
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
-  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" });
+  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [productSearchCat, setProductSearchCat] = useState("todas");
@@ -2144,7 +2173,7 @@ export default function App() {
     }
   }
 
-  async function handleImageUpload(event, target, folder) {
+  async function handleImageUpload(event, target, folder, context) {
     const file = event.target.files?.[0];
     if (!file) return;
     setUploadingImage(true);
@@ -2172,12 +2201,12 @@ export default function App() {
         setFlyerForm((prev) => ({ ...prev, imageUrl: data.url }));
       } else if (target === "category-banner") {
         setForm((prev) => ({ ...prev, bannerImageUrl: data.url }));
-      } else if (target === "manual-order-foto") {
-        setManualOrderForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
+      } else if (target === "manual-item-foto") {
+        updateCustomManualOrderItem(context, "fotoUrl", data.url);
       } else if (target === "nota-pedido-foto") {
-        setNotaPedidoForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
+        setNotaPedidoForm((prev) => ({ ...prev, notaFotos: [...(prev.notaFotos || []), data.url] }));
       } else if (target === "cotizacion-foto") {
-        setCotizacionForm((prev) => ({ ...prev, notaFotoUrl: data.url }));
+        setCotizacionForm((prev) => ({ ...prev, notaFotos: [...(prev.notaFotos || []), data.url] }));
       }
     } catch (error) {
       setListError(error.message || "Error al subir imagen");
@@ -2266,7 +2295,7 @@ export default function App() {
         "La fecha de entrega es a partir del abono 20 dias habiles.\n" +
         `Fecha de entrega ${primerItem}: ___________.`,
       firmaNombre: user?.name || "",
-      notaFotoUrl: order.notaFotoUrl || "",
+      notaFotos: order.notaFotos || [],
     });
   }
 
@@ -2425,7 +2454,7 @@ export default function App() {
       if (priceUpdates.length > 0) {
         await request(`/api/admin/orders/${cotizacionModal.id}/items`, {
           method: "PATCH",
-          body: JSON.stringify({ items: priceUpdates, notaFotoUrl: cotizacionForm.notaFotoUrl || null }),
+          body: JSON.stringify({ items: priceUpdates, notaFotos: cotizacionForm.notaFotos }),
         });
         await loadData();
       }
@@ -2452,6 +2481,7 @@ export default function App() {
       prefill.notaNumero = `${String(order.id).padStart(3, "0")}-${mm}${yy}`;
     }
     if (!prefill.notaAsesor) prefill.notaAsesor = user?.name || "";
+    prefill.notaFotos = order.notaFotos || [];
 
     setNotaPedidoModal(order);
     setNotaPedidoForm(prefill);
@@ -2498,7 +2528,7 @@ export default function App() {
     const key = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setManualOrderForm((prev) => ({
       ...prev,
-      items: [...prev.items, { key, custom: true, name: "", price: 0, quantity: 1 }],
+      items: [...prev.items, { key, custom: true, name: "", price: 0, quantity: 1, fotoUrl: "" }],
     }));
   }
 
@@ -2527,15 +2557,14 @@ export default function App() {
           telefono: manualOrderForm.telefono.trim(),
           items: manualOrderForm.items.map((i) =>
             i.custom
-              ? { custom: true, customNombre: i.name.trim(), quantity: i.quantity, unitPrice: i.price }
+              ? { custom: true, customNombre: i.name.trim(), customFotoUrl: i.fotoUrl, quantity: i.quantity, unitPrice: i.price }
               : { productId: i.productId, quantity: i.quantity }
           ),
-          notaFotoUrl: manualOrderForm.notaFotoUrl || null,
         }),
       });
 
       setFormModal("");
-      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" });
+      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] });
       await loadData();
     } catch (error) {
       setListError(error.message || "Error al crear pedido manual");
@@ -2866,7 +2895,7 @@ export default function App() {
               )}
               {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}
               {activeTab === "flyers" && <button onClick={() => { resetFlyerForm(); setFormModal("flyer"); }}>+ Nuevo flyer</button>}
-              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
+              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
               {activeTab === "historial" && <button className="ghost" onClick={handleExportOrders} disabled={exportingOrders}>{exportingOrders ? "Descargando..." : "Descargar Excel"}</button>}
               <button className="ghost" onClick={loadData} disabled={listLoading}>{listLoading ? "Actualizando..." : "Recargar"}</button>
             </div>
@@ -3792,7 +3821,7 @@ export default function App() {
       )}
 
       {formModal === "manualOrder" && (
-        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" }); }}>
+        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>
           <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
             <h2>Nuevo pedido manual</h2>
             {listError && <p className="error">{listError}</p>}
@@ -3831,31 +3860,46 @@ export default function App() {
                 <ul className="manualOrderItems">
                   {manualOrderForm.items.map((item) =>
                     item.custom ? (
-                      <li key={item.key} className="manualOrderCustomItem">
-                        <input
-                          type="text"
-                          placeholder="Nombre de la pieza"
-                          value={item.name}
-                          onChange={(e) => updateCustomManualOrderItem(item.key, "name", e.target.value)}
-                          required
-                        />
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(e) => updateCustomManualOrderItem(item.key, "quantity", Number(e.target.value || 1))}
-                          aria-label="Cantidad"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          placeholder="Precio"
-                          value={item.price}
-                          onChange={(e) => updateCustomManualOrderItem(item.key, "price", Number(e.target.value || 0))}
-                          aria-label="Precio"
-                        />
-                        <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.key)}>x</button>
+                      <li key={item.key} className="manualOrderCustomItemBlock">
+                        <div className="manualOrderCustomItem">
+                          <input
+                            type="text"
+                            placeholder="Nombre de la pieza"
+                            value={item.name}
+                            onChange={(e) => updateCustomManualOrderItem(item.key, "name", e.target.value)}
+                            required
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => updateCustomManualOrderItem(item.key, "quantity", Number(e.target.value || 1))}
+                            aria-label="Cantidad"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="Precio"
+                            value={item.price}
+                            onChange={(e) => updateCustomManualOrderItem(item.key, "price", Number(e.target.value || 0))}
+                            aria-label="Precio"
+                          />
+                          <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.key)}>x</button>
+                        </div>
+                        <div className="imageUploadRow">
+                          <label className="uploadBtn">
+                            {uploadingImage ? "Subiendo..." : item.fotoUrl ? "Cambiar foto" : "Subir foto (obligatoria)"}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              style={{ display: "none" }}
+                              onChange={(e) => handleImageUpload(e, "manual-item-foto", "notas-pedido", item.key)}
+                              disabled={uploadingImage}
+                            />
+                          </label>
+                          {item.fotoUrl && <img src={cdnImg(item.fotoUrl, 100)} alt="preview" className="imagePreviewThumb" />}
+                        </div>
                       </li>
                     ) : (
                       <li key={item.key}>
@@ -3868,18 +3912,9 @@ export default function App() {
                 </ul>
               )}
 
-              <label htmlFor="mo-foto">Foto de stock (privada, no se muestra en la web)</label>
-              <div className="imageUploadRow">
-                <label className="uploadBtn">
-                  {uploadingImage ? "Subiendo..." : manualOrderForm.notaFotoUrl ? "Cambiar foto" : "Subir foto"}
-                  <input id="mo-foto" type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "manual-order-foto", "notas-pedido")} disabled={uploadingImage} />
-                </label>
-              </div>
-              {manualOrderForm.notaFotoUrl && <img src={cdnImg(manualOrderForm.notaFotoUrl, 150)} alt="preview" className="imagePreviewThumb" />}
-
               <div className="actions">
-                <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0 || manualOrderForm.items.some((i) => i.custom && (!i.name.trim() || !(i.price >= 0)))}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
-                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], notaFotoUrl: "" }); }}>Cancelar</button>
+                <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0 || manualOrderForm.items.some((i) => i.custom && (!i.name.trim() || !(i.price >= 0) || !i.fotoUrl))}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
+                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>Cancelar</button>
               </div>
             </form>
           </div>
@@ -3977,14 +4012,38 @@ export default function App() {
                 required
               />
 
-              <label htmlFor="cot-foto">Foto referencial (opcional, util si es un diseno personalizado)</label>
+              <label>Fotos referenciales</label>
+              <p className="subtle">Se usan automaticamente las fotos de cada item (la del catalogo web, o la propia si es personalizado). Agrega mas solo si hace falta.</p>
+              {gatherOrderImages(cotizacionModal, []).length > 0 && (
+                <div className="imagePreviewGrid">
+                  {gatherOrderImages(cotizacionModal, []).map((url, i) => (
+                    <img key={i} src={cdnImg(url, 100)} alt="" className="imagePreviewThumb" />
+                  ))}
+                </div>
+              )}
               <div className="imageUploadRow">
                 <label className="uploadBtn">
-                  {uploadingImage ? "Subiendo..." : cotizacionForm.notaFotoUrl ? "Cambiar foto" : "Subir foto"}
-                  <input id="cot-foto" type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "cotizacion-foto", "notas-pedido")} disabled={uploadingImage} />
+                  {uploadingImage ? "Subiendo..." : "+ Agregar foto extra"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "cotizacion-foto", "notas-pedido")} disabled={uploadingImage} />
                 </label>
               </div>
-              {cotizacionForm.notaFotoUrl && <img src={cdnImg(cotizacionForm.notaFotoUrl, 150)} alt="preview" className="imagePreviewThumb" />}
+              {cotizacionForm.notaFotos.length > 0 && (
+                <div className="imagePreviewGrid">
+                  {cotizacionForm.notaFotos.map((url, idx) => (
+                    <div className="imagePreviewItem" key={`${url}-${idx}`}>
+                      <img src={cdnImg(url, 100)} alt="" className="imagePreviewThumb" />
+                      <button
+                        type="button"
+                        className="imagePreviewRemove"
+                        aria-label="Quitar foto"
+                        onClick={() => setCotizacionForm((p) => ({ ...p, notaFotos: p.notaFotos.filter((_, i) => i !== idx) }))}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <label>Items de la cotizacion</label>
               <p className="subtle">El precio unitario que pongas aca se guarda como el precio real del pedido. Ya no se puede editar una vez que el pedido este pagado.</p>
@@ -4128,20 +4187,41 @@ export default function App() {
               <label htmlFor="np-descripcion">Descripcion (se adjunta la foto referencial)</label>
               <textarea id="np-descripcion" rows={3} value={notaPedidoForm.notaDescripcion} disabled={notaPedidoReadOnly} onChange={(e) => setNotaPedidoForm((p) => ({ ...p, notaDescripcion: e.target.value }))} />
 
-              <label htmlFor="np-foto">Foto referencial</label>
+              <label>Fotos referenciales</label>
+              <p className="subtle">Se usan automaticamente las fotos de cada item (la del catalogo web, o la propia si es personalizado). Agrega mas solo si hace falta.</p>
+              {gatherOrderImages(notaPedidoModal, []).length > 0 && (
+                <div className="imagePreviewGrid">
+                  {gatherOrderImages(notaPedidoModal, []).map((url, i) => (
+                    <img key={i} src={cdnImg(url, 100)} alt="" className="imagePreviewThumb" />
+                  ))}
+                </div>
+              )}
               {!notaPedidoReadOnly && (
                 <div className="imageUploadRow">
                   <label className="uploadBtn">
-                    {uploadingImage ? "Subiendo..." : notaPedidoForm.notaFotoUrl ? "Cambiar foto" : "Subir foto"}
-                    <input id="np-foto" type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "nota-pedido-foto", "notas-pedido")} disabled={uploadingImage} />
+                    {uploadingImage ? "Subiendo..." : "+ Agregar foto extra"}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={(e) => handleImageUpload(e, "nota-pedido-foto", "notas-pedido")} disabled={uploadingImage} />
                   </label>
                 </div>
               )}
-              {!notaPedidoForm.notaFotoUrl && notaPedidoModal?.items?.[0]?.producto?.imageUrl && (
-                <p className="subtle">Sin foto propia: se va a usar la foto del producto de la web.</p>
-              )}
-              {notaPedidoEffectiveFoto(notaPedidoModal, notaPedidoForm) && (
-                <img src={cdnImg(notaPedidoEffectiveFoto(notaPedidoModal, notaPedidoForm), 200)} alt="preview" className="imagePreviewThumb" />
+              {notaPedidoForm.notaFotos.length > 0 && (
+                <div className="imagePreviewGrid">
+                  {notaPedidoForm.notaFotos.map((url, idx) => (
+                    <div className="imagePreviewItem" key={`${url}-${idx}`}>
+                      <img src={cdnImg(url, 100)} alt="" className="imagePreviewThumb" />
+                      {!notaPedidoReadOnly && (
+                        <button
+                          type="button"
+                          className="imagePreviewRemove"
+                          aria-label="Quitar foto"
+                          onClick={() => setNotaPedidoForm((p) => ({ ...p, notaFotos: p.notaFotos.filter((_, i) => i !== idx) }))}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
 
               <div className="actions">

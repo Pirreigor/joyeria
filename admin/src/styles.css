@@ -1152,8 +1152,14 @@ button:disabled {
   padding-top: 4px;
 }
 
-.manualOrderCustomItem {
+.manualOrderCustomItemBlock {
   display: grid !important;
+  gap: 6px;
+  align-items: stretch !important;
+}
+
+.manualOrderCustomItem {
+  display: grid;
   grid-template-columns: 1fr 60px 90px auto;
   gap: 6px;
 }
