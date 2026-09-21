@@ -506,8 +506,9 @@ const initialSettingsForm = {
   logoUrl: "",
   promoVideoUrl: "",
   promoVideoTitle: "",
-  mantenimiento: false,
 };
+
+const SUPER_ADMIN_EMAIL = "admin@joyeria.local";
 
 const initialProductForm = {
   id: null,
@@ -1126,7 +1127,9 @@ export default function App() {
   const [acceptError, setAcceptError] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [maintenanceOn, setMaintenanceOn] = useState(false);
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [maintenanceLockout, setMaintenanceLockout] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [importFile, setImportFile] = useState(null);
@@ -1144,21 +1147,35 @@ export default function App() {
   const isEditingProduct = useMemo(() => productForm.id !== null, [productForm.id]);
   const isEditingUser = useMemo(() => userForm.id !== null, [userForm.id]);
   const role = user?.rol || "ADMINISTRADOR";
+  const isSuperAdmin = (user?.email || "").toLowerCase() === SUPER_ADMIN_EMAIL;
   const roleMenuSections = useMemo(() => {
     const sections = MENU_BY_ROLE[role] || [];
     const perms = user?.permisos || [];
-    if (role === "ADMINISTRADOR" && !perms.length) return sections;
-    return sections
-      .map((s) => ({
-        ...s,
-        items: s.items.filter((i) => {
-          if (i.key === "orders") return ORDERS_MENU_KEYS.some((k) => perms.includes(k));
-          if (i.key === "historial") return perms.includes("historial") || ORDERS_MENU_KEYS.some((k) => perms.includes(k));
-          return perms.includes(i.key);
-        }),
-      }))
-      .filter((s) => s.items.length > 0);
-  }, [role, user]);
+    const base =
+      role === "ADMINISTRADOR" && !perms.length
+        ? sections
+        : sections
+            .map((s) => ({
+              ...s,
+              items: s.items.filter((i) => {
+                if (i.key === "orders") return ORDERS_MENU_KEYS.some((k) => perms.includes(k));
+                if (i.key === "historial") return perms.includes("historial") || ORDERS_MENU_KEYS.some((k) => perms.includes(k));
+                return perms.includes(i.key);
+              }),
+            }))
+            .filter((s) => s.items.length > 0);
+
+    if (!isSuperAdmin) return base;
+
+    return [
+      ...base,
+      {
+        key: "emergencia",
+        label: "Emergencia",
+        items: [{ key: "emergencia", label: "Modo mantenimiento", short: "MT" }],
+      },
+    ];
+  }, [role, user, isSuperAdmin]);
   const roleMenu = useMemo(
     () => roleMenuSections.flatMap((section) => section.items || []),
     [roleMenuSections]
@@ -1391,6 +1408,9 @@ export default function App() {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (response.status === 503 && data.maintenance && token) {
+        setMaintenanceLockout(true);
+      }
       throw new Error(data.message || "Ocurrio un error inesperado");
     }
 
@@ -1401,6 +1421,7 @@ export default function App() {
     event.preventDefault();
     setAuthLoading(true);
     setAuthError("");
+    setMaintenanceLockout(false);
 
     try {
       const data = await request("/api/auth/login", {
@@ -1467,6 +1488,7 @@ export default function App() {
     localStorage.removeItem(USER_KEY);
     setToken("");
     setUser(null);
+    setMaintenanceLockout(false);
     setDashboard({
       stats: { users: 0, products: 0, categories: 0, orders: 0 },
       recentOrders: [],
@@ -1499,9 +1521,11 @@ export default function App() {
     const fetchOrFallback = (allowed, path, fallback) =>
       allowed ? request(path).catch(() => fallback) : Promise.resolve(fallback);
 
+    const isSuperAdminUser = (user?.email || "").toLowerCase() === SUPER_ADMIN_EMAIL;
+
     try {
       const needsAttrCatalogs = can("atributos");
-      const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData, tiposPiezaData, materialesData, gemasData, origenesGemaData] = await Promise.all([
+      const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData, tiposPiezaData, materialesData, gemasData, origenesGemaData, maintenanceData] = await Promise.all([
         fetchOrFallback(can("dashboard"), "/api/admin/dashboard", dashboardFallback),
         fetchOrFallback(can("users"), "/api/admin/users", { users: [] }),
         fetchOrFallback(can("users"), "/api/admin/invitations", { invitations: [] }),
@@ -1515,6 +1539,7 @@ export default function App() {
         fetchOrFallback(needsAttrCatalogs, "/api/admin/materiales", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/gemas", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/origenes-gema", { items: [] }),
+        fetchOrFallback(isSuperAdminUser, "/api/admin/maintenance", null),
       ]);
       setDashboard({
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
@@ -1534,8 +1559,10 @@ export default function App() {
         logoUrl: settingsData?.settings?.logoUrl || "",
         promoVideoUrl: settingsData?.settings?.promoVideoUrl || "",
         promoVideoTitle: settingsData?.settings?.promoVideoTitle || "",
-        mantenimiento: Boolean(settingsData?.settings?.mantenimiento),
       });
+      if (isSuperAdminUser) {
+        setMaintenanceOn(Boolean(maintenanceData?.mantenimiento));
+      }
       setTiposPieza(tiposPiezaData.items || []);
       setMaterialesCatalogo(materialesData.items || []);
       setGemas(gemasData.items || []);
@@ -1755,7 +1782,6 @@ export default function App() {
       logoUrl: settingsForm.logoUrl.trim() || null,
       promoVideoUrl: settingsForm.promoVideoUrl.trim() || null,
       promoVideoTitle: settingsForm.promoVideoTitle.trim() || null,
-      mantenimiento: settingsForm.mantenimiento,
     };
 
     try {
@@ -1777,10 +1803,10 @@ export default function App() {
   }
 
   async function handleToggleMaintenance() {
-    const next = !settingsForm.mantenimiento;
+    const next = !maintenanceOn;
     const confirmMessage = next
-      ? "Esto apaga la tienda para todos los clientes: no van a poder ver productos, loguearse ni comprar. Los usuarios ADMINISTRADOR y VENDEDOR van a seguir pudiendo entrar. Confirmas?"
-      : "Esto vuelve a abrir la tienda al publico. Confirmas?";
+      ? "Esto desconecta TODO: la tienda publica y el ERP para cualquier otra cuenta que no sea admin@joyeria.local. Solo vos vas a poder volver a entrar y desactivarlo. Confirmas?"
+      : "Esto vuelve a conectar la tienda y el ERP para todo el equipo. Confirmas?";
 
     if (!window.confirm(confirmMessage)) return;
 
@@ -1788,11 +1814,11 @@ export default function App() {
     setListError("");
 
     try {
-      await request("/api/admin/settings", {
+      const data = await request("/api/admin/maintenance", {
         method: "PATCH",
         body: JSON.stringify({ mantenimiento: next }),
       });
-      setSettingsForm((prev) => ({ ...prev, mantenimiento: next }));
+      setMaintenanceOn(Boolean(data?.mantenimiento));
     } catch (error) {
       setListError(error.message || "No se pudo actualizar el modo mantenimiento");
     } finally {
@@ -2720,6 +2746,22 @@ export default function App() {
     );
   }
 
+  if (maintenanceLockout && !isSuperAdmin) {
+    return (
+      <main className="authPage">
+        <section className="authCard">
+          <p className="eyebrow">Don Joyero</p>
+          <h1>Sistema en mantenimiento</h1>
+          <p>
+            El ERP esta desconectado por un mantenimiento de emergencia. Comunicate con el administrador
+            principal para que lo reactive.
+          </p>
+          <button type="button" className="ghost" onClick={handleLogout}>Cerrar sesion</button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="page">
       <header className="topBar panel">
@@ -2900,21 +2942,34 @@ export default function App() {
                 <button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar branding"}</button>
               </div>
             </form>
+          </article>
+        )}
 
-            <div className={`maintenancePanel${settingsForm.mantenimiento ? " active" : ""}`}>
-              <h3>Modo mantenimiento</h3>
+        {activeTab === "emergencia" && isSuperAdmin && (
+          <article className="panel">
+            <h2>Modo mantenimiento de emergencia</h2>
+            <p className="subtle">
+              Esta vista solo la puede ver la cuenta admin@joyeria.local. Al activarla se corta la conexion
+              de la tienda publica y del ERP para cualquier otra cuenta, incluidos otros administradores y
+              vendedores, para que nadie mas pueda generar trafico ni consumo de recursos durante la
+              emergencia. Solo esta cuenta va a poder volver a entrar y desactivarlo.
+            </p>
+
+            <div className={`maintenancePanel${maintenanceOn ? " active" : ""}`}>
+              <h3>Estado actual</h3>
               <p>
-                {settingsForm.mantenimiento
-                  ? "La tienda esta APAGADA para clientes ahora mismo. Nadie puede ver productos, loguearse ni comprar. El ERP sigue funcionando normalmente."
-                  : "Apaga la tienda al publico (productos, login de clientes, checkout, dedicatorias) para un mantenimiento de emergencia, sin afectar el acceso al ERP."}
+                {maintenanceOn
+                  ? "TODO esta desconectado: la tienda publica y el ERP para el resto del equipo. Solo vos podes usar el panel ahora mismo."
+                  : "Todo esta funcionando con normalidad para clientes y para el equipo."}
               </p>
-              <button type="button" className={settingsForm.mantenimiento ? "danger" : ""} onClick={handleToggleMaintenance} disabled={maintenanceSaving}>
-                {maintenanceSaving ? "Actualizando..." : settingsForm.mantenimiento ? "Desactivar mantenimiento" : "Activar mantenimiento"}
+              <button type="button" className={maintenanceOn ? "danger" : ""} onClick={handleToggleMaintenance} disabled={maintenanceSaving}>
+                {maintenanceSaving ? "Actualizando..." : maintenanceOn ? "Desactivar mantenimiento" : "Activar mantenimiento"}
               </button>
             </div>
           </article>
         )}
 
+        {activeTab !== "emergencia" && (
         <article className="panel">
           <div className="listHeader">
             <h2>{TAB_LIST_TITLES[activeTab] || "Vista"}</h2>
@@ -3363,6 +3418,7 @@ export default function App() {
             </nav>
           )}
         </article>
+        )}
         </section>
       </section>
 

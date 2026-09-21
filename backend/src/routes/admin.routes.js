@@ -7,6 +7,8 @@ const {
   deleteCategory,
   getStoreSettings,
   updateStoreSettings,
+  getMaintenanceStatus,
+  setMaintenanceStatus,
   listSlides,
   createSlide,
   updateSlide,
@@ -49,13 +51,19 @@ const {
   findProductBySku,
 } = require("../controllers/catalog.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
-const { requireRole, requirePermission, requireAnyPermission } = require("../middleware/role.middleware");
+const { requireRole, requirePermission, requireAnyPermission, requireSuperAdmin } = require("../middleware/role.middleware");
+const { blockAdminDuringMaintenance } = require("../middleware/maintenance.middleware");
 const { uploadComprobante } = require("../middleware/upload.middleware");
 const { uploadImage: uploadImageMiddleware, uploadImportFiles } = require("../middleware/uploadImage.middleware");
 
 const router = Router();
 
-router.use(requireAuth, requireRole("ADMINISTRADOR", "VENDEDOR"));
+router.use(requireAuth, requireRole("ADMINISTRADOR", "VENDEDOR"), blockAdminDuringMaintenance);
+
+// Vista de emergencia: solo la cuenta admin@joyeria.local puede ver y accionar
+// el switch de mantenimiento, para que nadie mas pueda activarlo ni desactivarlo.
+router.get("/maintenance", requireSuperAdmin, getMaintenanceStatus);
+router.patch("/maintenance", requireSuperAdmin, setMaintenanceStatus);
 
 router.get("/dashboard", requirePermission("dashboard"), getDashboard);
 

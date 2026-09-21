@@ -1,6 +1,7 @@
 const prisma = require("../utils/prisma");
 const { hashPassword, comparePassword } = require("../utils/hash");
 const { signAccessToken } = require("../utils/jwt");
+const { isSuperAdmin } = require("../utils/superAdmin");
 
 async function getInvitation(req, res) {
   const { token } = req.params;
@@ -132,7 +133,7 @@ async function login(req, res) {
     return res.status(401).json({ message: "Credenciales invalidas" });
   }
 
-  if (user.rol === "CLIENTE") {
+  if (!isSuperAdmin(user)) {
     const config = await prisma.configTienda.findUnique({ where: { id: 1 }, select: { mantenimiento: true } });
     if (config?.mantenimiento) {
       return res.status(503).json({ message: "El sitio esta en mantenimiento. Volve a intentarlo mas tarde.", maintenance: true });

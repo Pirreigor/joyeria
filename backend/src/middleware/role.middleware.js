@@ -1,3 +1,17 @@
+const { isSuperAdmin } = require("../utils/superAdmin");
+
+function requireSuperAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: "No autorizado" });
+  }
+
+  if (!isSuperAdmin(req.user)) {
+    return res.status(403).json({ message: "No tienes permisos" });
+  }
+
+  return next();
+}
+
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) {
@@ -34,4 +48,5 @@ module.exports = {
   requireRole,
   requirePermission,
   requireAnyPermission,
+  requireSuperAdmin,
 };

@@ -3,6 +3,7 @@ const XLSX = require("xlsx");
 const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/hash");
 const { buildBaseCode, generateUniqueSku } = require("../utils/sku");
+const { SUPER_ADMIN_EMAIL, isSuperAdmin } = require("../utils/superAdmin");
 
 const ROLES_VALIDOS = ["ADMINISTRADOR", "VENDEDOR", "CLIENTE"];
 
@@ -158,7 +159,7 @@ async function getStoreSettings(req, res) {
 }
 
 async function updateStoreSettings(req, res) {
-  const { brandName, logoUrl, promoVideoUrl, promoVideoTitle, mantenimiento } = req.body;
+  const { brandName, logoUrl, promoVideoUrl, promoVideoTitle } = req.body;
 
   if (brandName !== undefined && !String(brandName).trim()) {
     return res.status(400).json({ message: "brandName no puede estar vacio" });
@@ -171,7 +172,6 @@ async function updateStoreSettings(req, res) {
       ...(logoUrl !== undefined ? { logoUrl: logoUrl || null } : {}),
       ...(promoVideoUrl !== undefined ? { promoVideoUrl: promoVideoUrl || null } : {}),
       ...(promoVideoTitle !== undefined ? { promoVideoTitle: promoVideoTitle || null } : {}),
-      ...(mantenimiento !== undefined ? { mantenimiento: Boolean(mantenimiento) } : {}),
     },
     create: {
       id: 1,
@@ -179,11 +179,33 @@ async function updateStoreSettings(req, res) {
       logoUrl: logoUrl || null,
       promoVideoUrl: promoVideoUrl || null,
       promoVideoTitle: promoVideoTitle || null,
-      mantenimiento: Boolean(mantenimiento),
     },
   });
 
   return res.json({ settings });
+}
+
+// Modo mantenimiento: separado de updateStoreSettings a proposito, ya que solo
+// admin@joyeria.local puede leerlo/tocarlo (ver requireSuperAdmin en las rutas).
+async function getMaintenanceStatus(req, res) {
+  const settings = await prisma.configTienda.findUnique({ where: { id: 1 }, select: { mantenimiento: true } });
+  return res.json({ mantenimiento: Boolean(settings?.mantenimiento) });
+}
+
+async function setMaintenanceStatus(req, res) {
+  const { mantenimiento } = req.body;
+
+  if (typeof mantenimiento !== "boolean") {
+    return res.status(400).json({ message: "mantenimiento debe ser true o false" });
+  }
+
+  const settings = await prisma.configTienda.upsert({
+    where: { id: 1 },
+    update: { mantenimiento },
+    create: { id: 1, brandName: "Don Joyero", mantenimiento },
+  });
+
+  return res.json({ mantenimiento: settings.mantenimiento });
 }
 
 async function listSlides(req, res) {
@@ -679,6 +701,8 @@ async function updateUser(req, res) {
     return res.status(404).json({ message: "Usuario no encontrado" });
   }
 
+  const existingIsSuperAdmin = isSuperAdmin(existing);
+
   const data = {};
 
   if (name !== undefined) {
@@ -692,6 +716,14 @@ async function updateUser(req, res) {
     const normalizedEmail = String(email).trim().toLowerCase();
     if (!normalizedEmail) {
       return res.status(400).json({ message: "email no puede estar vacio" });
+    }
+
+    if (existingIsSuperAdmin && normalizedEmail !== SUPER_ADMIN_EMAIL) {
+      return res.status(400).json({ message: "La cuenta admin@joyeria.local no puede cambiar de email" });
+    }
+
+    if (!existingIsSuperAdmin && normalizedEmail === SUPER_ADMIN_EMAIL) {
+      return res.status(400).json({ message: "Ese email esta reservado para la cuenta admin principal" });
     }
 
     const usedByOther = await prisma.usuario.findFirst({
@@ -709,6 +741,9 @@ async function updateUser(req, res) {
     const normalizedRole = String(role).trim().toUpperCase();
     if (!ROLES_VALIDOS.includes(normalizedRole)) {
       return res.status(400).json({ message: "Rol invalido" });
+    }
+    if (existingIsSuperAdmin && normalizedRole !== "ADMINISTRADOR") {
+      return res.status(400).json({ message: "La cuenta admin@joyeria.local no puede cambiar de rol" });
     }
     data.rol = normalizedRole;
   }
@@ -748,6 +783,10 @@ async function deleteUser(req, res) {
   const existing = await prisma.usuario.findUnique({ where: { id: Number(id) } });
   if (!existing) {
     return res.status(404).json({ message: "Usuario no encontrado" });
+  }
+
+  if (isSuperAdmin(existing)) {
+    return res.status(400).json({ message: "No se puede eliminar la cuenta admin principal" });
   }
 
   await prisma.usuario.delete({ where: { id: Number(id) } });
@@ -1153,6 +1192,8 @@ module.exports = {
   deleteCategory,
   getStoreSettings,
   updateStoreSettings,
+  getMaintenanceStatus,
+  setMaintenanceStatus,
   listSlides,
   createSlide,
   updateSlide,
