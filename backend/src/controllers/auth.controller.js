@@ -132,6 +132,13 @@ async function login(req, res) {
     return res.status(401).json({ message: "Credenciales invalidas" });
   }
 
+  if (user.rol === "CLIENTE") {
+    const config = await prisma.configTienda.findUnique({ where: { id: 1 }, select: { mantenimiento: true } });
+    if (config?.mantenimiento) {
+      return res.status(503).json({ message: "El sitio esta en mantenimiento. Volve a intentarlo mas tarde.", maintenance: true });
+    }
+  }
+
   const token = signAccessToken({ id: user.id, rol: user.rol, email: user.email, permisos: user.permisos });
 
   return res.json({

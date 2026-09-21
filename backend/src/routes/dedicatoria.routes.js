@@ -1,8 +1,11 @@
 const { Router } = require("express");
 
 const { getDedicatoria, submitDedicatoria, buscarPedido, guardarDedicatoriaPedido, verDedicatoriaCompartida } = require("../controllers/dedicatoria.controller");
+const { blockDuringMaintenance } = require("../middleware/maintenance.middleware");
 
 const router = Router();
+
+router.use(blockDuringMaintenance);
 
 router.get("/buscar/:pedidoId", buscarPedido);
 router.post("/pedido/:pedidoId", guardarDedicatoriaPedido);

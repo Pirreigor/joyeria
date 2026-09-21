@@ -158,7 +158,7 @@ async function getStoreSettings(req, res) {
 }
 
 async function updateStoreSettings(req, res) {
-  const { brandName, logoUrl, promoVideoUrl, promoVideoTitle } = req.body;
+  const { brandName, logoUrl, promoVideoUrl, promoVideoTitle, mantenimiento } = req.body;
 
   if (brandName !== undefined && !String(brandName).trim()) {
     return res.status(400).json({ message: "brandName no puede estar vacio" });
@@ -171,6 +171,7 @@ async function updateStoreSettings(req, res) {
       ...(logoUrl !== undefined ? { logoUrl: logoUrl || null } : {}),
       ...(promoVideoUrl !== undefined ? { promoVideoUrl: promoVideoUrl || null } : {}),
       ...(promoVideoTitle !== undefined ? { promoVideoTitle: promoVideoTitle || null } : {}),
+      ...(mantenimiento !== undefined ? { mantenimiento: Boolean(mantenimiento) } : {}),
     },
     create: {
       id: 1,
@@ -178,6 +179,7 @@ async function updateStoreSettings(req, res) {
       logoUrl: logoUrl || null,
       promoVideoUrl: promoVideoUrl || null,
       promoVideoTitle: promoVideoTitle || null,
+      mantenimiento: Boolean(mantenimiento),
     },
   });
 

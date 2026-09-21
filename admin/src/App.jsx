@@ -506,6 +506,7 @@ const initialSettingsForm = {
   logoUrl: "",
   promoVideoUrl: "",
   promoVideoTitle: "",
+  mantenimiento: false,
 };
 
 const initialProductForm = {
@@ -1125,6 +1126,7 @@ export default function App() {
   const [acceptError, setAcceptError] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [importFile, setImportFile] = useState(null);
@@ -1532,6 +1534,7 @@ export default function App() {
         logoUrl: settingsData?.settings?.logoUrl || "",
         promoVideoUrl: settingsData?.settings?.promoVideoUrl || "",
         promoVideoTitle: settingsData?.settings?.promoVideoTitle || "",
+        mantenimiento: Boolean(settingsData?.settings?.mantenimiento),
       });
       setTiposPieza(tiposPiezaData.items || []);
       setMaterialesCatalogo(materialesData.items || []);
@@ -1752,6 +1755,7 @@ export default function App() {
       logoUrl: settingsForm.logoUrl.trim() || null,
       promoVideoUrl: settingsForm.promoVideoUrl.trim() || null,
       promoVideoTitle: settingsForm.promoVideoTitle.trim() || null,
+      mantenimiento: settingsForm.mantenimiento,
     };
 
     try {
@@ -1769,6 +1773,30 @@ export default function App() {
       setListError(error.message || "No se pudo guardar configuracion");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleToggleMaintenance() {
+    const next = !settingsForm.mantenimiento;
+    const confirmMessage = next
+      ? "Esto apaga la tienda para todos los clientes: no van a poder ver productos, loguearse ni comprar. Los usuarios ADMINISTRADOR y VENDEDOR van a seguir pudiendo entrar. Confirmas?"
+      : "Esto vuelve a abrir la tienda al publico. Confirmas?";
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setMaintenanceSaving(true);
+    setListError("");
+
+    try {
+      await request("/api/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ mantenimiento: next }),
+      });
+      setSettingsForm((prev) => ({ ...prev, mantenimiento: next }));
+    } catch (error) {
+      setListError(error.message || "No se pudo actualizar el modo mantenimiento");
+    } finally {
+      setMaintenanceSaving(false);
     }
   }
 
@@ -2872,6 +2900,18 @@ export default function App() {
                 <button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar branding"}</button>
               </div>
             </form>
+
+            <div className={`maintenancePanel${settingsForm.mantenimiento ? " active" : ""}`}>
+              <h3>Modo mantenimiento</h3>
+              <p>
+                {settingsForm.mantenimiento
+                  ? "La tienda esta APAGADA para clientes ahora mismo. Nadie puede ver productos, loguearse ni comprar. El ERP sigue funcionando normalmente."
+                  : "Apaga la tienda al publico (productos, login de clientes, checkout, dedicatorias) para un mantenimiento de emergencia, sin afectar el acceso al ERP."}
+              </p>
+              <button type="button" className={settingsForm.mantenimiento ? "danger" : ""} onClick={handleToggleMaintenance} disabled={maintenanceSaving}>
+                {maintenanceSaving ? "Actualizando..." : settingsForm.mantenimiento ? "Desactivar mantenimiento" : "Activar mantenimiento"}
+              </button>
+            </div>
           </article>
         )}
 

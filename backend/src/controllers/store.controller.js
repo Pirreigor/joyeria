@@ -37,6 +37,7 @@ async function getStoreSettings(req, res) {
         logoUrl: null,
         promoVideoUrl: null,
         promoVideoTitle: null,
+        mantenimiento: false,
       },
     });
   }

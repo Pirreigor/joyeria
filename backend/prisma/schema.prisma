@@ -164,6 +164,7 @@ model ConfigTienda {
   logoUrl         String?
   promoVideoUrl   String?
   promoVideoTitle String?
+  mantenimiento   Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

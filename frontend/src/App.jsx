@@ -474,6 +474,7 @@ export default function App() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
 
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -546,24 +547,42 @@ export default function App() {
         setLoading(true);
         setError("");
 
-        const [productsResponse, categoriesResponse, slidesResponse, flyersResponse, settingsResponse] = await Promise.all([
+        // Se consulta primero y solo esto: si la tienda esta en mantenimiento,
+        // no se pide nada mas (ni productos ni imagenes), para no gastar
+        // ancho de banda ni carga en la base de datos mientras dure.
+        const settingsResponse = await fetch(`${API_URL}/api/store/settings`);
+        if (!settingsResponse.ok) {
+          throw new Error("No se pudo cargar la tienda.");
+        }
+        const settingsData = await settingsResponse.json();
+
+        if (mounted) {
+          setSettings(settingsData.settings || settings);
+        }
+
+        if (settingsData.settings?.mantenimiento) {
+          if (mounted) {
+            setMaintenanceMode(true);
+          }
+          return;
+        }
+
+        const [productsResponse, categoriesResponse, slidesResponse, flyersResponse] = await Promise.all([
           fetch(`${API_URL}/api/products`),
           fetch(`${API_URL}/api/store/categories`),
           fetch(`${API_URL}/api/store/slides`),
           fetch(`${API_URL}/api/store/flyers`),
-          fetch(`${API_URL}/api/store/settings`),
         ]);
 
-        if (!productsResponse.ok || !categoriesResponse.ok || !slidesResponse.ok || !flyersResponse.ok || !settingsResponse.ok) {
+        if (!productsResponse.ok || !categoriesResponse.ok || !slidesResponse.ok || !flyersResponse.ok) {
           throw new Error("No se pudo cargar la tienda.");
         }
 
-        const [productsData, categoriesData, slidesData, flyersData, settingsData] = await Promise.all([
+        const [productsData, categoriesData, slidesData, flyersData] = await Promise.all([
           productsResponse.json(),
           categoriesResponse.json(),
           slidesResponse.json(),
           flyersResponse.json(),
-          settingsResponse.json(),
         ]);
 
         if (mounted) {
@@ -571,7 +590,6 @@ export default function App() {
           setCategories(categoriesData.categories || []);
           setSlides(slidesData.slides || []);
           setFlyers(flyersData.flyers || []);
-          setSettings(settingsData.settings || settings);
           setActiveSlide(0);
         }
       } catch (requestError) {
@@ -912,6 +930,18 @@ export default function App() {
 
     setContactForm({ nombre: "", email: "", mensaje: "" });
     window.open(whatsappUrl, "_blank");
+  }
+
+  if (maintenanceMode) {
+    return (
+      <div className="page maintenancePage">
+        <div className="maintenanceCard">
+          {settings.logoUrl && <img src={cdnImg(settings.logoUrl, 150)} alt={settings.brandName} className="maintenanceLogo" />}
+          <h1>Estamos en mantenimiento</h1>
+          <p>Estamos haciendo algunos ajustes. Volvemos enseguida — gracias por tu paciencia.</p>
+        </div>
+      </div>
+    );
   }
 
   if (sharedDedicationToken) {
