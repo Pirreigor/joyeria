@@ -546,6 +546,7 @@ const initialUserForm = {
   password: "",
   rol: "CLIENTE",
   permisos: [],
+  tallerId: "",
 };
 
 const initialInviteForm = {
@@ -1457,14 +1458,14 @@ export default function App() {
 
     (async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/invitations/${inviteToken}`);
+        const response = await fetch(`${API_URL}/api/auth/invitations/${inviteToken}`, { signal: AbortSignal.timeout(15000) });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(data.message || "No se pudo validar la invitacion");
         }
         setInviteInfo(data.invitation);
       } catch (error) {
-        setInviteInfoError(error.message || "No se pudo validar la invitacion");
+        setInviteInfoError(error.name === "TimeoutError" ? "La conexion tarda demasiado. Revisa tu internet y reintenta." : error.message || "No se pudo validar la invitacion");
       } finally {
         setInviteInfoLoading(false);
       }
@@ -2095,6 +2096,7 @@ export default function App() {
       password: userForm.password,
       role: userForm.rol,
       permissions: ["ADMINISTRADOR", "VENDEDOR"].includes(userForm.rol) ? userForm.permisos : [],
+      tallerId: userForm.rol === "TALLER" ? Number(userForm.tallerId) : null,
     };
 
     try {
@@ -2997,7 +2999,10 @@ export default function App() {
           {inviteInfoLoading && <p>Validando invitacion...</p>}
 
           {!inviteInfoLoading && inviteInfoError && (
-            <p className="error">{inviteInfoError}</p>
+            <>
+              <p className="error">{inviteInfoError}</p>
+              <button type="button" className="ghost" onClick={() => window.location.reload()}>Reintentar</button>
+            </>
           )}
 
           {!inviteInfoLoading && !inviteInfoError && inviteInfo && (
@@ -3700,6 +3705,34 @@ export default function App() {
               </div>
             ))}
 
+            {activeTab === "users" && invitations.length > 0 && (
+              <>
+                <h3 className="listSubheading">Invitaciones pendientes</h3>
+                {invitations.map((inv) => {
+                  const expired = new Date(inv.expiresAt) < new Date();
+                  return (
+                    <article key={inv.id} className="card">
+                      <div className="card-info">
+                        <strong>{inv.name}</strong>
+                        <small>{inv.email} — Expira: {new Date(inv.expiresAt).toLocaleDateString()}</small>
+                      </div>
+                      <div className="card-badges">
+                        <span className={`badge ${expired ? "off" : "on"}`}>{expired ? "Expirada" : "Pendiente"}</span>
+                        <span className={`badge ${inv.rol === "CLIENTE" ? "off" : "on"}`}>{roleLabel(inv.rol)}</span>
+                      </div>
+                      <div className="actions">
+                        <button type="button" className="ghost" onClick={() => handleResendInvitation(inv)} disabled={invitationActionId === inv.id}>
+                          {invitationActionId === inv.id ? "..." : "Reenviar invitacion"}
+                        </button>
+                        <button type="button" className="danger" onClick={() => handleRevokeInvitation(inv)} disabled={invitationActionId === inv.id}>
+                          {invitationActionId === inv.id ? "..." : "Revocar"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </>
+            )}
             {activeTab === "users" && pagedList.map((u) => (
               <article key={u.id} className="card">
                 <div className="card-info">
@@ -3726,34 +3759,6 @@ export default function App() {
               </article>
             ))}
 
-            {activeTab === "users" && invitations.length > 0 && (
-              <>
-                <h3 className="listSubheading">Invitaciones pendientes</h3>
-                {invitations.map((inv) => {
-                  const expired = new Date(inv.expiresAt) < new Date();
-                  return (
-                    <article key={inv.id} className="card">
-                      <div className="card-info">
-                        <strong>{inv.name}</strong>
-                        <small>{inv.email} — Expira: {new Date(inv.expiresAt).toLocaleDateString()}</small>
-                      </div>
-                      <div className="card-badges">
-                        <span className={`badge ${expired ? "off" : "on"}`}>{expired ? "Expirada" : "Pendiente"}</span>
-                        <span className={`badge ${inv.rol === "CLIENTE" ? "off" : "on"}`}>{roleLabel(inv.rol)}</span>
-                      </div>
-                      <div className="actions">
-                        <button type="button" className="ghost" onClick={() => handleResendInvitation(inv)} disabled={invitationActionId === inv.id}>
-                          {invitationActionId === inv.id ? "..." : "Reenviar"}
-                        </button>
-                        <button type="button" className="danger" onClick={() => handleRevokeInvitation(inv)} disabled={invitationActionId === inv.id}>
-                          {invitationActionId === inv.id ? "..." : "Revocar"}
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </>
-            )}
 
             {activeTab === "categories" && pagedList.map((c) => (
               <article key={c.id} className={c._parent ? "card card-sub" : "card"}>
@@ -4025,7 +4030,17 @@ export default function App() {
                 <option value="CLIENTE">Cliente</option>
                 <option value="VENDEDOR">Vendedor</option>
                 <option value="ADMINISTRADOR">Administrador</option>
+                <option value="TALLER">Taller</option>
               </select>
+              {userForm.rol === "TALLER" && !isEditingUser && (
+                <>
+                  <label htmlFor="user-taller">Taller</label>
+                  <select id="user-taller" value={userForm.tallerId} onChange={(e) => setUserForm((p) => ({ ...p, tallerId: e.target.value }))} required>
+                    <option value="">Elegir taller...</option>
+                    {talleres.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  </select>
+                </>
+              )}
               {["ADMINISTRADOR", "VENDEDOR"].includes(userForm.rol) && (
                 <>
                   <label>

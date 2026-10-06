@@ -660,8 +660,16 @@ async function createUser(req, res) {
   const normalizedEmail = String(email).trim().toLowerCase();
   const normalizedRole = role ? String(role).trim().toUpperCase() : "CLIENTE";
 
-  if (!ROLES_VALIDOS.includes(normalizedRole)) {
+  if (![...ROLES_VALIDOS, "TALLER"].includes(normalizedRole)) {
     return res.status(400).json({ message: "Rol invalido" });
+  }
+
+  let tallerDelUsuario = null;
+  if (normalizedRole === "TALLER") {
+    tallerDelUsuario = req.body.tallerId ? await prisma.taller.findUnique({ where: { id: Number(req.body.tallerId) } }) : null;
+    if (!tallerDelUsuario) {
+      return res.status(400).json({ message: "Elegi el taller al que pertenece el usuario" });
+    }
   }
 
   const existing = await prisma.usuario.findUnique({ where: { email: normalizedEmail } });
@@ -677,7 +685,8 @@ async function createUser(req, res) {
       email: normalizedEmail,
       passwordHash,
       rol: normalizedRole,
-      permisos: Array.isArray(permissions) ? permissions.filter((p) => typeof p === "string") : [],
+      permisos: normalizedRole === "TALLER" || !Array.isArray(permissions) ? [] : permissions.filter((p) => typeof p === "string"),
+      tallerId: tallerDelUsuario?.id ?? null,
     },
     select: {
       id: true,
