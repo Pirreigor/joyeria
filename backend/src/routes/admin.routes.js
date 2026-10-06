@@ -36,6 +36,7 @@ const {
   updateOrderItemPrices,
   updateCotizacion,
   confirmPayment,
+  registrarPagoAdicional,
   listOrderDedicatorias,
 } = require("../controllers/admin.controller");
 const { uploadImage, exportTemplate, importProducts } = require("../controllers/import.controller");
@@ -138,6 +139,7 @@ router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "en
 router.get("/orders/export", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), exportOrders);
 router.post("/orders/manual", requirePermission("orders"), createManualOrder);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
+router.post("/orders/:id/pagos", requirePermission("orders"), uploadComprobante, registrarPagoAdicional);
 router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios"), updateOrderStatus);
 router.patch("/orders/:id/items", requirePermission("orders"), updateOrderItemPrices);
 router.patch("/orders/:id/cotizacion", requirePermission("orders"), updateCotizacion);

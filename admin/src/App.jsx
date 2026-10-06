@@ -1096,6 +1096,23 @@ function NotaCambios({ cambios }) {
   );
 }
 
+function PagosLista({ pagos }) {
+  if (!pagos?.length) return null;
+  return (
+    <ul className="pagosLista">
+      {pagos.map((p) => (
+        <li key={p.id}>
+          <small>
+            Pago: {p.metodoPago || "—"} — #{p.numeroComprobante || "—"}
+            {p.usuario?.name ? " — " + p.usuario.name : ""} — {new Date(p.createdAt).toLocaleDateString()}
+            {p.comprobanteUrl && <> — <a href={`${API_URL}${p.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a></>}
+          </small>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function TallerHistorial({ historial }) {
   if (!historial?.length) return <small className="subtle">Sin movimientos registrados</small>;
   return (
@@ -1189,6 +1206,9 @@ export default function App() {
   const [notaPedidoSaving, setNotaPedidoSaving] = useState(false);
   const [notaPedidoReadOnly, setNotaPedidoReadOnly] = useState(false);
   const [notaPedidoTaller, setNotaPedidoTaller] = useState(false);
+  const [pagoAdicional, setPagoAdicional] = useState(null);
+  const [pagoAdicionalForm, setPagoAdicionalForm] = useState({ metodoPago: "", numeroComprobante: "", comprobante: null });
+  const [pagoAdicionalSaving, setPagoAdicionalSaving] = useState(false);
 
   const [shippingModal, setShippingModal] = useState(null);
   const [shippingForm, setShippingForm] = useState({ courierEnvio: "", numeroGuia: "" });
@@ -2781,8 +2801,10 @@ export default function App() {
     try {
       const data = await request("/api/admin/taller/pedidos");
       setTallerData({ talleres: data.talleres || [], pedidos: data.pedidos || [] });
+      return data.pedidos || [];
     } catch (error) {
       setListError(error.message || "No se pudieron cargar los pedidos de taller");
+      return [];
     }
   }
 
@@ -2957,18 +2979,52 @@ export default function App() {
     setNotaPedidoTaller(taller);
   }
 
+  function openPagoAdicional(orderId) {
+    setPagoAdicional(orderId);
+    setPagoAdicionalForm({ metodoPago: "", numeroComprobante: "", comprobante: null });
+  }
+
+  async function handlePagoAdicionalSubmit(event) {
+    event.preventDefault();
+    setPagoAdicionalSaving(true);
+    setListError("");
+    try {
+      const fd = new FormData();
+      fd.append("metodoPago", pagoAdicionalForm.metodoPago);
+      fd.append("numeroComprobante", pagoAdicionalForm.numeroComprobante);
+      fd.append("comprobante", pagoAdicionalForm.comprobante);
+      const response = await fetch(`${API_URL}/api/admin/orders/${pagoAdicional}/pagos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || "No se pudo registrar el pago");
+      }
+      setPagoAdicional(null);
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo registrar el pago");
+    } finally {
+      setPagoAdicionalSaving(false);
+    }
+  }
+
   async function handleNotaPedidoSubmit(event) {
     event.preventDefault();
     setNotaPedidoSaving(true);
     setListError("");
 
+    let ordenPdf = notaPedidoModal;
     try {
       if (!notaPedidoReadOnly && notaPedidoTaller) {
         await request(`/api/admin/taller/pedidos/${notaPedidoModal.id}/nota`, {
           method: "PATCH",
           body: JSON.stringify(notaPedidoForm),
         });
-        await cargarTallerData();
+        const pedidosFrescos = await cargarTallerData();
+        ordenPdf = pedidosFrescos.find((o) => o.id === notaPedidoModal.id) || notaPedidoModal;
       } else if (!notaPedidoReadOnly) {
         await request(`/api/admin/orders/${notaPedidoModal.id}/nota-pedido`, {
           method: "PATCH",
@@ -2978,7 +3034,7 @@ export default function App() {
       }
 
       const logo = await fetchLogoForPdf();
-      await buildNotaPedidoPdf({ order: notaPedidoModal, form: notaPedidoForm, logo });
+      await buildNotaPedidoPdf({ order: ordenPdf, form: notaPedidoForm, logo });
       setNotaPedidoModal(null);
     } catch (error) {
       setListError(error.message || "No se pudo guardar la nota de pedido");
@@ -3932,6 +3988,7 @@ export default function App() {
                   <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
                   <small>Total: S/ {Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
                   {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
+                  <PagosLista pagos={order.pagos} />
                   {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
                   {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
                   {order.taller && <small>Taller: {order.taller.nombre}{order.etapaTaller ? ` — Etapa: ${order.etapaTaller.nombre}` : ""}</small>}
@@ -3945,6 +4002,9 @@ export default function App() {
                   </ul>
                 )}
                 <div className="actions">
+                  {["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
+                    <button type="button" className="ghost" onClick={() => openPagoAdicional(order.id)}>Agregar pago</button>
+                  )}
                   {["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openDedicationView(order)}>Dedicatorias</button>
                   )}
@@ -3994,6 +4054,7 @@ export default function App() {
                     <div className="card-info historialRowDetail">
                       <small>{order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
                       {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
+                  <PagosLista pagos={order.pagos} />
                       {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
                       {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
                       {order.confirmedBy && <small>Pago confirmado por: {order.confirmedBy.name}</small>}
@@ -4696,6 +4757,34 @@ export default function App() {
               <div className="actions">
                 <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0 || manualOrderForm.items.some((i) => i.custom && (!i.name.trim() || !(i.price >= 0) || !i.fotoUrl))}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
                 <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {pagoAdicional !== null && (
+        <div className="modalOverlay" onClick={() => setPagoAdicional(null)}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>Agregar pago — Pedido #{pagoAdicional}</h2>
+            <form onSubmit={handlePagoAdicionalSubmit} className="categoryForm">
+              <label htmlFor="pa-metodo">Metodo de pago</label>
+              <select id="pa-metodo" value={pagoAdicionalForm.metodoPago} onChange={(e) => setPagoAdicionalForm((p) => ({ ...p, metodoPago: e.target.value }))} required>
+                <option value="">Seleccionar...</option>
+                <option value="Transferencia BCP">Transferencia BCP</option>
+                <option value="YAPE">YAPE</option>
+                <option value="Transferencia BN">Transferencia BN</option>
+                <option value="PLIN">PLIN</option>
+                <option value="BBVA">BBVA</option>
+                <option value="Interbank">Interbank</option>
+              </select>
+              <label htmlFor="pa-numero">Numero de comprobante</label>
+              <input id="pa-numero" type="text" value={pagoAdicionalForm.numeroComprobante} onChange={(e) => setPagoAdicionalForm((p) => ({ ...p, numeroComprobante: e.target.value }))} required />
+              <label htmlFor="pa-comprobante">Comprobante de pago (imagen)</label>
+              <input id="pa-comprobante" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setPagoAdicionalForm((p) => ({ ...p, comprobante: e.target.files[0] || null }))} required />
+              <div className="actions">
+                <button type="submit" disabled={pagoAdicionalSaving}>{pagoAdicionalSaving ? "Guardando..." : "Registrar pago"}</button>
+                <button type="button" className="ghost" onClick={() => setPagoAdicional(null)}>Cancelar</button>
               </div>
             </form>
           </div>

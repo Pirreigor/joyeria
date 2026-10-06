@@ -38,6 +38,7 @@ model Usuario {
   pedidosDespachados Pedido[]   @relation("PedidoDespachadoPor")
   etapasTallerRegistradas PedidoEtapaTaller[] @relation("EtapaRegistradaPor")
   notaCambiosRealizados   PedidoNotaCambio[] @relation("NotaCambioPor")
+  pagosRegistrados        PedidoPago[] @relation("PagoRegistradoPor")
   talleres           Taller[]  @relation("UsuarioTalleres")
   resetTokenHash     String?
   resetTokenExpiresAt DateTime?
@@ -261,6 +262,7 @@ model Pedido {
   notaFotos                     String[] @default([])
   notaGuardadaAt                DateTime?
   notaCambios                   PedidoNotaCambio[]
+  pagos                         PedidoPago[]
   cotizacion                    Json?
   tallerId                      Int?
   taller                        Taller?      @relation(fields: [tallerId], references: [id], onDelete: SetNull)
@@ -323,6 +325,20 @@ model PedidoNotaCambio {
   createdAt     DateTime @default(now())
 
   @@map("pedido_nota_cambios")
+}
+
+model PedidoPago {
+  id                Int      @id @default(autoincrement())
+  pedidoId          Int
+  pedido            Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  metodoPago        String?
+  numeroComprobante String?
+  comprobanteUrl    String?
+  usuarioId         Int?
+  usuario           Usuario? @relation("PagoRegistradoPor", fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt         DateTime @default(now())
+
+  @@map("pedido_pagos")
 }
 
 model ItemPedido {

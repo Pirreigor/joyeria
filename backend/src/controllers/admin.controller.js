@@ -982,6 +982,10 @@ async function listOrders(req, res) {
         orderBy: { createdAt: "asc" },
         include: { usuario: { select: { name: true } } },
       },
+      pagos: {
+        orderBy: { createdAt: "asc" },
+        include: { usuario: { select: { name: true } } },
+      },
       historialTaller: {
         orderBy: { createdAt: "asc" },
         include: { usuario: { select: { name: true } } },
@@ -1172,6 +1176,44 @@ async function updateCotizacion(req, res) {
   return res.json({ order });
 }
 
+const ESTADOS_CON_PAGO = ["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
+const METODOS_PAGO_VALIDOS = ["Transferencia BCP", "YAPE", "Transferencia BN", "PLIN", "BBVA", "Interbank"];
+
+async function registrarPagoAdicional(req, res) {
+  const { id } = req.params;
+  const { metodoPago, numeroComprobante } = req.body;
+
+  if (!metodoPago || !numeroComprobante) {
+    return res.status(400).json({ message: "metodoPago y numeroComprobante son obligatorios" });
+  }
+  if (!METODOS_PAGO_VALIDOS.includes(metodoPago)) {
+    return res.status(400).json({ message: "Metodo de pago invalido" });
+  }
+  if (!req.file) {
+    return res.status(400).json({ message: "El comprobante de pago (imagen) es obligatorio" });
+  }
+
+  const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
+  if (!existing) {
+    return res.status(404).json({ message: "Pedido no encontrado" });
+  }
+  if (!ESTADOS_CON_PAGO.includes(existing.estado)) {
+    return res.status(409).json({ message: "Este pedido todavia no tiene pagos confirmados" });
+  }
+
+  await prisma.pedidoPago.create({
+    data: {
+      pedidoId: existing.id,
+      metodoPago: String(metodoPago).trim(),
+      numeroComprobante: String(numeroComprobante).trim(),
+      comprobanteUrl: `/uploads/comprobantes/${req.file.filename}`,
+      usuarioId: req.user.id,
+    },
+  });
+
+  return res.status(201).json({ ok: true });
+}
+
 async function confirmPayment(req, res) {
   const { id } = req.params;
   const { metodoPago, numeroComprobante, direccionEnvio, tallerId } = req.body;
@@ -1223,6 +1265,7 @@ async function confirmPayment(req, res) {
       comprobanteUrl,
       direccionEnvio: String(direccionEnvio).trim(),
       confirmedByUserId: req.user.id,
+      pagos: { create: { metodoPago: String(metodoPago).trim(), numeroComprobante: String(numeroComprobante).trim(), comprobanteUrl, usuarioId: req.user.id } },
       tallerId: taller.id,
       etapaTallerId: taller.etapas[0].id,
       tallerEnviadoAt: new Date(),
@@ -1284,6 +1327,7 @@ async function listOrderDedicatorias(req, res) {
 
 module.exports = {
   NOTA_PEDIDO_FIELDS,
+  registrarPagoAdicional,
   cambiosDeNota,
   sendUserPasswordReset,
   listCategories,
