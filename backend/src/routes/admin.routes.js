@@ -65,7 +65,7 @@ const { uploadImage: uploadImageMiddleware, uploadImportFiles } = require("../mi
 
 const router = Router();
 
-router.use(requireAuth, requireRole("ADMINISTRADOR", "VENDEDOR"), blockAdminDuringMaintenance);
+router.use(requireAuth, requireRole("ADMINISTRADOR", "VENDEDOR", "TALLER"), blockAdminDuringMaintenance);
 
 // Vista de emergencia: solo la cuenta admin@joyeria.local puede ver y accionar
 // el switch de mantenimiento, para que nadie mas pueda activarlo ni desactivarlo.
