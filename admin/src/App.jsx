@@ -1214,7 +1214,7 @@ export default function App() {
   const role = user?.rol || "ADMINISTRADOR";
   const isSuperAdmin = (user?.email || "").toLowerCase() === SUPER_ADMIN_EMAIL;
   const roleMenuSections = useMemo(() => {
-    const sections = MENU_BY_ROLE[role] || [];
+    const sections = MENU_BY_ROLE[role] || STAFF_MENU;
     const perms = user?.permisos || [];
     const base =
       role === "ADMINISTRADOR" && !perms.length
