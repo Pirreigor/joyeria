@@ -108,7 +108,7 @@ router.patch("/products/:id", requirePermission("products"), updateProduct);
 router.delete("/products/:id", requirePermission("products"), deleteProduct);
 router.get("/products/by-sku/:sku", requirePermission("products"), findProductBySku);
 
-router.post("/upload-image", requireAnyPermission("products", "categories", "slides", "flyers", "taller"), uploadImageMiddleware, uploadImage);
+router.post("/upload-image", requireAnyPermission("products", "categories", "slides", "flyers", "pedidosTaller"), uploadImageMiddleware, uploadImage);
 router.get("/products/export-template", requirePermission("products"), exportTemplate);
 router.get("/products/export-inventory", requireRole("ADMINISTRADOR"), exportInventory);
 router.post("/products/import", requirePermission("products"), uploadImportFiles, importProducts);
@@ -133,21 +133,21 @@ router.post("/origenes-gema", requirePermission("atributos"), createOrigenGema);
 router.patch("/origenes-gema/:id", requirePermission("atributos"), updateOrigenGema);
 router.delete("/origenes-gema/:id", requirePermission("atributos"), deleteOrigenGema);
 
-router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial", "taller"), listOrders);
+router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial", "pedidosTaller", "pedidosTerminados"), listOrders);
 router.get("/orders/export", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), exportOrders);
 router.post("/orders/manual", requirePermission("orders"), createManualOrder);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
-router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios", "taller"), updateOrderStatus);
+router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios", "pedidosTaller"), updateOrderStatus);
 router.patch("/orders/:id/items", requirePermission("orders"), updateOrderItemPrices);
 router.patch("/orders/:id/cotizacion", requirePermission("orders"), updateCotizacion);
-router.patch("/orders/:id/taller-etapa", requirePermission("taller"), updateOrderTallerEtapa);
+router.patch("/orders/:id/taller-etapa", requirePermission("pedidosTaller"), updateOrderTallerEtapa);
 
-router.get("/talleres", requireAnyPermission("taller", "orders"), listTalleres);
-router.post("/talleres", requirePermission("taller"), createTaller);
-router.patch("/talleres/:id", requirePermission("taller"), updateTaller);
-router.delete("/talleres/:id", requirePermission("taller"), deleteTaller);
-router.post("/talleres/:id/usuarios", requirePermission("taller"), asignarUsuarioTaller);
-router.delete("/talleres/:id/usuarios/:userId", requirePermission("taller"), quitarUsuarioTaller);
+router.get("/talleres", requireAnyPermission("pedidosTaller", "pedidosTerminados", "configTaller", "orders"), listTalleres);
+router.post("/talleres", requirePermission("configTaller"), createTaller);
+router.patch("/talleres/:id", requirePermission("configTaller"), updateTaller);
+router.delete("/talleres/:id", requirePermission("configTaller"), deleteTaller);
+router.post("/talleres/:id/usuarios", requirePermission("configTaller"), asignarUsuarioTaller);
+router.delete("/talleres/:id/usuarios/:userId", requirePermission("configTaller"), quitarUsuarioTaller);
 router.patch("/orders/:id/nota-pedido", requirePermission("orders"), updateNotaPedido);
 router.get("/orders/:id/dedicatorias", requireAnyPermission("orders", "despacho", "envios"), listOrderDedicatorias);
 

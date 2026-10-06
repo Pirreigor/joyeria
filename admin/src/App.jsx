@@ -627,7 +627,9 @@ const ALL_PERMISSIONS = [
   { key: "flyers", label: "Flyers" },
   { key: "orders", label: "Pedidos" },
   { key: "historial", label: "Historial" },
-  { key: "taller", label: "Taller" },
+  { key: "pedidosTaller", label: "Pedidos taller" },
+  { key: "pedidosTerminados", label: "Pedidos terminados" },
+  { key: "configTaller", label: "Configuracion de taller" },
   { key: "settings", label: "Branding" },
 ];
 
@@ -1223,7 +1225,7 @@ export default function App() {
             .map((s) => ({
               ...s,
               items: s.items.filter((i) => {
-                if (i.key === "pedidosTaller" || i.key === "pedidosTerminados" || i.key === "configTaller") return perms.includes("taller");
+                if (i.key === "pedidosTaller" || i.key === "pedidosTerminados" || i.key === "configTaller") return perms.includes(i.key);
                 if (i.key === "orders") return ORDERS_MENU_KEYS.some((k) => perms.includes(k));
                 if (i.key === "historial") return perms.includes("historial") || ORDERS_MENU_KEYS.some((k) => perms.includes(k));
                 return perms.includes(i.key);
@@ -1668,14 +1670,14 @@ export default function App() {
         fetchOrFallback(can("products"), "/api/admin/products", { products: [] }),
         fetchOrFallback(can("slides"), "/api/admin/slides", { slides: [] }),
         fetchOrFallback(can("flyers"), "/api/admin/flyers", { flyers: [] }),
-        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios") || can("historial") || can("taller"), "/api/admin/orders", { orders: [] }),
+        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios") || can("historial") || can("pedidosTaller") || can("pedidosTerminados"), "/api/admin/orders", { orders: [] }),
         fetchOrFallback(can("settings"), "/api/admin/settings", null),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/tipos-pieza", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/materiales", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/gemas", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/origenes-gema", { items: [] }),
         fetchOrFallback(isSuperAdminUser, "/api/admin/maintenance", null),
-        fetchOrFallback(can("taller") || can("orders"), "/api/admin/talleres", { talleres: [] }),
+        fetchOrFallback(can("pedidosTaller") || can("pedidosTerminados") || can("configTaller") || can("orders"), "/api/admin/talleres", { talleres: [] }),
       ]);
       setDashboard({
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
