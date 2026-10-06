@@ -978,6 +978,10 @@ async function listOrders(req, res) {
       },
       taller: true,
       etapaTaller: true,
+      notaCambios: {
+        orderBy: { createdAt: "asc" },
+        include: { usuario: { select: { name: true } } },
+      },
       historialTaller: {
         orderBy: { createdAt: "asc" },
         include: { usuario: { select: { name: true } } },

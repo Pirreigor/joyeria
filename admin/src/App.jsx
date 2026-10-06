@@ -468,6 +468,35 @@ async function buildNotaPedidoPdf({ order, form, logo }) {
     drawImageGrid(doc, fotos, rightX + 5, fotoLabelY + 4, galleryW, galleryH, 3);
   }
 
+  if (order.notaCambios?.length) {
+    doc.addPage();
+    let y = 20;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("Historial de cambios de la nota", 15, y);
+    y += 10;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    for (const c of order.notaCambios) {
+      const campo = NOTA_CAMPO_LABELS[c.campo] || c.campo;
+      const texto = c.campo === "notaFotos"
+        ? campo + ": fotos actualizadas"
+        : campo + ": \"" + (c.valorAnterior || "-") + "\" cambiado a \"" + (c.valorNuevo || "-") + "\"";
+      const detalle = new Date(c.createdAt).toLocaleString("es-PE") + (c.usuario?.name ? " - " + c.usuario.name : "");
+      const lineas = doc.splitTextToSize(texto, 260);
+      if (y + lineas.length * 5 + 12 > 195) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(lineas, 15, y);
+      y += lineas.length * 5;
+      doc.setTextColor(120, 120, 120);
+      doc.text(detalle, 15, y);
+      doc.setTextColor(0, 0, 0);
+      y += 9;
+    }
+  }
+
   doc.save(`nota-pedido-${order.id}.pdf`);
 }
 
