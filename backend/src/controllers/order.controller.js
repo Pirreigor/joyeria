@@ -29,12 +29,6 @@ async function createOrder(req, res) {
         throw error;
       }
 
-      if (product.stock < item.quantity) {
-        const error = new Error(`Stock insuficiente para ${product.name}`);
-        error.statusCode = 400;
-        throw error;
-      }
-
       total += Number(product.price) * item.quantity;
 
       itemsData.push({
@@ -98,12 +92,6 @@ async function checkout(req, res) {
 
       if (!product || !product.active) {
         const error = new Error(`Producto ${item.productId} no disponible`);
-        error.statusCode = 400;
-        throw error;
-      }
-
-      if (product.stock < item.quantity) {
-        const error = new Error(`Stock insuficiente para ${product.name}`);
         error.statusCode = 400;
         throw error;
       }

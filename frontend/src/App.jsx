@@ -849,7 +849,7 @@ export default function App() {
       if (found) {
         return previous.map((item) =>
           item.id === product.id
-            ? { ...item, quantity: Math.min(item.quantity + 1, Math.max(product.stock, 1)) }
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
@@ -860,7 +860,6 @@ export default function App() {
           id: product.id,
           name: product.name,
           price: Number(product.price),
-          stock: Number(product.stock || 0),
           quantity: 1,
         },
       ];
@@ -877,7 +876,7 @@ export default function App() {
       }
 
       return previous.map((item) =>
-        item.id === productId ? { ...item, quantity: Math.min(safeQuantity, Math.max(item.stock, 1)) } : item
+        item.id === productId ? { ...item, quantity: safeQuantity } : item
       );
     });
   }
