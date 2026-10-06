@@ -1187,7 +1187,8 @@ export default function App() {
   const [tallerFiltro, setTallerFiltro] = useState(null);
   const [tallerEtapaFiltro, setTallerEtapaFiltro] = useState(null);
   const [tallerAccesoAbierto, setTallerAccesoAbierto] = useState(null);
-  const [tallerAccesoForm, setTallerAccesoForm] = useState({ name: "", email: "", password: "" });
+  const [tallerAccesoUserId, setTallerAccesoUserId] = useState("");
+  const [tallerUsuariosDisponibles, setTallerUsuariosDisponibles] = useState([]);
   const [tallerAccesoSaving, setTallerAccesoSaving] = useState(false);
   const [maintenanceOn, setMaintenanceOn] = useState(false);
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
@@ -1697,6 +1698,7 @@ export default function App() {
         setMaintenanceOn(Boolean(maintenanceData?.mantenimiento));
       }
       setTalleres(talleresData.talleres || []);
+      setTallerUsuariosDisponibles(talleresData.usuariosDisponibles || []);
       setTiposPieza(tiposPiezaData.items || []);
       setMaterialesCatalogo(materialesData.items || []);
       setGemas(gemasData.items || []);
@@ -2735,9 +2737,9 @@ export default function App() {
     return urls;
   }
 
-  async function handleTallerEtapaSave(order) {
+  async function handleTallerEtapaSave(order, etapaOverride) {
     const pending = tallerPendientes[order.id] || {};
-    const etapaTallerId = Number(pending.etapaId ?? order.etapaTallerId);
+    const etapaTallerId = Number(etapaOverride ?? pending.etapaId ?? order.etapaTallerId);
     const files = pending.files || [];
     if (etapaTallerId === order.etapaTallerId && files.length === 0) return;
 
@@ -2762,26 +2764,26 @@ export default function App() {
     }
   }
 
-  async function handleCrearAccesoTaller(event, taller) {
+  async function handleAsignarAccesoTaller(event, taller) {
     event.preventDefault();
     setTallerAccesoSaving(true);
     setListError("");
     try {
       await request(`/api/admin/talleres/${taller.id}/usuarios`, {
         method: "POST",
-        body: JSON.stringify(tallerAccesoForm),
+        body: JSON.stringify({ userId: Number(tallerAccesoUserId) }),
       });
       setTallerAccesoAbierto(null);
       await loadData();
     } catch (error) {
-      setListError(error.message || "No se pudo crear el acceso");
+      setListError(error.message || "No se pudo asignar el usuario");
     } finally {
       setTallerAccesoSaving(false);
     }
   }
 
   async function handleEliminarAccesoTaller(taller, usuario) {
-    if (!window.confirm(`Quitar el acceso de ${usuario.email}?`)) return;
+    if (!window.confirm(`Quitar el acceso de taller a ${usuario.email}? La cuenta queda como vendedor sin permisos.`)) return;
     setListError("");
     try {
       await request(`/api/admin/talleres/${taller.id}/usuarios/${usuario.id}`, { method: "DELETE" });
@@ -3075,7 +3077,7 @@ export default function App() {
             <button type="submit" disabled={forgotSaving}>{forgotSaving ? "Enviando..." : "Enviar correo"}</button>
           </form>
           {forgotMessage && <p>{forgotMessage}</p>}
-          <button type="button" className="ghost" onClick={() => { setForgotMode(false); setForgotMessage(""); }}>Volver al login</button>
+          <button type="button" className="linkButton" onClick={() => { setForgotMode(false); setForgotMessage(""); }}>Volver al login</button>
         </section>
       </main>
     );
@@ -3087,7 +3089,7 @@ export default function App() {
         <section className="authCard">
           <p className="eyebrow">Don Joyero</p>
           <h1>Admin</h1>
-          <p>Inicia sesion para gestionar categorias del catalogo.</p>
+          <p>Ingresa con tu cuenta para entrar al panel.</p>
 
           <form onSubmit={handleLogin} className="authForm">
             <label htmlFor="email">Email</label>
@@ -3118,7 +3120,7 @@ export default function App() {
           </form>
 
           {authError && <p className="error">{authError}</p>}
-          <button type="button" className="ghost" onClick={() => setForgotMode(true)}>Olvide mi contrasena</button>
+          <button type="button" className="linkButton" onClick={() => setForgotMode(true)}>Olvide mi contrasena</button>
         </section>
       </main>
     );
@@ -3368,9 +3370,9 @@ export default function App() {
             {tallerSeleccionado && pedidosTallerFiltrados.length === 0 && <p className="subtle">No hay pedidos en esta fase.</p>}
             {pedidosTallerFiltrados.map((order) => {
               const pending = tallerPendientes[order.id] || {};
-              const etapaValue = pending.etapaId ?? order.etapaTallerId ?? "";
               const files = pending.files || [];
-              const hayCambio = Number(etapaValue) !== order.etapaTallerId || files.length > 0;
+              const etapas = tallerSeleccionado.etapas;
+              const siguiente = etapas[etapas.findIndex((e) => e.id === order.etapaTallerId) + 1];
               return (
                 <article key={order.id} className="card tallerCard">
                   <div className="card-info">
@@ -3385,10 +3387,7 @@ export default function App() {
                     <TallerHistorial historial={order.historialTaller} />
                   </div>
                   <div className="tallerPedidoAcciones">
-                    <label htmlFor={`etapa-${order.id}`}>Cambiar a etapa</label>
-                    <select id={`etapa-${order.id}`} value={etapaValue} onChange={(e) => setTallerPendiente(order.id, { etapaId: e.target.value })}>
-                      {tallerSeleccionado.etapas.map((etapa) => <option key={etapa.id} value={etapa.id}>{etapa.nombre}</option>)}
-                    </select>
+                    <small className="subtle">Etapa actual: {order.etapaTaller?.nombre || "—"}</small>
                     <label htmlFor={`fotos-${order.id}`}>Fotos de la etapa (opcional)</label>
                     <input
                       id={`fotos-${order.id}`}
@@ -3398,11 +3397,14 @@ export default function App() {
                       multiple
                       onChange={(e) => setTallerPendiente(order.id, { files: Array.from(e.target.files || []) })}
                     />
-                    <button type="button" disabled={!hayCambio || tallerGuardando === order.id} onClick={() => handleTallerEtapaSave(order)}>
-                      {tallerGuardando === order.id ? "Guardando..." : "Guardar etapa"}
-                    </button>
+                    {siguiente ? (
+                      <button type="button" disabled={tallerGuardando === order.id} onClick={() => handleTallerEtapaSave(order, siguiente.id)}>
+                        {tallerGuardando === order.id ? "Guardando..." : `Pasar a ${siguiente.nombre}`}
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar listo para envio</button>
+                    )}
                     <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
-                    <button type="button" className="ghost" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar listo para envio</button>
                   </div>
                 </article>
               );
@@ -3452,7 +3454,7 @@ export default function App() {
                   <button type="button" className="danger" onClick={() => handleTallerDelete(taller)}>Eliminar</button>
                 </div>
                 <div className="tallerAccesos">
-                  <strong>Accesos del taller</strong>
+                  <strong>Usuarios del taller</strong>
                   {(taller.usuarios || []).length === 0 && <small className="subtle">Este taller todavia no tiene accesos</small>}
                   {(taller.usuarios || []).map((usuario) => (
                     <div key={usuario.id} className="tallerAccesoRow">
@@ -3461,17 +3463,24 @@ export default function App() {
                     </div>
                   ))}
                   {tallerAccesoAbierto === taller.id ? (
-                    <form onSubmit={(e) => handleCrearAccesoTaller(e, taller)} className="tallerAccesoForm">
-                      <input type="text" placeholder="Nombre" value={tallerAccesoForm.name} onChange={(e) => setTallerAccesoForm((p) => ({ ...p, name: e.target.value }))} required />
-                      <input type="email" placeholder="Email de acceso" value={tallerAccesoForm.email} onChange={(e) => setTallerAccesoForm((p) => ({ ...p, email: e.target.value }))} required />
-                      <input type="password" placeholder="Contrasena inicial" value={tallerAccesoForm.password} onChange={(e) => setTallerAccesoForm((p) => ({ ...p, password: e.target.value }))} required />
+                    <form onSubmit={(e) => handleAsignarAccesoTaller(e, taller)} className="tallerAccesoForm">
+                      {tallerUsuariosDisponibles.length === 0 ? (
+                        <small className="subtle">No hay usuarios disponibles. Creá la cuenta primero en Usuarios.</small>
+                      ) : (
+                        <select value={tallerAccesoUserId} onChange={(e) => setTallerAccesoUserId(e.target.value)} required>
+                          <option value="">Elegir un usuario...</option>
+                          {tallerUsuariosDisponibles.map((u) => (
+                            <option key={u.id} value={u.id}>{u.name} — {u.email} ({roleLabel(u.rol)})</option>
+                          ))}
+                        </select>
+                      )}
                       <div className="actions">
-                        <button type="submit" disabled={tallerAccesoSaving}>{tallerAccesoSaving ? "Creando..." : "Crear acceso"}</button>
+                        <button type="submit" disabled={tallerAccesoSaving || tallerUsuariosDisponibles.length === 0}>{tallerAccesoSaving ? "Asignando..." : "Asignar usuario"}</button>
                         <button type="button" className="ghost" onClick={() => setTallerAccesoAbierto(null)}>Cancelar</button>
                       </div>
                     </form>
                   ) : (
-                    <button type="button" className="ghost" onClick={() => { setTallerAccesoAbierto(taller.id); setTallerAccesoForm({ name: "", email: "", password: "" }); }}>+ Dar acceso</button>
+                    <button type="button" className="ghost" onClick={() => { setTallerAccesoAbierto(taller.id); setTallerAccesoUserId(""); }}>+ Asignar usuario</button>
                   )}
                 </div>
               </div>

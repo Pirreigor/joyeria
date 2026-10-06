@@ -41,7 +41,7 @@ const {
 const { uploadImage, exportTemplate, importProducts } = require("../controllers/import.controller");
 const {
   listTalleres, createTaller, updateTaller, deleteTaller, updateOrderTallerEtapa,
-  createTallerUsuario, deleteTallerUsuario,
+  asignarUsuarioTaller, quitarUsuarioTaller,
 } = require("../controllers/taller.controller");
 const {
   createInvitation,
@@ -146,8 +146,8 @@ router.get("/talleres", requireAnyPermission("taller", "orders"), listTalleres);
 router.post("/talleres", requirePermission("taller"), createTaller);
 router.patch("/talleres/:id", requirePermission("taller"), updateTaller);
 router.delete("/talleres/:id", requirePermission("taller"), deleteTaller);
-router.post("/talleres/:id/usuarios", requirePermission("taller"), createTallerUsuario);
-router.delete("/talleres/:id/usuarios/:userId", requirePermission("taller"), deleteTallerUsuario);
+router.post("/talleres/:id/usuarios", requirePermission("taller"), asignarUsuarioTaller);
+router.delete("/talleres/:id/usuarios/:userId", requirePermission("taller"), quitarUsuarioTaller);
 router.patch("/orders/:id/nota-pedido", requirePermission("orders"), updateNotaPedido);
 router.get("/orders/:id/dedicatorias", requireAnyPermission("orders", "despacho", "envios"), listOrderDedicatorias);
 

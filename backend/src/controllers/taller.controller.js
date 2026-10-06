@@ -16,8 +16,15 @@ function normalizeEtapas(etapas) {
 }
 
 async function listTalleres(req, res) {
-  const talleres = await prisma.taller.findMany({ orderBy: { nombre: "asc" }, include: TALLER_INCLUDE });
-  return res.json({ talleres });
+  const [talleres, usuariosDisponibles] = await Promise.all([
+    prisma.taller.findMany({ orderBy: { nombre: "asc" }, include: TALLER_INCLUDE }),
+    prisma.usuario.findMany({
+      where: { rol: { not: "CLIENTE" }, tallerId: null, email: { not: SUPER_ADMIN_EMAIL } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true, rol: true },
+    }),
+  ]);
+  return res.json({ talleres, usuariosDisponibles });
 }
 
 async function createTaller(req, res) {
@@ -144,44 +151,33 @@ async function updateOrderTallerEtapa(req, res) {
   return res.json({ order });
 }
 
-async function createTallerUsuario(req, res) {
+async function asignarUsuarioTaller(req, res) {
   const { id } = req.params;
-  const { name, email, password } = req.body;
-
-  if (!name || !String(name).trim() || !email || !password) {
-    return res.status(400).json({ message: "name, email y password son obligatorios" });
-  }
+  const { userId } = req.body;
 
   const taller = await prisma.taller.findUnique({ where: { id: Number(id) } });
   if (!taller) {
     return res.status(404).json({ message: "Taller no encontrado" });
   }
 
-  const normalizedEmail = String(email).trim().toLowerCase();
-  if (normalizedEmail === SUPER_ADMIN_EMAIL) {
-    return res.status(409).json({ message: "Ese email esta reservado" });
+  const usuario = await prisma.usuario.findUnique({ where: { id: Number(userId) } });
+  if (!usuario || usuario.rol === "CLIENTE" || usuario.email === SUPER_ADMIN_EMAIL) {
+    return res.status(400).json({ message: "Ese usuario no puede asignarse a un taller" });
   }
-  const existing = await prisma.usuario.findUnique({ where: { email: normalizedEmail } });
-  if (existing) {
-    return res.status(409).json({ message: "El email ya esta en uso" });
+  if (usuario.tallerId && usuario.tallerId !== taller.id) {
+    return res.status(409).json({ message: "Ese usuario ya pertenece a otro taller" });
   }
 
-  const usuario = await prisma.usuario.create({
-    data: {
-      name: String(name).trim(),
-      email: normalizedEmail,
-      passwordHash: await hashPassword(String(password)),
-      rol: "TALLER",
-      permisos: [],
-      tallerId: taller.id,
-    },
+  const actualizado = await prisma.usuario.update({
+    where: { id: usuario.id },
+    data: { rol: "TALLER", tallerId: taller.id, permisos: [] },
     select: { id: true, name: true, email: true },
   });
 
-  return res.status(201).json({ usuario });
+  return res.json({ usuario: actualizado });
 }
 
-async function deleteTallerUsuario(req, res) {
+async function quitarUsuarioTaller(req, res) {
   const { id, userId } = req.params;
 
   const usuario = await prisma.usuario.findUnique({ where: { id: Number(userId) } });
@@ -189,13 +185,17 @@ async function deleteTallerUsuario(req, res) {
     return res.status(404).json({ message: "Acceso no encontrado en este taller" });
   }
 
-  await prisma.usuario.delete({ where: { id: usuario.id } });
+  await prisma.usuario.update({
+    where: { id: usuario.id },
+    data: { rol: "VENDEDOR", tallerId: null, permisos: [] },
+  });
+
   return res.status(204).send();
 }
 
 module.exports = {
-  createTallerUsuario,
-  deleteTallerUsuario,
+  asignarUsuarioTaller,
+  quitarUsuarioTaller,
   listTalleres,
   createTaller,
   updateTaller,

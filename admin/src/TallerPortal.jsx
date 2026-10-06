@@ -133,9 +133,9 @@ export default function TallerPortal({ apiUrl, token, user, onLogout }) {
     setPendientes((prev) => ({ ...prev, [orderId]: { ...prev[orderId], ...patch } }));
   }
 
-  async function guardarEtapa(pedido) {
+  async function guardarEtapa(pedido, etapaOverride) {
     const pending = pendientes[pedido.id] || {};
-    const etapaTallerId = Number(pending.etapaId ?? pedido.etapaTallerId);
+    const etapaTallerId = Number(etapaOverride ?? pending.etapaId ?? pedido.etapaTallerId);
     const files = pending.files || [];
     if (etapaTallerId === pedido.etapaTallerId && files.length === 0) return;
 
@@ -231,9 +231,8 @@ export default function TallerPortal({ apiUrl, token, user, onLogout }) {
 
         {visibles.map((pedido) => {
           const pending = pendientes[pedido.id] || {};
-          const etapaValue = pending.etapaId ?? pedido.etapaTallerId ?? "";
           const files = pending.files || [];
-          const hayCambio = Number(etapaValue) !== pedido.etapaTallerId || files.length > 0;
+          const siguiente = taller.etapas[taller.etapas.findIndex((e) => e.id === pedido.etapaTallerId) + 1];
           const enProceso = pedido.estado === "EN_TALLER";
           return (
             <article key={pedido.id} className="card tallerCard">
@@ -257,12 +256,7 @@ export default function TallerPortal({ apiUrl, token, user, onLogout }) {
 
               {enProceso && (
                 <div className="tallerPedidoAcciones">
-                  <label htmlFor={`etapa-${pedido.id}`}>Cambiar a etapa</label>
-                  <select id={`etapa-${pedido.id}`} value={etapaValue} onChange={(e) => setPendiente(pedido.id, { etapaId: e.target.value })}>
-                    {taller.etapas.map((etapa) => (
-                      <option key={etapa.id} value={etapa.id}>{etapa.nombre}</option>
-                    ))}
-                  </select>
+                  <small className="subtle">Etapa actual: {pedido.etapaTaller?.nombre || "—"}</small>
                   <label htmlFor={`fotos-${pedido.id}`}>Fotos de la etapa (opcional)</label>
                   <input
                     id={`fotos-${pedido.id}`}
@@ -272,10 +266,13 @@ export default function TallerPortal({ apiUrl, token, user, onLogout }) {
                     multiple
                     onChange={(e) => setPendiente(pedido.id, { files: Array.from(e.target.files || []) })}
                   />
-                  <button type="button" disabled={!hayCambio || guardando === pedido.id} onClick={() => guardarEtapa(pedido)}>
-                    {guardando === pedido.id ? "Guardando..." : "Guardar etapa"}
-                  </button>
-                  <button type="button" className="ghost" onClick={() => marcarListo(pedido)}>Marcar listo para envio</button>
+                  {siguiente ? (
+                    <button type="button" disabled={guardando === pedido.id} onClick={() => guardarEtapa(pedido, siguiente.id)}>
+                      {guardando === pedido.id ? "Guardando..." : `Pasar a ${siguiente.nombre}`}
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => marcarListo(pedido)}>Marcar listo para envio</button>
+                  )}
                 </div>
               )}
             </article>
