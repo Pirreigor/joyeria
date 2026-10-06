@@ -3334,18 +3334,17 @@ export default function App() {
             <h2>Pedidos en taller</h2>
             {talleres.length === 0 && <p className="subtle">No hay talleres configurados.</p>}
             {talleres.length > 0 && (
-              <div className="orderStageBar">
-                {talleres.map((t) => (
-                  <button
-                    type="button"
-                    key={t.id}
-                    className={tallerSeleccionado?.id === t.id ? "stageChip active" : "stageChip"}
-                    onClick={() => { setTallerFiltro(t.id); setTallerEtapaFiltro(null); }}
-                  >
-                    {t.nombre}
-                    <span className="stageChipCount">{tallerActivos.filter((o) => o.tallerId === t.id).length}</span>
-                  </button>
-                ))}
+              <div className="tallerSelector">
+                <label htmlFor="taller-select">Taller</label>
+                <select
+                  id="taller-select"
+                  value={tallerSeleccionado?.id ?? ""}
+                  onChange={(e) => { setTallerFiltro(Number(e.target.value)); setTallerEtapaFiltro(null); }}
+                >
+                  {talleres.map((t) => (
+                    <option key={t.id} value={t.id}>{t.nombre} ({tallerActivos.filter((o) => o.tallerId === t.id).length} en proceso)</option>
+                  ))}
+                </select>
               </div>
             )}
             {tallerSeleccionado && (
@@ -3404,7 +3403,7 @@ export default function App() {
                     ) : (
                       <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar listo para envio</button>
                     )}
-                    <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
+                    <button type="button" className="ghost" onClick={() => handleDescargarNotaHistorial(order)}>Descargar nota (PDF)</button>
                   </div>
                 </article>
               );
@@ -3867,7 +3866,7 @@ export default function App() {
                     <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order)}>Nota de pedido</button>
                   )}
                   {["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && order.notaJoya && (
-                    <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
+                    <button type="button" className="ghost" onClick={() => handleDescargarNotaHistorial(order)}>Descargar nota (PDF)</button>
                   )}
                   {["PAGADO", "EN_TALLER"].includes(order.estado) ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
