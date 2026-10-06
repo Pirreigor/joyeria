@@ -1037,6 +1037,36 @@ function ProductBarcodeLabel({ sku, name, price }) {
   );
 }
 
+const NOTA_CAMPO_LABELS = {
+  notaNumero: "N° de nota", notaAsesor: "Asesor", notaNumeroProforma: "N° proforma", notaJoya: "Joya", notaMetal: "Metal",
+  notaColor: "Color", notaPiedraCentral: "Piedra central", notaPiedraCentralTamano: "Tamaño piedra central",
+  notaPiedraLateral: "Piedra lateral", notaPiedraLateralTamano: "Tamaño piedra lateral", notaCorteCentral: "Corte central",
+  notaCorteLateral: "Corte lateral", notaTallaV: "Talla V", notaTallaD: "Talla D", notaAnchoV: "Ancho V", notaAnchoD: "Ancho D",
+  notaGrabadoV: "Grabado V", notaGrabadoD: "Grabado D", notaPesoTotal: "Peso total", notaPrioridadFechaEntrega: "Prioridad / fecha de entrega",
+  notaFechaEnviadaTallerIda: "Enviada a taller (ida)", notaFechaEnviadaTallerRegreso: "Regreso de taller", notaDescripcion: "Descripción",
+  notaFotos: "Fotos",
+};
+
+function NotaCambios({ cambios }) {
+  if (!cambios?.length) return null;
+  return (
+    <div className="notaCambios">
+      <strong>Cambios en la nota</strong>
+      <ul>
+        {cambios.map((c) => (
+          <li key={c.id}>
+            <span>
+              {NOTA_CAMPO_LABELS[c.campo] || c.campo}:{" "}
+              {c.campo === "notaFotos" ? "fotos actualizadas" : <><s>{c.valorAnterior || "—"}</s> → <b>{c.valorNuevo || "—"}</b></>}
+            </span>
+            <small>{new Date(c.createdAt).toLocaleString()}{c.usuario?.name ? " — " + c.usuario.name : ""}</small>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function TallerHistorial({ historial }) {
   if (!historial?.length) return <small className="subtle">Sin movimientos registrados</small>;
   return (
@@ -3411,6 +3441,7 @@ export default function App() {
                       {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`}</li>)}
                     </ul>
                     <TallerHistorial historial={order.historialTaller} />
+                      <NotaCambios cambios={order.notaCambios} />
                   </div>
                   <div className="tallerPedidoAcciones">
                     <small className="subtle">Etapa actual: {order.etapaTaller?.nombre || "—"}</small>
@@ -3452,6 +3483,7 @@ export default function App() {
                   </div>
                   <small>{order.taller?.nombre} — {order.clienteNombre || order.usuario?.name || "Cliente"}</small>
                   <TallerHistorial historial={order.historialTaller} />
+                      <NotaCambios cambios={order.notaCambios} />
                 </div>
                 <div className="actions">
                   <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
@@ -3948,6 +3980,7 @@ export default function App() {
                         <div className="historialDocumento">
                           <strong>Historial de taller</strong>
                           <TallerHistorial historial={order.historialTaller} />
+                      <NotaCambios cambios={order.notaCambios} />
                         </div>
                       )}
                       <div className="historialDocumento">

@@ -1,5 +1,5 @@
 const prisma = require("../utils/prisma");
-const { NOTA_PEDIDO_FIELDS } = require("./admin.controller");
+const { NOTA_PEDIDO_FIELDS, cambiosDeNota } = require("./admin.controller");
 
 const ESTADOS_DEL_TALLER = ["EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
 
@@ -36,12 +36,17 @@ async function listTallerPedidos(req, res) {
   });
   const ids = pedidos.map((p) => p.id);
 
-  const [items, historiales] = await Promise.all([
+  const [items, historiales, cambiosNota] = await Promise.all([
     prisma.itemPedido.findMany({
       where: { pedidoId: { in: ids } },
       include: { producto: { select: { name: true, imageUrl: true } } },
     }),
     prisma.pedidoEtapaTaller.findMany({
+      where: { pedidoId: { in: ids } },
+      orderBy: { createdAt: "asc" },
+      include: { usuario: { select: { name: true } } },
+    }),
+    prisma.pedidoNotaCambio.findMany({
       where: { pedidoId: { in: ids } },
       orderBy: { createdAt: "asc" },
       include: { usuario: { select: { name: true } } },
@@ -55,6 +60,7 @@ async function listTallerPedidos(req, res) {
   };
   const itemsPorPedido = agrupar(items, "pedidoId");
   const historialPorPedido = agrupar(historiales, "pedidoId");
+  const cambiosPorPedido = agrupar(cambiosNota, "pedidoId");
   const tallerPorId = new Map(talleres.map((t) => [t.id, t]));
 
   return res.json({
@@ -88,6 +94,14 @@ async function listTallerPedidos(req, res) {
           usuario: h.usuario ? { name: h.usuario.name } : null,
         })),
         notaFotos: p.notaFotos,
+        notaCambios: (cambiosPorPedido.get(p.id) || []).map((c) => ({
+          id: c.id,
+          campo: c.campo,
+          valorAnterior: c.valorAnterior,
+          valorNuevo: c.valorNuevo,
+          createdAt: c.createdAt,
+          usuario: c.usuario ? { name: c.usuario.name } : null,
+        })),
         ...Object.fromEntries(Object.entries(p).filter(([k]) => k.startsWith("nota") && k !== "notaFotos" && k !== "notaGuardadaAt")),
       };
     }),
@@ -162,7 +176,11 @@ async function actualizarNotaTaller(req, res) {
     data.notaFotos = req.body.notaFotos.map((url) => String(url).trim()).filter(Boolean);
   }
 
-  await prisma.pedido.update({ where: { id: pedido.id }, data });
+  const cambios = cambiosDeNota(pedido, data);
+  await prisma.pedido.update({
+    where: { id: pedido.id },
+    data: { ...data, notaCambios: { create: cambios.map((c) => ({ ...c, usuarioId: req.user.id })) } },
+  });
   return res.json({ ok: true });
 }
 

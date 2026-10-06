@@ -909,6 +909,23 @@ async function createManualOrder(req, res) {
   return res.status(201).json({ order });
 }
 
+function normalizarValorNota(valor) {
+  if (Array.isArray(valor)) return valor.length ? valor.join(", ") : null;
+  const texto = valor == null ? "" : String(valor).trim();
+  return texto === "" ? null : texto;
+}
+
+function cambiosDeNota(actual, nuevos) {
+  const cambios = [];
+  for (const campo of [...NOTA_PEDIDO_FIELDS, "notaFotos"]) {
+    if (nuevos[campo] === undefined) continue;
+    const valorAnterior = normalizarValorNota(actual[campo]);
+    const valorNuevo = normalizarValorNota(nuevos[campo]);
+    if (valorAnterior !== valorNuevo) cambios.push({ campo, valorAnterior, valorNuevo });
+  }
+  return cambios;
+}
+
 const ESTADOS_NOTA_PEDIDO_EDITABLE = ["PREPARAR", "NUEVO", "PAGADO", "EN_TALLER"];
 
 const NOTA_PEDIDO_FIELDS = [
@@ -942,9 +959,10 @@ async function updateNotaPedido(req, res) {
     data.notaFotos = notaFotos.map((url) => String(url).trim()).filter(Boolean);
   }
 
+  const cambios = cambiosDeNota(existing, data);
   const order = await prisma.pedido.update({
     where: { id: Number(id) },
-    data,
+    data: { ...data, notaCambios: { create: cambios.map((c) => ({ ...c, usuarioId: req.user.id })) } },
     include: { items: { include: { producto: true } } },
   });
 
@@ -1262,6 +1280,7 @@ async function listOrderDedicatorias(req, res) {
 
 module.exports = {
   NOTA_PEDIDO_FIELDS,
+  cambiosDeNota,
   sendUserPasswordReset,
   listCategories,
   createCategory,
