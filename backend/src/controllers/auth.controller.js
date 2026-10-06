@@ -60,7 +60,6 @@ async function acceptInvitation(req, res) {
         passwordHash,
         rol: invitation.rol,
         permisos: invitation.permisos,
-        tallerId: invitation.tallerId,
       },
       select: {
         id: true,

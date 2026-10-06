@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import TallerPortal from "./TallerPortal";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
@@ -546,7 +545,6 @@ const initialUserForm = {
   password: "",
   rol: "CLIENTE",
   permisos: [],
-  tallerId: "",
 };
 
 const initialInviteForm = {
@@ -554,7 +552,6 @@ const initialInviteForm = {
   email: "",
   rol: "CLIENTE",
   permisos: [],
-  tallerId: "",
 };
 
 const CATALOG_ENDPOINTS = {
@@ -1189,6 +1186,7 @@ export default function App() {
   const [tallerPendientes, setTallerPendientes] = useState({});
   const [tallerGuardando, setTallerGuardando] = useState(null);
   const [tallerFiltro, setTallerFiltro] = useState(null);
+  const [tallerData, setTallerData] = useState({ talleres: [], pedidos: [] });
   const [tallerEtapaFiltro, setTallerEtapaFiltro] = useState(null);
   const [tallerAccesoAbierto, setTallerAccesoAbierto] = useState(null);
   const [tallerAccesoUserId, setTallerAccesoUserId] = useState("");
@@ -1249,16 +1247,12 @@ export default function App() {
     [roleMenuSections]
   );
 
-  const tallerActivos = orders.filter((o) => o.estado === "EN_TALLER");
-  const paymentOrder = paymentModal !== null ? orders.find((o) => o.id === paymentModal) : null;
-  const tallerTerminados = orders.filter(
-    (o) => o.tallerId && ["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(o.estado) && o.historialTaller?.length > 0
-  );
-
+  const tallerActivos = tallerData.pedidos.filter((o) => o.estado === "EN_TALLER");
+  const tallerTerminados = tallerData.pedidos.filter((o) => o.estado !== "EN_TALLER");
   const tallerSeleccionado =
-    talleres.find((t) => t.id === tallerFiltro) ||
-    talleres.find((t) => tallerActivos.some((o) => o.tallerId === t.id)) ||
-    talleres[0] ||
+    tallerData.talleres.find((t) => t.id === tallerFiltro) ||
+    tallerData.talleres.find((t) => tallerActivos.some((o) => o.tallerId === t.id)) ||
+    tallerData.talleres[0] ||
     null;
   const pedidosDelTallerSel = tallerSeleccionado ? tallerActivos.filter((o) => o.tallerId === tallerSeleccionado.id) : [];
   const pedidosTallerFiltrados =
@@ -1670,7 +1664,7 @@ export default function App() {
         fetchOrFallback(can("products"), "/api/admin/products", { products: [] }),
         fetchOrFallback(can("slides"), "/api/admin/slides", { slides: [] }),
         fetchOrFallback(can("flyers"), "/api/admin/flyers", { flyers: [] }),
-        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios") || can("historial") || can("pedidosTaller") || can("pedidosTerminados"), "/api/admin/orders", { orders: [] }),
+        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios") || can("historial") , "/api/admin/orders", { orders: [] }),
         fetchOrFallback(can("settings"), "/api/admin/settings", null),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/tipos-pieza", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/materiales", { items: [] }),
@@ -1702,6 +1696,9 @@ export default function App() {
         setMaintenanceOn(Boolean(maintenanceData?.mantenimiento));
       }
       setTalleres(talleresData.talleres || []);
+      if (can("pedidosTaller") || can("pedidosTerminados")) {
+        await cargarTallerData();
+      }
       setTallerUsuariosDisponibles(talleresData.usuariosDisponibles || []);
       setTiposPieza(tiposPiezaData.items || []);
       setMaterialesCatalogo(materialesData.items || []);
@@ -2099,7 +2096,6 @@ export default function App() {
       password: userForm.password,
       role: userForm.rol,
       permissions: ["ADMINISTRADOR", "VENDEDOR", "TALLER"].includes(userForm.rol) ? userForm.permisos : [],
-      tallerId: userForm.rol === "TALLER" ? Number(userForm.tallerId) : null,
     };
 
     try {
@@ -2149,7 +2145,6 @@ export default function App() {
           email: inviteForm.email.trim(),
           role: inviteForm.rol,
           permissions: ["ADMINISTRADOR", "VENDEDOR"].includes(inviteForm.rol) ? inviteForm.permisos : [],
-          tallerId: inviteForm.rol === "TALLER" ? Number(inviteForm.tallerId) : null,
         }),
       });
 
@@ -2722,6 +2717,25 @@ export default function App() {
     }
   }
 
+  async function cargarTallerData() {
+    try {
+      const data = await request("/api/admin/taller/pedidos");
+      setTallerData({ talleres: data.talleres || [], pedidos: data.pedidos || [] });
+    } catch (error) {
+      setListError(error.message || "No se pudieron cargar los pedidos de taller");
+    }
+  }
+
+  async function handleMarcarListoTaller(order) {
+    setListError("");
+    try {
+      await request(`/api/admin/taller/pedidos/${order.id}/listo`, { method: "PATCH" });
+      await cargarTallerData();
+    } catch (error) {
+      setListError(error.message || "No se pudo marcar como listo");
+    }
+  }
+
   function setTallerPendiente(orderId, patch) {
     setTallerPendientes((prev) => ({ ...prev, [orderId]: { ...prev[orderId], ...patch } }));
   }
@@ -2753,11 +2767,11 @@ export default function App() {
     setTallerGuardando(order.id);
     try {
       const fotos = files.length ? await subirFotosTaller(files) : [];
-      const data = await request(`/api/admin/orders/${order.id}/taller-etapa`, {
+      await request(`/api/admin/taller/pedidos/${order.id}/etapa`, {
         method: "PATCH",
         body: JSON.stringify({ etapaTallerId, fotos }),
       });
-      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...data.order } : o)));
+      await cargarTallerData();
       setTallerPendientes((prev) => {
         const next = { ...prev };
         delete next[order.id];
@@ -3135,10 +3149,6 @@ export default function App() {
     );
   }
 
-  if (user?.rol === "TALLER") {
-    return <TallerPortal apiUrl={API_URL} token={token} user={user} onLogout={handleLogout} />;
-  }
-
   if (maintenanceLockout && !isSuperAdmin) {
     return (
       <main className="authPage">
@@ -3341,8 +3351,8 @@ export default function App() {
         {activeTab === "pedidosTaller" && (
           <article className="panel">
             <h2>Pedidos en taller</h2>
-            {talleres.length === 0 && <p className="subtle">No hay talleres configurados.</p>}
-            {talleres.length > 0 && (
+            {tallerData.talleres.length === 0 && <p className="subtle">No hay talleres asignados a tu usuario.</p>}
+            {tallerData.talleres.length > 0 && (
               <div className="tallerSelector">
                 <label htmlFor="taller-select">Taller</label>
                 <select
@@ -3350,7 +3360,7 @@ export default function App() {
                   value={tallerSeleccionado?.id ?? ""}
                   onChange={(e) => { setTallerFiltro(Number(e.target.value)); setTallerEtapaFiltro(null); }}
                 >
-                  {talleres.map((t) => (
+                  {tallerData.talleres.map((t) => (
                     <option key={t.id} value={t.id}>{t.nombre} ({tallerActivos.filter((o) => o.tallerId === t.id).length} en proceso)</option>
                   ))}
                 </select>
@@ -3410,7 +3420,7 @@ export default function App() {
                         {tallerGuardando === order.id ? "Guardando..." : `Pasar a ${siguiente.nombre}`}
                       </button>
                     ) : (
-                      <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar listo para envio</button>
+                      <button type="button" onClick={() => handleMarcarListoTaller(order)}>Marcar listo para envio</button>
                     )}
                     <button type="button" className="ghost" onClick={() => handleDescargarNotaHistorial(order)}>Descargar nota (PDF)</button>
                   </div>
@@ -4036,15 +4046,6 @@ export default function App() {
                 <option value="ADMINISTRADOR">Administrador</option>
                 <option value="TALLER">Taller</option>
               </select>
-              {userForm.rol === "TALLER" && !isEditingUser && (
-                <>
-                  <label htmlFor="user-taller">Taller</label>
-                  <select id="user-taller" value={userForm.tallerId} onChange={(e) => setUserForm((p) => ({ ...p, tallerId: e.target.value }))} required>
-                    <option value="">Elegir taller...</option>
-                    {talleres.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                  </select>
-                </>
-              )}
               {["ADMINISTRADOR", "VENDEDOR", "TALLER"].includes(userForm.rol) && (
                 <>
                   <label>
@@ -4086,15 +4087,6 @@ export default function App() {
                 <option value="ADMINISTRADOR">Administrador</option>
                 <option value="TALLER">Taller</option>
               </select>
-              {inviteForm.rol === "TALLER" && (
-                <>
-                  <label htmlFor="invite-taller">Taller</label>
-                  <select id="invite-taller" value={inviteForm.tallerId} onChange={(e) => setInviteForm((p) => ({ ...p, tallerId: e.target.value }))} required>
-                    <option value="">Elegir taller...</option>
-                    {talleres.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-                  </select>
-                </>
-              )}
               {["ADMINISTRADOR", "VENDEDOR"].includes(inviteForm.rol) && (
                 <>
                   <label>

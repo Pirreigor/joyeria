@@ -39,8 +39,9 @@ const {
   listOrderDedicatorias,
 } = require("../controllers/admin.controller");
 const { uploadImage, exportTemplate, importProducts } = require("../controllers/import.controller");
+const { listTallerPedidos, cambiarEtapaTaller, marcarListoTaller } = require("../controllers/tallerErp.controller");
 const {
-  listTalleres, createTaller, updateTaller, deleteTaller, updateOrderTallerEtapa,
+  listTalleres, createTaller, updateTaller, deleteTaller,
   asignarUsuarioTaller, quitarUsuarioTaller,
 } = require("../controllers/taller.controller");
 const {
@@ -133,14 +134,16 @@ router.post("/origenes-gema", requirePermission("atributos"), createOrigenGema);
 router.patch("/origenes-gema/:id", requirePermission("atributos"), updateOrigenGema);
 router.delete("/origenes-gema/:id", requirePermission("atributos"), deleteOrigenGema);
 
-router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial", "pedidosTaller", "pedidosTerminados"), listOrders);
+router.get("/orders", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), listOrders);
 router.get("/orders/export", requireAnyPermission("orders", "despacho", "clientes", "envios", "historial"), exportOrders);
 router.post("/orders/manual", requirePermission("orders"), createManualOrder);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
-router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios", "pedidosTaller"), updateOrderStatus);
+router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios"), updateOrderStatus);
 router.patch("/orders/:id/items", requirePermission("orders"), updateOrderItemPrices);
 router.patch("/orders/:id/cotizacion", requirePermission("orders"), updateCotizacion);
-router.patch("/orders/:id/taller-etapa", requirePermission("pedidosTaller"), updateOrderTallerEtapa);
+router.get("/taller/pedidos", requireAnyPermission("pedidosTaller", "pedidosTerminados"), listTallerPedidos);
+router.patch("/taller/pedidos/:id/etapa", requirePermission("pedidosTaller"), cambiarEtapaTaller);
+router.patch("/taller/pedidos/:id/listo", requirePermission("pedidosTaller"), marcarListoTaller);
 
 router.get("/talleres", requireAnyPermission("pedidosTaller", "pedidosTerminados", "configTaller", "orders"), listTalleres);
 router.post("/talleres", requirePermission("configTaller"), createTaller);

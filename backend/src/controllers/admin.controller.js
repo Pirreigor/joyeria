@@ -6,7 +6,7 @@ const { buildBaseCode, generateUniqueSku } = require("../utils/sku");
 const { SUPER_ADMIN_EMAIL, isSuperAdmin } = require("../utils/superAdmin");
 const { enviarCorreoCambioPassword } = require("../utils/passwordReset");
 
-const ROLES_VALIDOS = ["ADMINISTRADOR", "VENDEDOR", "CLIENTE"];
+const ROLES_VALIDOS = ["ADMINISTRADOR", "VENDEDOR", "CLIENTE", "TALLER"];
 
 async function resolveSkuAttributes({ tipoPiezaId, materialId, gemaId, origenGemaId }) {
   const [tipoPieza, material, gema, origenGema] = await Promise.all([
@@ -660,16 +660,8 @@ async function createUser(req, res) {
   const normalizedEmail = String(email).trim().toLowerCase();
   const normalizedRole = role ? String(role).trim().toUpperCase() : "CLIENTE";
 
-  if (![...ROLES_VALIDOS, "TALLER"].includes(normalizedRole)) {
+  if (!ROLES_VALIDOS.includes(normalizedRole)) {
     return res.status(400).json({ message: "Rol invalido" });
-  }
-
-  let tallerDelUsuario = null;
-  if (normalizedRole === "TALLER") {
-    tallerDelUsuario = req.body.tallerId ? await prisma.taller.findUnique({ where: { id: Number(req.body.tallerId) } }) : null;
-    if (!tallerDelUsuario) {
-      return res.status(400).json({ message: "Elegi el taller al que pertenece el usuario" });
-    }
   }
 
   const existing = await prisma.usuario.findUnique({ where: { email: normalizedEmail } });
@@ -685,8 +677,7 @@ async function createUser(req, res) {
       email: normalizedEmail,
       passwordHash,
       rol: normalizedRole,
-      permisos: normalizedRole === "TALLER" || !Array.isArray(permissions) ? [] : permissions.filter((p) => typeof p === "string"),
-      tallerId: tallerDelUsuario?.id ?? null,
+      permisos: Array.isArray(permissions) ? permissions.filter((p) => typeof p === "string") : [],
     },
     select: {
       id: true,
@@ -749,13 +740,7 @@ async function updateUser(req, res) {
 
   if (role !== undefined) {
     const normalizedRole = String(role).trim().toUpperCase();
-    if (existing.rol === "TALLER" && normalizedRole !== "TALLER") {
-      return res.status(400).json({ message: "Quita el acceso de taller desde Configuracion de taller" });
-    }
-    if (normalizedRole === "TALLER" && existing.rol !== "TALLER") {
-      return res.status(400).json({ message: "Asigna el taller desde Configuracion de taller" });
-    }
-    if (!ROLES_VALIDOS.includes(normalizedRole) && normalizedRole !== "TALLER") {
+    if (!ROLES_VALIDOS.includes(normalizedRole)) {
       return res.status(400).json({ message: "Rol invalido" });
     }
     if (existingIsSuperAdmin && normalizedRole !== "ADMINISTRADOR") {

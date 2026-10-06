@@ -37,8 +37,7 @@ model Usuario {
   pedidosConfirmados Pedido[]   @relation("PedidoConfirmadoPor")
   pedidosDespachados Pedido[]   @relation("PedidoDespachadoPor")
   etapasTallerRegistradas PedidoEtapaTaller[] @relation("EtapaRegistradaPor")
-  tallerId           Int?
-  taller             Taller?   @relation("UsuarioTaller", fields: [tallerId], references: [id], onDelete: SetNull)
+  talleres           Taller[]  @relation("UsuarioTalleres")
   resetTokenHash     String?
   resetTokenExpiresAt DateTime?
   createdAt          DateTime   @default(now())
@@ -57,8 +56,6 @@ model InvitacionUsuario {
   expiresAt     DateTime
   acceptedAt    DateTime?
   invitedByName String?
-  tallerId      Int?
-  taller        Taller?   @relation("InvitacionTaller", fields: [tallerId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
 
   @@map("invitaciones_usuarios")
@@ -281,8 +278,7 @@ model Taller {
   activo    Boolean       @default(true)
   etapas    EtapaTaller[]
   pedidos   Pedido[]
-  usuarios  Usuario[]     @relation("UsuarioTaller")
-  invitaciones InvitacionUsuario[] @relation("InvitacionTaller")
+  usuarios  Usuario[]     @relation("UsuarioTalleres")
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
