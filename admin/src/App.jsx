@@ -2321,8 +2321,8 @@ export default function App() {
     setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
   }
 
-  function openCotizacionModal(order) {
-    const items = order.items?.length
+  function cotizacionItemsFromOrder(order) {
+    return order.items?.length
       ? order.items.map((item) => ({
           id: item.id,
           cantidad: item.quantity,
@@ -2330,6 +2330,48 @@ export default function App() {
           precioU: Number(item.unitPrice || 0),
         }))
       : [{ id: null, cantidad: 1, descripcion: "", precioU: Number(order.total || 0) }];
+  }
+
+  function tieneNotaPedido(order) {
+    return Boolean(order.notaNumero || order.notaFotos?.length || NOTA_PEDIDO_FORM_FIELDS.some((f) => order[f]));
+  }
+
+  async function handleDescargarCotizacionHistorial(order) {
+    setListError("");
+    try {
+      const logo = await fetchLogoForPdf();
+      await buildCotizacionPdf({
+        order,
+        form: {
+          ...initialCotizacionForm,
+          ...order.cotizacion,
+          adelanto: Number(order.cotizacion.adelanto || 0),
+          items: cotizacionItemsFromOrder(order),
+          notaFotos: order.notaFotos || [],
+        },
+        logo,
+      });
+    } catch (error) {
+      setListError(error.message || "No se pudo descargar la cotizacion");
+    }
+  }
+
+  async function handleDescargarNotaHistorial(order) {
+    setListError("");
+    try {
+      const logo = await fetchLogoForPdf();
+      const form = { ...initialNotaPedidoForm, notaFotos: order.notaFotos || [] };
+      NOTA_PEDIDO_FORM_FIELDS.forEach((field) => {
+        form[field] = order[field] || "";
+      });
+      await buildNotaPedidoPdf({ order, form, logo });
+    } catch (error) {
+      setListError(error.message || "No se pudo descargar la nota de pedido");
+    }
+  }
+
+  function openCotizacionModal(order) {
+    const items = cotizacionItemsFromOrder(order);
 
     const subtotal = items.reduce((sum, it) => sum + it.cantidad * it.precioU, 0);
     const primerItem = items[0]?.descripcion || "el producto";
@@ -2510,8 +2552,14 @@ export default function App() {
           method: "PATCH",
           body: JSON.stringify({ items: priceUpdates, notaFotos: cotizacionForm.notaFotos }),
         });
-        await loadData();
       }
+
+      const { notaFotos, items, ...cotizacionDatos } = cotizacionForm;
+      await request(`/api/admin/orders/${cotizacionModal.id}/cotizacion`, {
+        method: "PATCH",
+        body: JSON.stringify({ cotizacion: cotizacionDatos }),
+      });
+      await loadData();
 
       const logo = await fetchLogoForPdf();
       await buildCotizacionPdf({ order: cotizacionModal, form: cotizacionForm, logo });
@@ -3362,6 +3410,28 @@ export default function App() {
                         <ul className="orderItems">
                           {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
                         </ul>
+                      )}
+                      {order.cotizacion && (
+                        <div className="historialDocumento">
+                          <strong>Cotizacion</strong>
+                          <small>Cliente: {order.cotizacion.cliente || "—"}{order.cotizacion.dni ? ` — DNI: ${order.cotizacion.dni}` : ""}</small>
+                          <small>Fecha: {order.cotizacion.fecha || "—"} — Adelanto: S/ {Number(order.cotizacion.adelanto || 0).toFixed(2)}</small>
+                          {order.cotizacion.descripcionProyecto && <small>Descripcion: {order.cotizacion.descripcionProyecto}</small>}
+                          {order.cotizacion.guardadaAt && <small>Guardada: {new Date(order.cotizacion.guardadaAt).toLocaleString()}{order.cotizacion.guardadaPor ? ` por ${order.cotizacion.guardadaPor}` : ""}</small>}
+                          <button type="button" className="ghost" onClick={() => handleDescargarCotizacionHistorial(order)}>Descargar PDF</button>
+                        </div>
+                      )}
+                      {tieneNotaPedido(order) && (
+                        <div className="historialDocumento">
+                          <strong>Nota de pedido{order.notaNumero ? ` #${order.notaNumero}` : ""}</strong>
+                          {order.notaAsesor && <small>Asesor: {order.notaAsesor}</small>}
+                          {order.notaJoya && <small>Joya: {order.notaJoya}{order.notaMetal ? ` — Metal: ${order.notaMetal}` : ""}{order.notaColor ? ` — Color: ${order.notaColor}` : ""}</small>}
+                          {order.notaPesoTotal && <small>Peso total: {order.notaPesoTotal}</small>}
+                          {order.notaPrioridadFechaEntrega && <small>Fecha de entrega: {order.notaPrioridadFechaEntrega}</small>}
+                          {order.notaDescripcion && <small>Descripcion: {order.notaDescripcion}</small>}
+                          {order.notaFotos?.length > 0 && <small>Fotos: {order.notaFotos.length}</small>}
+                          <button type="button" className="ghost" onClick={() => handleDescargarNotaHistorial(order)}>Descargar PDF</button>
+                        </div>
                       )}
                     </div>
                   )}

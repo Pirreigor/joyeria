@@ -1506,3 +1506,16 @@ button:disabled {
     width: 100%;
   }
 }
+
+.historialDocumento {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.historialDocumento .ghost {
+  justify-self: start;
+  margin-top: 4px;
+}

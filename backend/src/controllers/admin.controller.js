@@ -1095,6 +1095,43 @@ async function updateOrderItemPrices(req, res) {
   return res.json({ order });
 }
 
+const COTIZACION_FIELDS = [
+  "cliente", "celular", "correo", "dni", "fecha", "descripcionProyecto", "adelanto", "terminos", "firmaNombre",
+];
+
+async function updateCotizacion(req, res) {
+  const { id } = req.params;
+  const { cotizacion } = req.body;
+
+  if (!cotizacion || typeof cotizacion !== "object") {
+    return res.status(400).json({ message: "cotizacion es obligatoria" });
+  }
+
+  const existing = await prisma.pedido.findUnique({ where: { id: Number(id) } });
+  if (!existing) {
+    return res.status(404).json({ message: "Pedido no encontrado" });
+  }
+
+  if (!ESTADOS_PRECIO_EDITABLE.includes(existing.estado)) {
+    return res.status(409).json({ message: "La cotizacion ya no se puede modificar en esta etapa" });
+  }
+
+  const snapshot = {};
+  for (const field of COTIZACION_FIELDS) {
+    snapshot[field] = cotizacion[field] == null ? "" : String(cotizacion[field]).trim();
+  }
+  snapshot.guardadaAt = new Date().toISOString();
+  snapshot.guardadaPor = req.user?.email || "";
+
+  const order = await prisma.pedido.update({
+    where: { id: Number(id) },
+    data: { cotizacion: snapshot },
+    include: { items: { include: { producto: true } } },
+  });
+
+  return res.json({ order });
+}
+
 async function confirmPayment(req, res) {
   const { id } = req.params;
   const { metodoPago, numeroComprobante, direccionEnvio } = req.body;
@@ -1218,6 +1255,7 @@ module.exports = {
   exportOrders,
   updateOrderStatus,
   updateOrderItemPrices,
+  updateCotizacion,
   confirmPayment,
   listOrderDedicatorias,
 };

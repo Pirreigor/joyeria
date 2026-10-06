@@ -33,6 +33,7 @@ const {
   exportOrders,
   updateOrderStatus,
   updateOrderItemPrices,
+  updateCotizacion,
   confirmPayment,
   listOrderDedicatorias,
 } = require("../controllers/admin.controller");
@@ -132,6 +133,7 @@ router.post("/orders/manual", requirePermission("orders"), createManualOrder);
 router.post("/orders/:id/confirm-payment", requirePermission("orders"), uploadComprobante, confirmPayment);
 router.patch("/orders/:id/status", requireAnyPermission("orders", "despacho", "envios"), updateOrderStatus);
 router.patch("/orders/:id/items", requirePermission("orders"), updateOrderItemPrices);
+router.patch("/orders/:id/cotizacion", requirePermission("orders"), updateCotizacion);
 router.patch("/orders/:id/nota-pedido", requirePermission("orders"), updateNotaPedido);
 router.get("/orders/:id/dedicatorias", requireAnyPermission("orders", "despacho", "envios"), listOrderDedicatorias);
 

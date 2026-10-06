@@ -252,6 +252,7 @@ model Pedido {
   notaFechaEnviadaTallerRegreso String?
   notaDescripcion               String?
   notaFotos                     String[] @default([])
+  cotizacion                    Json?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
