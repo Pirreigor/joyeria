@@ -3411,28 +3411,36 @@ export default function App() {
                           {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
                         </ul>
                       )}
-                      {order.cotizacion && (
-                        <div className="historialDocumento">
-                          <strong>Cotizacion</strong>
-                          <small>Cliente: {order.cotizacion.cliente || "—"}{order.cotizacion.dni ? ` — DNI: ${order.cotizacion.dni}` : ""}</small>
-                          <small>Fecha: {order.cotizacion.fecha || "—"} — Adelanto: S/ {Number(order.cotizacion.adelanto || 0).toFixed(2)}</small>
-                          {order.cotizacion.descripcionProyecto && <small>Descripcion: {order.cotizacion.descripcionProyecto}</small>}
-                          {order.cotizacion.guardadaAt && <small>Guardada: {new Date(order.cotizacion.guardadaAt).toLocaleString()}{order.cotizacion.guardadaPor ? ` por ${order.cotizacion.guardadaPor}` : ""}</small>}
-                          <button type="button" className="ghost" onClick={() => handleDescargarCotizacionHistorial(order)}>Descargar PDF</button>
-                        </div>
-                      )}
-                      {tieneNotaPedido(order) && (
-                        <div className="historialDocumento">
-                          <strong>Nota de pedido{order.notaNumero ? ` #${order.notaNumero}` : ""}</strong>
-                          {order.notaAsesor && <small>Asesor: {order.notaAsesor}</small>}
-                          {order.notaJoya && <small>Joya: {order.notaJoya}{order.notaMetal ? ` — Metal: ${order.notaMetal}` : ""}{order.notaColor ? ` — Color: ${order.notaColor}` : ""}</small>}
-                          {order.notaPesoTotal && <small>Peso total: {order.notaPesoTotal}</small>}
-                          {order.notaPrioridadFechaEntrega && <small>Fecha de entrega: {order.notaPrioridadFechaEntrega}</small>}
-                          {order.notaDescripcion && <small>Descripcion: {order.notaDescripcion}</small>}
-                          {order.notaFotos?.length > 0 && <small>Fotos: {order.notaFotos.length}</small>}
-                          <button type="button" className="ghost" onClick={() => handleDescargarNotaHistorial(order)}>Descargar PDF</button>
-                        </div>
-                      )}
+                      <div className="historialDocumento">
+                        <strong>Cotizacion</strong>
+                        {order.cotizacion ? (
+                          <>
+                            <small>Cliente: {order.cotizacion.cliente || "—"}{order.cotizacion.dni ? ` — DNI: ${order.cotizacion.dni}` : ""}</small>
+                            <small>Fecha: {order.cotizacion.fecha || "—"} — Adelanto: S/ {Number(order.cotizacion.adelanto || 0).toFixed(2)}</small>
+                            {order.cotizacion.descripcionProyecto && <small>Descripcion: {order.cotizacion.descripcionProyecto}</small>}
+                            {order.cotizacion.guardadaAt && <small>Guardada: {new Date(order.cotizacion.guardadaAt).toLocaleString()}{order.cotizacion.guardadaPor ? ` por ${order.cotizacion.guardadaPor}` : ""}</small>}
+                          </>
+                        ) : (
+                          <small className="subtle">Aun no generada</small>
+                        )}
+                        <button type="button" className="ghost" disabled={!order.cotizacion} onClick={() => handleDescargarCotizacionHistorial(order)}>Descargar PDF</button>
+                      </div>
+                      <div className="historialDocumento">
+                        <strong>Nota de pedido{order.notaNumero ? ` #${order.notaNumero}` : ""}</strong>
+                        {tieneNotaPedido(order) ? (
+                          <>
+                            {order.notaAsesor && <small>Asesor: {order.notaAsesor}</small>}
+                            {order.notaJoya && <small>Joya: {order.notaJoya}{order.notaMetal ? ` — Metal: ${order.notaMetal}` : ""}{order.notaColor ? ` — Color: ${order.notaColor}` : ""}</small>}
+                            {order.notaPesoTotal && <small>Peso total: {order.notaPesoTotal}</small>}
+                            {order.notaPrioridadFechaEntrega && <small>Fecha de entrega: {order.notaPrioridadFechaEntrega}</small>}
+                            {order.notaDescripcion && <small>Descripcion: {order.notaDescripcion}</small>}
+                            {order.notaFotos?.length > 0 && <small>Fotos: {order.notaFotos.length}</small>}
+                          </>
+                        ) : (
+                          <small className="subtle">Aun no generada</small>
+                        )}
+                        <button type="button" className="ghost" disabled={!tieneNotaPedido(order)} onClick={() => handleDescargarNotaHistorial(order)}>Descargar PDF</button>
+                      </div>
                     </div>
                   )}
                 </article>
