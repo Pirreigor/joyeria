@@ -711,10 +711,6 @@ async function updateUser(req, res) {
     return res.status(404).json({ message: "Usuario no encontrado" });
   }
 
-  if (existing.rol === "TALLER") {
-    return res.status(400).json({ message: "Los accesos de taller se administran desde Configuracion de taller" });
-  }
-
   const existingIsSuperAdmin = isSuperAdmin(existing);
 
   const data = {};
@@ -753,7 +749,13 @@ async function updateUser(req, res) {
 
   if (role !== undefined) {
     const normalizedRole = String(role).trim().toUpperCase();
-    if (!ROLES_VALIDOS.includes(normalizedRole)) {
+    if (existing.rol === "TALLER" && normalizedRole !== "TALLER") {
+      return res.status(400).json({ message: "Quita el acceso de taller desde Configuracion de taller" });
+    }
+    if (normalizedRole === "TALLER" && existing.rol !== "TALLER") {
+      return res.status(400).json({ message: "Asigna el taller desde Configuracion de taller" });
+    }
+    if (!ROLES_VALIDOS.includes(normalizedRole) && normalizedRole !== "TALLER") {
       return res.status(400).json({ message: "Rol invalido" });
     }
     if (existingIsSuperAdmin && normalizedRole !== "ADMINISTRADOR") {

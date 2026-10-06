@@ -2098,7 +2098,7 @@ export default function App() {
       email: userForm.email.trim(),
       password: userForm.password,
       role: userForm.rol,
-      permissions: ["ADMINISTRADOR", "VENDEDOR"].includes(userForm.rol) ? userForm.permisos : [],
+      permissions: ["ADMINISTRADOR", "VENDEDOR", "TALLER"].includes(userForm.rol) ? userForm.permisos : [],
       tallerId: userForm.rol === "TALLER" ? Number(userForm.tallerId) : null,
     };
 
@@ -3742,7 +3742,7 @@ export default function App() {
                 <div className="card-info">
                   <strong>{u.name}</strong>
                   <small>{u.email} — Creado: {new Date(u.createdAt).toLocaleDateString()}</small>
-                  {["ADMINISTRADOR", "VENDEDOR"].includes(u.rol) && (
+                  {["ADMINISTRADOR", "VENDEDOR", "TALLER"].includes(u.rol) && (
                     <small>
                       {u.permisos?.length > 0
                         ? `Permisos: ${u.permisos.join(", ")}`
@@ -4045,7 +4045,7 @@ export default function App() {
                   </select>
                 </>
               )}
-              {["ADMINISTRADOR", "VENDEDOR"].includes(userForm.rol) && (
+              {["ADMINISTRADOR", "VENDEDOR", "TALLER"].includes(userForm.rol) && (
                 <>
                   <label>
                     Permisos ({userForm.rol === "ADMINISTRADOR" ? "sin seleccion = acceso total" : "sin seleccion = sin acceso a ninguna seccion"})
