@@ -20,8 +20,16 @@ async function createInvitation(req, res) {
   const normalizedEmail = String(email).trim().toLowerCase();
   const normalizedRole = role ? String(role).trim().toUpperCase() : "ADMINISTRADOR";
 
-  if (!ROLES_VALIDOS.includes(normalizedRole)) {
+  if (![...ROLES_VALIDOS, "TALLER"].includes(normalizedRole)) {
     return res.status(400).json({ message: "Rol invalido" });
+  }
+
+  let tallerDeInvitacion = null;
+  if (normalizedRole === "TALLER") {
+    tallerDeInvitacion = req.body.tallerId ? await prisma.taller.findUnique({ where: { id: Number(req.body.tallerId) } }) : null;
+    if (!tallerDeInvitacion) {
+      return res.status(400).json({ message: "Elegi el taller al que pertenece el usuario" });
+    }
   }
 
   const existingUser = await prisma.usuario.findUnique({ where: { email: normalizedEmail } });
@@ -31,7 +39,7 @@ async function createInvitation(req, res) {
 
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
-  const permisos = Array.isArray(permissions) ? permissions.filter((p) => typeof p === "string") : [];
+  const permisos = normalizedRole === "TALLER" || !Array.isArray(permissions) ? [] : permissions.filter((p) => typeof p === "string");
 
   const pending = await prisma.invitacionUsuario.findFirst({
     where: { email: normalizedEmail, acceptedAt: null },
@@ -44,6 +52,7 @@ async function createInvitation(req, res) {
           name: String(name).trim(),
           rol: normalizedRole,
           permisos,
+          tallerId: tallerDeInvitacion?.id ?? null,
           token,
           expiresAt,
           invitedByName: req.user?.email || null,
@@ -55,6 +64,7 @@ async function createInvitation(req, res) {
           email: normalizedEmail,
           rol: normalizedRole,
           permisos,
+          tallerId: tallerDeInvitacion?.id ?? null,
           token,
           expiresAt,
           invitedByName: req.user?.email || null,

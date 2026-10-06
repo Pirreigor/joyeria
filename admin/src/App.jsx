@@ -554,6 +554,7 @@ const initialInviteForm = {
   email: "",
   rol: "CLIENTE",
   permisos: [],
+  tallerId: "",
 };
 
 const CATALOG_ENDPOINTS = {
@@ -2146,6 +2147,7 @@ export default function App() {
           email: inviteForm.email.trim(),
           role: inviteForm.rol,
           permissions: ["ADMINISTRADOR", "VENDEDOR"].includes(inviteForm.rol) ? inviteForm.permisos : [],
+          tallerId: inviteForm.rol === "TALLER" ? Number(inviteForm.tallerId) : null,
         }),
       });
 
@@ -4080,7 +4082,17 @@ export default function App() {
                 <option value="CLIENTE">Cliente</option>
                 <option value="VENDEDOR">Vendedor</option>
                 <option value="ADMINISTRADOR">Administrador</option>
+                <option value="TALLER">Taller</option>
               </select>
+              {inviteForm.rol === "TALLER" && (
+                <>
+                  <label htmlFor="invite-taller">Taller</label>
+                  <select id="invite-taller" value={inviteForm.tallerId} onChange={(e) => setInviteForm((p) => ({ ...p, tallerId: e.target.value }))} required>
+                    <option value="">Elegir taller...</option>
+                    {talleres.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  </select>
+                </>
+              )}
               {["ADMINISTRADOR", "VENDEDOR"].includes(inviteForm.rol) && (
                 <>
                   <label>
