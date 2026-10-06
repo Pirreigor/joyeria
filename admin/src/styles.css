@@ -1519,3 +1519,65 @@ button:disabled {
   justify-self: start;
   margin-top: 4px;
 }
+
+.orderBadge.en_taller {
+  background: #3182ce;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tallerGrupo {
+  margin-top: 16px;
+}
+
+.tallerPedido {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.tallerPedidoAcciones {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.tallerEtapaRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.tallerConfigCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.tallerHistorial {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.tallerHistorial li {
+  display: grid;
+  gap: 2px;
+}
+
+.tallerHistorialFotos {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}

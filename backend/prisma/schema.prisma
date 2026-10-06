@@ -17,6 +17,7 @@ enum EstadoPedido {
   PREPARAR
   NUEVO
   PAGADO
+  EN_TALLER
   LISTO_PARA_ENVIO
   ENVIADO
   ENTREGADO
@@ -34,6 +35,7 @@ model Usuario {
   productosCreados   Producto[] @relation("ProductoCreadoPor")
   pedidosConfirmados Pedido[]   @relation("PedidoConfirmadoPor")
   pedidosDespachados Pedido[]   @relation("PedidoDespachadoPor")
+  etapasTallerRegistradas PedidoEtapaTaller[] @relation("EtapaRegistradaPor")
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -253,10 +255,52 @@ model Pedido {
   notaDescripcion               String?
   notaFotos                     String[] @default([])
   cotizacion                    Json?
+  tallerId                      Int?
+  taller                        Taller?      @relation(fields: [tallerId], references: [id], onDelete: SetNull)
+  etapaTallerId                 Int?
+  etapaTaller                   EtapaTaller? @relation(fields: [etapaTallerId], references: [id], onDelete: SetNull)
+  tallerEnviadoAt               DateTime?
+  historialTaller               PedidoEtapaTaller[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   @@map("pedidos")
+}
+
+model Taller {
+  id        Int           @id @default(autoincrement())
+  nombre    String
+  activo    Boolean       @default(true)
+  etapas    EtapaTaller[]
+  pedidos   Pedido[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("talleres")
+}
+
+model EtapaTaller {
+  id        Int      @id @default(autoincrement())
+  tallerId  Int
+  taller    Taller   @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+  nombre    String
+  orden     Int
+  pedidos   Pedido[]
+
+  @@map("etapas_taller")
+}
+
+model PedidoEtapaTaller {
+  id          Int      @id @default(autoincrement())
+  pedidoId    Int
+  pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  etapaNombre String
+  fotos       String[] @default([])
+  usuarioId   Int?
+  usuario     Usuario? @relation("EtapaRegistradaPor", fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@map("pedido_etapas_taller")
 }
 
 model ItemPedido {

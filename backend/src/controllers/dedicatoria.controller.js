@@ -29,7 +29,7 @@ async function getDedicatoria(req, res) {
   });
 }
 
-const ESTADOS_CON_DEDICATORIA = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
+const ESTADOS_CON_DEDICATORIA = ["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
 const MOTIVOS_VALIDOS = ["Aniversario", "Compromiso", "Cumpleaños", "San Valentin", "Graduacion", "Otro"];
 
 async function findPedidoByContacto(pedidoId, contacto) {

@@ -45,6 +45,8 @@ async function fetchImageForPdf(url, { width = 400, format = "PNG" } = {}) {
     const optimizedUrl = cdnImg(url, width).replace("f_auto,q_auto", transform);
     const imgRes = await fetch(optimizedUrl);
     const blob = await imgRes.blob();
+    const realFormat = blob.type === "image/png" ? "PNG" : blob.type === "image/jpeg" ? "JPEG" : null;
+    if (!realFormat) return null;
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
@@ -59,7 +61,7 @@ async function fetchImageForPdf(url, { width = 400, format = "PNG" } = {}) {
       img.src = dataUrl;
     });
 
-    return { dataUrl, ratio, format };
+    return { dataUrl, ratio, format: realFormat };
   } catch {
     return null;
   }
@@ -622,6 +624,7 @@ const ALL_PERMISSIONS = [
   { key: "flyers", label: "Flyers" },
   { key: "orders", label: "Pedidos" },
   { key: "historial", label: "Historial" },
+  { key: "taller", label: "Taller" },
   { key: "settings", label: "Branding" },
 ];
 
@@ -661,6 +664,14 @@ const STAFF_MENU = [
     ],
   },
   {
+    key: "taller",
+    label: "Taller",
+    items: [
+      { key: "pedidosTaller", label: "Pedidos taller", short: "PT" },
+      { key: "configTaller", label: "Configuracion de taller", short: "CT" },
+    ],
+  },
+  {
     key: "sistema",
     label: "Sistema",
     items: [{ key: "settings", label: "Branding", short: "BR" }],
@@ -672,11 +683,12 @@ const MENU_BY_ROLE = {
   VENDEDOR: STAFF_MENU,
 };
 
-const ORDER_LOCKED_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
+const ORDER_LOCKED_STATES = ["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
 
 const ORDER_STAGES = [
   { key: "preparar", label: "Preparar", estados: ["PREPARAR", "NUEVO"], color: "#d69e2e" },
   { key: "pagado", label: "Pagado", estados: ["PAGADO"], color: "#38a169" },
+  { key: "taller", label: "En taller", estados: ["EN_TALLER"], color: "#3182ce" },
   { key: "listo", label: "Listo para envio", estados: ["LISTO_PARA_ENVIO"], color: "#dd6b20" },
   { key: "enviado", label: "Enviado", estados: ["ENVIADO"], color: "#805ad5" },
   { key: "entregado", label: "Entregado", estados: ["ENTREGADO"], color: "#2f855a" },
@@ -684,7 +696,11 @@ const ORDER_STAGES = [
 
 const ORDERS_MENU_KEYS = ["orders", "despacho", "envios"];
 
-const PAID_ORDER_STATES = ["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
+const PAID_ORDER_STATES = ["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
+
+const CUSTOM_PANEL_TABS = ["emergencia", "pedidosTaller", "configTaller"];
+
+const initialTallerForm = { id: null, nombre: "", activo: true, etapas: [] };
 
 const MOTIVOS_DEDICATORIA = ["Aniversario", "Compromiso", "Cumpleaños", "San Valentin", "Graduacion", "Otro"];
 
@@ -1018,6 +1034,29 @@ function ProductBarcodeLabel({ sku, name, price }) {
   );
 }
 
+function TallerHistorial({ historial }) {
+  if (!historial?.length) return <small className="subtle">Sin movimientos registrados</small>;
+  return (
+    <ol className="tallerHistorial">
+      {historial.map((h) => (
+        <li key={h.id}>
+          <strong>{h.etapaNombre}</strong>
+          <small>{new Date(h.createdAt).toLocaleString()}{h.usuario?.name ? ` — ${h.usuario.name}` : ""}</small>
+          {h.fotos?.length > 0 && (
+            <div className="tallerHistorialFotos">
+              {h.fotos.map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noreferrer">
+                  <img src={cdnImg(url, 120)} alt="" className="imagePreviewThumb" />
+                </a>
+              ))}
+            </div>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function roleLabel(rol) {
   if (rol === "ADMINISTRADOR") return "Admin";
   if (rol === "VENDEDOR") return "Vendedor";
@@ -1075,7 +1114,7 @@ export default function App() {
   const [productSearch, setProductSearch] = useState("");
   const [productSearchCat, setProductSearchCat] = useState("todas");
   const [paymentModal, setPaymentModal] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
+  const [paymentForm, setPaymentForm] = useState({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null, tallerId: "" });
   const [paymentSaving, setPaymentSaving] = useState(false);
 
   const [cotizacionModal, setCotizacionModal] = useState(null);
@@ -1127,6 +1166,11 @@ export default function App() {
   const [acceptError, setAcceptError] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [talleres, setTalleres] = useState([]);
+  const [tallerForm, setTallerForm] = useState(initialTallerForm);
+  const [tallerSaving, setTallerSaving] = useState(false);
+  const [tallerPendientes, setTallerPendientes] = useState({});
+  const [tallerGuardando, setTallerGuardando] = useState(null);
   const [maintenanceOn, setMaintenanceOn] = useState(false);
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [maintenanceLockout, setMaintenanceLockout] = useState(false);
@@ -1158,6 +1202,7 @@ export default function App() {
             .map((s) => ({
               ...s,
               items: s.items.filter((i) => {
+                if (i.key === "pedidosTaller" || i.key === "configTaller") return perms.includes("taller");
                 if (i.key === "orders") return ORDERS_MENU_KEYS.some((k) => perms.includes(k));
                 if (i.key === "historial") return perms.includes("historial") || ORDERS_MENU_KEYS.some((k) => perms.includes(k));
                 return perms.includes(i.key);
@@ -1179,6 +1224,11 @@ export default function App() {
   const roleMenu = useMemo(
     () => roleMenuSections.flatMap((section) => section.items || []),
     [roleMenuSections]
+  );
+
+  const tallerActivos = orders.filter((o) => o.estado === "EN_TALLER");
+  const tallerTerminados = orders.filter(
+    (o) => o.tallerId && ["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(o.estado) && o.historialTaller?.length > 0
   );
 
   const filteredList = useMemo(() => {
@@ -1525,7 +1575,7 @@ export default function App() {
 
     try {
       const needsAttrCatalogs = can("atributos");
-      const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData, tiposPiezaData, materialesData, gemasData, origenesGemaData, maintenanceData] = await Promise.all([
+      const [dashboardData, usersData, invitationsData, categoriesData, productsData, slidesData, flyersData, ordersData, settingsData, tiposPiezaData, materialesData, gemasData, origenesGemaData, maintenanceData, talleresData] = await Promise.all([
         fetchOrFallback(can("dashboard"), "/api/admin/dashboard", dashboardFallback),
         fetchOrFallback(can("users"), "/api/admin/users", { users: [] }),
         fetchOrFallback(can("users"), "/api/admin/invitations", { invitations: [] }),
@@ -1533,13 +1583,14 @@ export default function App() {
         fetchOrFallback(can("products"), "/api/admin/products", { products: [] }),
         fetchOrFallback(can("slides"), "/api/admin/slides", { slides: [] }),
         fetchOrFallback(can("flyers"), "/api/admin/flyers", { flyers: [] }),
-        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios") || can("historial"), "/api/admin/orders", { orders: [] }),
+        fetchOrFallback(can("orders") || can("despacho") || can("clientes") || can("envios") || can("historial") || can("taller"), "/api/admin/orders", { orders: [] }),
         fetchOrFallback(can("settings"), "/api/admin/settings", null),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/tipos-pieza", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/materiales", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/gemas", { items: [] }),
         fetchOrFallback(needsAttrCatalogs, "/api/admin/origenes-gema", { items: [] }),
         fetchOrFallback(isSuperAdminUser, "/api/admin/maintenance", null),
+        fetchOrFallback(can("taller") || can("orders"), "/api/admin/talleres", { talleres: [] }),
       ]);
       setDashboard({
         stats: dashboardData?.stats || { users: 0, products: 0, categories: 0, orders: 0 },
@@ -1563,6 +1614,7 @@ export default function App() {
       if (isSuperAdminUser) {
         setMaintenanceOn(Boolean(maintenanceData?.mantenimiento));
       }
+      setTalleres(talleresData.talleres || []);
       setTiposPieza(tiposPiezaData.items || []);
       setMaterialesCatalogo(materialesData.items || []);
       setGemas(gemasData.items || []);
@@ -2318,7 +2370,7 @@ export default function App() {
 
   function openPaymentModal(orderId) {
     setPaymentModal(orderId);
-    setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null });
+    setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null, tallerId: "" });
   }
 
   function cotizacionItemsFromOrder(order) {
@@ -2508,6 +2560,126 @@ export default function App() {
     }
   }
 
+  function closeTallerModal() {
+    setFormModal("");
+    setTallerForm(initialTallerForm);
+  }
+
+  function openTallerModal(taller) {
+    setTallerForm({
+      id: taller.id,
+      nombre: taller.nombre,
+      activo: taller.activo,
+      etapas: taller.etapas.map((e) => ({ id: e.id, nombre: e.nombre })),
+    });
+    setFormModal("taller");
+  }
+
+  function moveTallerEtapa(idx, dir) {
+    setTallerForm((prev) => {
+      const etapas = [...prev.etapas];
+      const target = idx + dir;
+      [etapas[idx], etapas[target]] = [etapas[target], etapas[idx]];
+      return { ...prev, etapas };
+    });
+  }
+
+  function updateTallerEtapa(idx, nombre) {
+    setTallerForm((prev) => ({ ...prev, etapas: prev.etapas.map((e, i) => (i === idx ? { ...e, nombre } : e)) }));
+  }
+
+  function removeTallerEtapa(idx) {
+    setTallerForm((prev) => ({ ...prev, etapas: prev.etapas.filter((_, i) => i !== idx) }));
+  }
+
+  function addTallerEtapa() {
+    setTallerForm((prev) => ({ ...prev, etapas: [...prev.etapas, { id: null, nombre: "" }] }));
+  }
+
+  async function handleTallerSubmit(event) {
+    event.preventDefault();
+    setTallerSaving(true);
+    setListError("");
+
+    const payload = {
+      nombre: tallerForm.nombre.trim(),
+      etapas: tallerForm.etapas.filter((e) => e.nombre.trim()).map((e) => ({ id: e.id, nombre: e.nombre.trim() })),
+    };
+    if (tallerForm.id) payload.activo = tallerForm.activo;
+
+    try {
+      await request(tallerForm.id ? `/api/admin/talleres/${tallerForm.id}` : "/api/admin/talleres", {
+        method: tallerForm.id ? "PATCH" : "POST",
+        body: JSON.stringify(payload),
+      });
+      closeTallerModal();
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar el taller");
+    } finally {
+      setTallerSaving(false);
+    }
+  }
+
+  async function handleTallerDelete(taller) {
+    if (!window.confirm(`Eliminar el taller ${taller.nombre}?`)) return;
+    setListError("");
+    try {
+      await request(`/api/admin/talleres/${taller.id}`, { method: "DELETE" });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo eliminar el taller");
+    }
+  }
+
+  function setTallerPendiente(orderId, patch) {
+    setTallerPendientes((prev) => ({ ...prev, [orderId]: { ...prev[orderId], ...patch } }));
+  }
+
+  async function subirFotosTaller(files) {
+    const urls = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await fetch(`${API_URL}/api/admin/upload-image`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Error al subir imagen");
+      urls.push(data.url);
+    }
+    return urls;
+  }
+
+  async function handleTallerEtapaSave(order) {
+    const pending = tallerPendientes[order.id] || {};
+    const etapaTallerId = Number(pending.etapaId ?? order.etapaTallerId);
+    const files = pending.files || [];
+    if (etapaTallerId === order.etapaTallerId && files.length === 0) return;
+
+    setListError("");
+    setTallerGuardando(order.id);
+    try {
+      const fotos = files.length ? await subirFotosTaller(files) : [];
+      const data = await request(`/api/admin/orders/${order.id}/taller-etapa`, {
+        method: "PATCH",
+        body: JSON.stringify({ etapaTallerId, fotos }),
+      });
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...data.order } : o)));
+      setTallerPendientes((prev) => {
+        const next = { ...prev };
+        delete next[order.id];
+        return next;
+      });
+    } catch (error) {
+      setListError(error.message || "No se pudo guardar la etapa");
+    } finally {
+      setTallerGuardando(null);
+    }
+  }
+
   async function handlePaymentSubmit(event) {
     event.preventDefault();
     setPaymentSaving(true);
@@ -2518,6 +2690,7 @@ export default function App() {
       fd.append("metodoPago", paymentForm.metodoPago);
       fd.append("numeroComprobante", paymentForm.numeroComprobante);
       fd.append("direccionEnvio", paymentForm.direccionEnvio);
+      fd.append("tallerId", paymentForm.tallerId);
       fd.append("comprobante", paymentForm.comprobante);
 
       const response = await fetch(`${API_URL}/api/admin/orders/${paymentModal}/confirm-payment`, {
@@ -2993,6 +3166,95 @@ export default function App() {
           </article>
         )}
 
+        {activeTab === "pedidosTaller" && (
+          <article className="panel">
+            <h2>Pedidos en taller</h2>
+            {tallerActivos.length === 0 && <p className="subtle">No hay pedidos en taller.</p>}
+            {talleres.map((taller) => {
+              const pedidosDelTaller = tallerActivos.filter((o) => o.tallerId === taller.id);
+              if (pedidosDelTaller.length === 0) return null;
+              return (
+                <section key={taller.id} className="tallerGrupo">
+                  <h3>{taller.nombre}</h3>
+                  {pedidosDelTaller.map((order) => {
+                    const pending = tallerPendientes[order.id] || {};
+                    const etapaValue = pending.etapaId ?? order.etapaTallerId ?? "";
+                    const files = pending.files || [];
+                    const hayCambio = Number(etapaValue) !== order.etapaTallerId || files.length > 0;
+                    return (
+                      <div key={order.id} className="card tallerPedido">
+                        <div className="card-info">
+                          <strong>Pedido #{order.id}</strong>
+                          <small>{order.clienteNombre || order.usuario?.name || "Cliente"}</small>
+                          <ul className="orderItems">
+                            {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`}</li>)}
+                          </ul>
+                          <TallerHistorial historial={order.historialTaller} />
+                        </div>
+                        <div className="tallerPedidoAcciones">
+                          <label htmlFor={`etapa-${order.id}`}>Etapa actual: {order.etapaTaller?.nombre || "—"}</label>
+                          <select id={`etapa-${order.id}`} value={etapaValue} onChange={(e) => setTallerPendiente(order.id, { etapaId: e.target.value })}>
+                            {taller.etapas.map((etapa) => <option key={etapa.id} value={etapa.id}>{etapa.nombre}</option>)}
+                          </select>
+                          <label htmlFor={`fotos-${order.id}`}>Fotos de la etapa (opcional)</label>
+                          <input
+                            id={`fotos-${order.id}`}
+                            key={`fotos-${order.id}-${files.length}`}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            onChange={(e) => setTallerPendiente(order.id, { files: Array.from(e.target.files || []) })}
+                          />
+                          <button type="button" disabled={!hayCambio || tallerGuardando === order.id} onClick={() => handleTallerEtapaSave(order)}>
+                            {tallerGuardando === order.id ? "Guardando..." : "Guardar etapa"}
+                          </button>
+                          <button type="button" className="ghost" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar listo para envio</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </section>
+              );
+            })}
+
+            <h2>Terminados en taller</h2>
+            {tallerTerminados.length === 0 && <p className="subtle">Todavia no hay pedidos terminados en taller.</p>}
+            {tallerTerminados.map((order) => (
+              <div key={order.id} className="card tallerPedido">
+                <div className="card-info">
+                  <strong>Pedido #{order.id} — {order.estado}</strong>
+                  <small>{order.taller?.nombre}</small>
+                  <TallerHistorial historial={order.historialTaller} />
+                </div>
+              </div>
+            ))}
+          </article>
+        )}
+
+        {activeTab === "configTaller" && (
+          <article className="panel">
+            <div className="listHeader">
+              <h2>Configuracion de taller</h2>
+              <div className="actions">
+                <button onClick={() => { setTallerForm({ ...initialTallerForm, etapas: [{ id: null, nombre: "" }] }); setFormModal("taller"); }}>+ Nuevo taller</button>
+              </div>
+            </div>
+            {talleres.length === 0 && <p className="subtle">Todavia no hay talleres configurados.</p>}
+            {talleres.map((taller) => (
+              <div key={taller.id} className="card tallerConfigCard">
+                <div className="card-info">
+                  <strong>{taller.nombre}{taller.activo ? "" : " (inactivo)"}</strong>
+                  <small>Etapas: {taller.etapas.map((e) => e.nombre).join(" → ") || "Sin etapas"}</small>
+                </div>
+                <div className="actions">
+                  <button type="button" className="ghost" onClick={() => openTallerModal(taller)}>Editar</button>
+                  <button type="button" className="danger" onClick={() => handleTallerDelete(taller)}>Eliminar</button>
+                </div>
+              </div>
+            ))}
+          </article>
+        )}
+
         {activeTab === "emergencia" && isSuperAdmin && (
           <article className="panel">
             <h2>Modo mantenimiento de emergencia</h2>
@@ -3017,7 +3279,7 @@ export default function App() {
           </article>
         )}
 
-        {activeTab !== "emergencia" && (
+        {!CUSTOM_PANEL_TABS.includes(activeTab) && (
         <article className="panel">
           <div className="listHeader">
             <h2>{TAB_LIST_TITLES[activeTab] || "Vista"}</h2>
@@ -3348,6 +3610,7 @@ export default function App() {
                   {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
                   {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
                   {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
+                  {order.taller && <small>Taller: {order.taller.nombre}{order.etapaTaller ? ` — Etapa: ${order.etapaTaller.nombre}` : ""}</small>}
                   {order.confirmedBy && <small>Pago confirmado por: {order.confirmedBy.name}</small>}
                   {order.dispatchedBy && <small>Despachado por: {order.dispatchedBy.name}</small>}
                   {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
@@ -3358,19 +3621,19 @@ export default function App() {
                   </ul>
                 )}
                 <div className="actions">
-                  {["PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
+                  {["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openDedicationView(order)}>Dedicatorias</button>
                   )}
                   {["PREPARAR", "NUEVO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openCotizacionModal(order)}>Cotizacion</button>
                   )}
-                  {order.estado === "PAGADO" && (
+                  {["PAGADO", "EN_TALLER"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order)}>Nota de pedido</button>
                   )}
                   {["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && order.notaJoya && (
                     <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
                   )}
-                  {order.estado === "PAGADO" ? (
+                  {["PAGADO", "EN_TALLER"].includes(order.estado) ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar Listo para Envio</button>
                   ) : order.estado === "LISTO_PARA_ENVIO" ? (
                     <button type="button" onClick={() => openShippingModal(order.id)}>Marcar Enviado</button>
@@ -3410,6 +3673,12 @@ export default function App() {
                         <ul className="orderItems">
                           {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
                         </ul>
+                      )}
+                      {order.historialTaller?.length > 0 && (
+                        <div className="historialDocumento">
+                          <strong>Historial de taller</strong>
+                          <TallerHistorial historial={order.historialTaller} />
+                        </div>
                       )}
                       <div className="historialDocumento">
                         <strong>Cotizacion</strong>
@@ -4095,6 +4364,41 @@ export default function App() {
         </div>
       )}
 
+      {formModal === "taller" && (
+        <div className="modalOverlay" onClick={closeTallerModal}>
+          <div className="modalContent" onClick={(e) => e.stopPropagation()}>
+            <h2>{tallerForm.id ? "Editar taller" : "Nuevo taller"}</h2>
+            <form onSubmit={handleTallerSubmit} className="categoryForm">
+              <label htmlFor="tl-nombre">Nombre del taller</label>
+              <input id="tl-nombre" type="text" value={tallerForm.nombre} onChange={(e) => setTallerForm((p) => ({ ...p, nombre: e.target.value }))} required />
+
+              {tallerForm.id && (
+                <label className="checkboxLabel">
+                  <input type="checkbox" checked={tallerForm.activo} onChange={(e) => setTallerForm((p) => ({ ...p, activo: e.target.checked }))} />
+                  Activo (aparece para enviar pedidos nuevos)
+                </label>
+              )}
+
+              <label>Etapas de produccion (en orden)</label>
+              {tallerForm.etapas.map((etapa, idx) => (
+                <div key={idx} className="tallerEtapaRow">
+                  <input type="text" value={etapa.nombre} placeholder={`Etapa ${idx + 1}`} onChange={(e) => updateTallerEtapa(idx, e.target.value)} />
+                  <button type="button" className="ghost" disabled={idx === 0} onClick={() => moveTallerEtapa(idx, -1)}>Subir</button>
+                  <button type="button" className="ghost" disabled={idx === tallerForm.etapas.length - 1} onClick={() => moveTallerEtapa(idx, 1)}>Bajar</button>
+                  <button type="button" className="ghost" onClick={() => removeTallerEtapa(idx)}>Quitar</button>
+                </div>
+              ))}
+              <button type="button" className="ghost" onClick={addTallerEtapa}>+ Agregar etapa</button>
+
+              <div className="actions">
+                <button type="submit" disabled={tallerSaving}>{tallerSaving ? "Guardando..." : "Guardar taller"}</button>
+                <button type="button" className="ghost" onClick={closeTallerModal}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {paymentModal !== null && (
         <div className="modalOverlay" onClick={() => setPaymentModal(null)}>
           <div className="modalContent" onClick={(e) => e.stopPropagation()}>
@@ -4133,6 +4437,19 @@ export default function App() {
                 onChange={(e) => setPaymentForm((p) => ({ ...p, comprobante: e.target.files[0] || null }))}
                 required
               />
+
+              <label htmlFor="pm-taller">Taller de produccion</label>
+              <select
+                id="pm-taller"
+                value={paymentForm.tallerId}
+                onChange={(e) => setPaymentForm((p) => ({ ...p, tallerId: e.target.value }))}
+                required
+              >
+                <option value="">Seleccionar taller...</option>
+                {talleres.filter((t) => t.activo && t.etapas.length > 0).map((t) => (
+                  <option key={t.id} value={t.id}>{t.nombre}</option>
+                ))}
+              </select>
 
               <label htmlFor="pm-direccion">Direccion de envio</label>
               <textarea

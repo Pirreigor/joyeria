@@ -899,7 +899,7 @@ async function createManualOrder(req, res) {
   return res.status(201).json({ order });
 }
 
-const ESTADOS_NOTA_PEDIDO_EDITABLE = ["PAGADO"];
+const ESTADOS_NOTA_PEDIDO_EDITABLE = ["PAGADO", "EN_TALLER"];
 const NOTA_PEDIDO_FIELDS = [
   "notaNumero", "notaAsesor", "notaNumeroProforma", "notaJoya", "notaMetal", "notaColor",
   "notaPiedraCentral", "notaPiedraCentralTamano", "notaPiedraLateral", "notaPiedraLateralTamano",
@@ -946,6 +946,12 @@ async function listOrders(req, res) {
     include: {
       usuario: {
         select: { id: true, name: true, email: true },
+      },
+      taller: true,
+      etapaTaller: true,
+      historialTaller: {
+        orderBy: { createdAt: "asc" },
+        include: { usuario: { select: { name: true } } },
       },
       confirmedBy: {
         select: { id: true, name: true, email: true },
@@ -1011,13 +1017,13 @@ async function updateOrderStatus(req, res) {
   const { id } = req.params;
   const { status, courierEnvio, numeroGuia } = req.body;
 
-  const ESTADOS_VALIDOS = ["PREPARAR", "NUEVO", "PAGADO", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
+  const ESTADOS_VALIDOS = ["PREPARAR", "NUEVO", "PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO", "CANCELADO"];
   if (!ESTADOS_VALIDOS.includes(status)) {
     return res.status(400).json({ message: "Estado invalido" });
   }
 
-  if (status === "PAGADO") {
-    return res.status(400).json({ message: "Para marcar como PAGADO use el endpoint de confirmacion de pago" });
+  if (status === "PAGADO" || status === "EN_TALLER") {
+    return res.status(400).json({ message: "Para marcar como " + status + " use el endpoint de confirmacion de pago" });
   }
 
   if (status === "ENVIADO" && (!courierEnvio || !String(courierEnvio).trim() || !numeroGuia || !String(numeroGuia).trim())) {
@@ -1034,6 +1040,7 @@ async function updateOrderStatus(req, res) {
     data: {
       estado: status,
       ...(status === "LISTO_PARA_ENVIO" ? { dispatchedByUserId: req.user.id } : {}),
+      ...(status === "LISTO_PARA_ENVIO" && existing.estado === "EN_TALLER" ? { historialTaller: { create: { etapaNombre: "Terminado en taller", usuarioId: req.user.id } } } : {}),
       ...(status === "ENVIADO" ? { courierEnvio: String(courierEnvio).trim(), numeroGuia: String(numeroGuia).trim() } : {}),
     },
   });
@@ -1134,10 +1141,21 @@ async function updateCotizacion(req, res) {
 
 async function confirmPayment(req, res) {
   const { id } = req.params;
-  const { metodoPago, numeroComprobante, direccionEnvio } = req.body;
+  const { metodoPago, numeroComprobante, direccionEnvio, tallerId } = req.body;
 
-  if (!metodoPago || !numeroComprobante || !direccionEnvio) {
-    return res.status(400).json({ message: "metodoPago, numeroComprobante y direccionEnvio son obligatorios" });
+  if (!metodoPago || !numeroComprobante || !direccionEnvio || !tallerId) {
+    return res.status(400).json({ message: "metodoPago, numeroComprobante, direccionEnvio y tallerId son obligatorios" });
+  }
+
+  const taller = await prisma.taller.findUnique({
+    where: { id: Number(tallerId) },
+    include: { etapas: { orderBy: { orden: "asc" } } },
+  });
+  if (!taller || !taller.activo) {
+    return res.status(400).json({ message: "El taller seleccionado no esta disponible" });
+  }
+  if (taller.etapas.length === 0) {
+    return res.status(400).json({ message: "El taller seleccionado no tiene etapas de produccion configuradas" });
   }
 
   const METODOS_VALIDOS = ["Transferencia BCP", "YAPE", "Transferencia BN", "PLIN", "BBVA", "Interbank"];
@@ -1162,13 +1180,18 @@ async function confirmPayment(req, res) {
   const order = await prisma.pedido.update({
     where: { id: Number(id) },
     data: {
-      estado: "PAGADO",
+      estado: "EN_TALLER",
       metodoPago: String(metodoPago).trim(),
       numeroComprobante: String(numeroComprobante).trim(),
       comprobanteUrl,
       direccionEnvio: String(direccionEnvio).trim(),
       confirmedByUserId: req.user.id,
+      tallerId: taller.id,
+      etapaTallerId: taller.etapas[0].id,
+      tallerEnviadoAt: new Date(),
+      historialTaller: { create: { etapaNombre: taller.etapas[0].nombre, usuarioId: req.user.id } },
     },
+    include: { taller: true, etapaTaller: true },
   });
 
   const yaTieneDedicatorias = await prisma.dedicatoria.count({
