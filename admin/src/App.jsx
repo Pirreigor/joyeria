@@ -1227,6 +1227,7 @@ export default function App() {
   );
 
   const tallerActivos = orders.filter((o) => o.estado === "EN_TALLER");
+  const paymentOrder = paymentModal !== null ? orders.find((o) => o.id === paymentModal) : null;
   const tallerTerminados = orders.filter(
     (o) => o.tallerId && ["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(o.estado) && o.historialTaller?.length > 0
   );
@@ -3192,6 +3193,7 @@ export default function App() {
                           <TallerHistorial historial={order.historialTaller} />
                         </div>
                         <div className="tallerPedidoAcciones">
+                          <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
                           <label htmlFor={`etapa-${order.id}`}>Etapa actual: {order.etapaTaller?.nombre || "—"}</label>
                           <select id={`etapa-${order.id}`} value={etapaValue} onChange={(e) => setTallerPendiente(order.id, { etapaId: e.target.value })}>
                             {taller.etapas.map((etapa) => <option key={etapa.id} value={etapa.id}>{etapa.nombre}</option>)}
@@ -3225,6 +3227,7 @@ export default function App() {
                   <strong>Pedido #{order.id} — {order.estado}</strong>
                   <small>{order.taller?.nombre}</small>
                   <TallerHistorial historial={order.historialTaller} />
+                  <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
                 </div>
               </div>
             ))}
@@ -3627,7 +3630,7 @@ export default function App() {
                   {["PREPARAR", "NUEVO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openCotizacionModal(order)}>Cotizacion</button>
                   )}
-                  {["PAGADO", "EN_TALLER"].includes(order.estado) && (
+                  {["PREPARAR", "NUEVO", "PAGADO", "EN_TALLER"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order)}>Nota de pedido</button>
                   )}
                   {["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && order.notaJoya && (
@@ -4287,7 +4290,7 @@ export default function App() {
                 {productSearch.length >= 2 || productSearchCat !== "todas" ? (
                   <ul className="productPickerResults">
                     {products.filter((p) => p.active).filter((p) => productSearchCat === "todas" || p.category === productSearchCat).filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase())).slice(0, 20).map((p) => (
-                      <li key={p.id}><button type="button" onClick={() => { addManualOrderItem(p.id); setProductSearch(""); }}><span>{p.name}</span><small>{p.category || "Sin categoria"} — S/ {Number(p.price).toFixed(2)}</small></button></li>
+                      <li key={p.id}><button type="button" onClick={() => { addManualOrderItem(p.id); setProductSearch(""); }}><span>{p.name}</span><small>{p.category || "Sin categoria"} — S/ {Number(p.price).toFixed(2)}{p.stock <= 0 ? " — sin stock (venta sobre pedido)" : ""}</small></button></li>
                     ))}
                     {products.filter((p) => p.active).filter((p) => productSearchCat === "todas" || p.category === productSearchCat).filter((p) => !productSearch || productSearch.length < 2 || p.name.toLowerCase().includes(productSearch.toLowerCase())).length === 0 && <li className="noResults">Sin resultados</li>}
                   </ul>
@@ -4438,6 +4441,9 @@ export default function App() {
                 required
               />
 
+              {paymentOrder && !paymentOrder.notaGuardadaAt && (
+                <p className="subtle">Antes de enviar al taller, guarda la nota de pedido (Nota de pedido > Guardar y descargar).</p>
+              )}
               <label htmlFor="pm-taller">Taller de produccion</label>
               <select
                 id="pm-taller"
@@ -4606,7 +4612,7 @@ export default function App() {
         <div className="modalOverlay" onClick={() => setNotaPedidoModal(null)}>
           <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
             <h2>{notaPedidoReadOnly ? "Ver nota de pedido" : "Nota de pedido"} — Pedido #{notaPedidoModal.id}</h2>
-            {notaPedidoReadOnly && <p className="subtle">Este pedido ya paso de Pagado, la nota ya no se puede modificar.</p>}
+            {notaPedidoReadOnly && <p className="subtle">Vista de solo lectura.</p>}
             {listError && <p className="error">{listError}</p>}
             <form onSubmit={handleNotaPedidoSubmit} className="categoryForm">
               <label htmlFor="np-numero">N° de nota</label>

@@ -254,6 +254,7 @@ model Pedido {
   notaFechaEnviadaTallerRegreso String?
   notaDescripcion               String?
   notaFotos                     String[] @default([])
+  notaGuardadaAt                DateTime?
   cotizacion                    Json?
   tallerId                      Int?
   taller                        Taller?      @relation(fields: [tallerId], references: [id], onDelete: SetNull)

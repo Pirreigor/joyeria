@@ -861,12 +861,6 @@ async function createManualOrder(req, res) {
         throw error;
       }
 
-      if (product.stock < item.quantity) {
-        const error = new Error(`Stock insuficiente para ${product.name}`);
-        error.statusCode = 400;
-        throw error;
-      }
-
       total += Number(product.price) * item.quantity;
 
       itemsData.push({
@@ -899,7 +893,8 @@ async function createManualOrder(req, res) {
   return res.status(201).json({ order });
 }
 
-const ESTADOS_NOTA_PEDIDO_EDITABLE = ["PAGADO", "EN_TALLER"];
+const ESTADOS_NOTA_PEDIDO_EDITABLE = ["PREPARAR", "NUEVO", "PAGADO", "EN_TALLER"];
+
 const NOTA_PEDIDO_FIELDS = [
   "notaNumero", "notaAsesor", "notaNumeroProforma", "notaJoya", "notaMetal", "notaColor",
   "notaPiedraCentral", "notaPiedraCentralTamano", "notaPiedraLateral", "notaPiedraLateralTamano",
@@ -921,7 +916,7 @@ async function updateNotaPedido(req, res) {
     return res.status(409).json({ message: "La nota de pedido ya no se puede modificar en esta etapa" });
   }
 
-  const data = {};
+  const data = { notaGuardadaAt: new Date() };
   for (const field of NOTA_PEDIDO_FIELDS) {
     if (req.body[field] !== undefined) {
       data[field] = req.body[field] === null ? null : String(req.body[field]).trim();
@@ -1173,6 +1168,10 @@ async function confirmPayment(req, res) {
   });
   if (!existing) {
     return res.status(404).json({ message: "Pedido no encontrado" });
+  }
+
+  if (!existing.notaGuardadaAt) {
+    return res.status(400).json({ message: "Guarda la nota de pedido (Nota de pedido > Guardar y descargar) antes de enviar al taller" });
   }
 
   const comprobanteUrl = `/uploads/comprobantes/${req.file.filename}`;
