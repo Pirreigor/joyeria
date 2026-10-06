@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const { NOTA_PEDIDO_FIELDS } = require("./admin.controller");
 
 const ESTADOS_DEL_TALLER = ["EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
 
@@ -142,4 +143,27 @@ async function marcarListoTaller(req, res) {
   return res.json({ ok: true });
 }
 
-module.exports = { listTallerPedidos, cambiarEtapaTaller, marcarListoTaller };
+async function actualizarNotaTaller(req, res) {
+  const pedido = await pedidoDentroDelAmbito(req.params.id, req.user);
+  if (!pedido) {
+    return res.status(404).json({ message: "Pedido no encontrado en tus talleres" });
+  }
+  if (pedido.estado !== "EN_TALLER") {
+    return res.status(409).json({ message: "La nota solo se puede editar mientras el pedido esta en taller" });
+  }
+
+  const data = { notaGuardadaAt: new Date() };
+  for (const field of NOTA_PEDIDO_FIELDS) {
+    if (req.body[field] !== undefined) {
+      data[field] = req.body[field] === null ? null : String(req.body[field]).trim();
+    }
+  }
+  if (Array.isArray(req.body.notaFotos)) {
+    data.notaFotos = req.body.notaFotos.map((url) => String(url).trim()).filter(Boolean);
+  }
+
+  await prisma.pedido.update({ where: { id: pedido.id }, data });
+  return res.json({ ok: true });
+}
+
+module.exports = { listTallerPedidos, cambiarEtapaTaller, marcarListoTaller, actualizarNotaTaller };

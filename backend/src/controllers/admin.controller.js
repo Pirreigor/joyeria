@@ -1261,6 +1261,7 @@ async function listOrderDedicatorias(req, res) {
 }
 
 module.exports = {
+  NOTA_PEDIDO_FIELDS,
   sendUserPasswordReset,
   listCategories,
   createCategory,

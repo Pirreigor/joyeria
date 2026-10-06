@@ -1129,6 +1129,7 @@ export default function App() {
   const [notaPedidoForm, setNotaPedidoForm] = useState(initialNotaPedidoForm);
   const [notaPedidoSaving, setNotaPedidoSaving] = useState(false);
   const [notaPedidoReadOnly, setNotaPedidoReadOnly] = useState(false);
+  const [notaPedidoTaller, setNotaPedidoTaller] = useState(false);
 
   const [shippingModal, setShippingModal] = useState(null);
   const [shippingForm, setShippingForm] = useState({ courierEnvio: "", numeroGuia: "" });
@@ -1254,7 +1255,6 @@ export default function App() {
     tallerData.talleres.find((t) => tallerActivos.some((o) => o.tallerId === t.id)) ||
     tallerData.talleres[0] ||
     null;
-  const paymentOrder = paymentModal !== null ? orders.find((o) => o.id === paymentModal) : null;
   const pedidosDelTallerSel = tallerSeleccionado ? tallerActivos.filter((o) => o.tallerId === tallerSeleccionado.id) : [];
   const pedidosTallerFiltrados =
     tallerEtapaFiltro === null ? pedidosDelTallerSel : pedidosDelTallerSel.filter((o) => o.etapaTallerId === tallerEtapaFiltro);
@@ -2878,7 +2878,7 @@ export default function App() {
     }
   }
 
-  function openNotaPedidoModal(order, { readOnly = false } = {}) {
+  function openNotaPedidoModal(order, { readOnly = false, taller = false } = {}) {
     const prefill = {};
     NOTA_PEDIDO_FORM_FIELDS.forEach((field) => {
       prefill[field] = order[field] || "";
@@ -2895,6 +2895,7 @@ export default function App() {
     setNotaPedidoModal(order);
     setNotaPedidoForm(prefill);
     setNotaPedidoReadOnly(readOnly);
+    setNotaPedidoTaller(taller);
   }
 
   async function handleNotaPedidoSubmit(event) {
@@ -2903,7 +2904,13 @@ export default function App() {
     setListError("");
 
     try {
-      if (!notaPedidoReadOnly) {
+      if (!notaPedidoReadOnly && notaPedidoTaller) {
+        await request(`/api/admin/taller/pedidos/${notaPedidoModal.id}/nota`, {
+          method: "PATCH",
+          body: JSON.stringify(notaPedidoForm),
+        });
+        await cargarTallerData();
+      } else if (!notaPedidoReadOnly) {
         await request(`/api/admin/orders/${notaPedidoModal.id}/nota-pedido`, {
           method: "PATCH",
           body: JSON.stringify(notaPedidoForm),
@@ -3423,6 +3430,7 @@ export default function App() {
                     ) : (
                       <button type="button" onClick={() => handleMarcarListoTaller(order)}>Marcar listo para envio</button>
                     )}
+                    <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { taller: true })}>Editar nota de pedido</button>
                     <button type="button" className="ghost" onClick={() => handleDescargarNotaHistorial(order)}>Descargar nota (PDF)</button>
                   </div>
                 </article>
@@ -3895,7 +3903,14 @@ export default function App() {
                   ) : order.estado === "ENVIADO" ? (
                     <button type="button" onClick={() => handleUpdateOrderStatus(order.id, "ENTREGADO")}>Marcar Entregado</button>
                   ) : !ORDER_LOCKED_STATES.includes(order.estado) ? (
-                    <button type="button" onClick={() => openPaymentModal(order.id)}>Pagar</button>
+                    <button
+                      type="button"
+                      disabled={!order.notaGuardadaAt}
+                      title={order.notaGuardadaAt ? "" : "Guarda primero la nota de pedido"}
+                      onClick={() => openPaymentModal(order.id)}
+                    >
+                      Pagar
+                    </button>
                   ) : null}
                 </div>
               </article>
@@ -4699,9 +4714,6 @@ export default function App() {
                 required
               />
 
-              {paymentOrder && !paymentOrder.notaGuardadaAt && (
-                <p className="subtle">Antes de enviar al taller, guarda la nota de pedido (Nota de pedido > Guardar y descargar).</p>
-              )}
               <label htmlFor="pm-taller">Taller de produccion</label>
               <select
                 id="pm-taller"

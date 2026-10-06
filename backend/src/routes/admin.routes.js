@@ -39,7 +39,7 @@ const {
   listOrderDedicatorias,
 } = require("../controllers/admin.controller");
 const { uploadImage, exportTemplate, importProducts } = require("../controllers/import.controller");
-const { listTallerPedidos, cambiarEtapaTaller, marcarListoTaller } = require("../controllers/tallerErp.controller");
+const { listTallerPedidos, cambiarEtapaTaller, marcarListoTaller, actualizarNotaTaller } = require("../controllers/tallerErp.controller");
 const {
   listTalleres, createTaller, updateTaller, deleteTaller,
   asignarUsuarioTaller, quitarUsuarioTaller,
@@ -144,6 +144,7 @@ router.patch("/orders/:id/cotizacion", requirePermission("orders"), updateCotiza
 router.get("/taller/pedidos", requireAnyPermission("pedidosTaller", "pedidosTerminados"), listTallerPedidos);
 router.patch("/taller/pedidos/:id/etapa", requirePermission("pedidosTaller"), cambiarEtapaTaller);
 router.patch("/taller/pedidos/:id/listo", requirePermission("pedidosTaller"), marcarListoTaller);
+router.patch("/taller/pedidos/:id/nota", requirePermission("pedidosTaller"), actualizarNotaTaller);
 
 router.get("/talleres", requireAnyPermission("pedidosTaller", "pedidosTerminados", "configTaller", "orders"), listTalleres);
 router.post("/talleres", requirePermission("configTaller"), createTaller);
