@@ -11,6 +11,7 @@ enum Rol {
   ADMINISTRADOR
   VENDEDOR
   CLIENTE
+  TALLER
 }
 
 enum EstadoPedido {
@@ -36,6 +37,8 @@ model Usuario {
   pedidosConfirmados Pedido[]   @relation("PedidoConfirmadoPor")
   pedidosDespachados Pedido[]   @relation("PedidoDespachadoPor")
   etapasTallerRegistradas PedidoEtapaTaller[] @relation("EtapaRegistradaPor")
+  tallerId           Int?
+  taller             Taller?   @relation("UsuarioTaller", fields: [tallerId], references: [id], onDelete: SetNull)
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -274,6 +277,7 @@ model Taller {
   activo    Boolean       @default(true)
   etapas    EtapaTaller[]
   pedidos   Pedido[]
+  usuarios  Usuario[]     @relation("UsuarioTaller")
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 

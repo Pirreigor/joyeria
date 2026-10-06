@@ -701,6 +701,10 @@ async function updateUser(req, res) {
     return res.status(404).json({ message: "Usuario no encontrado" });
   }
 
+  if (existing.rol === "TALLER") {
+    return res.status(400).json({ message: "Los accesos de taller se administran desde Configuracion de taller" });
+  }
+
   const existingIsSuperAdmin = isSuperAdmin(existing);
 
   const data = {};

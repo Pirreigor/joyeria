@@ -1,6 +1,11 @@
 const prisma = require("../utils/prisma");
+const { hashPassword } = require("../utils/hash");
+const { SUPER_ADMIN_EMAIL } = require("../utils/superAdmin");
 
-const TALLER_INCLUDE = { etapas: { orderBy: { orden: "asc" } } };
+const TALLER_INCLUDE = {
+  etapas: { orderBy: { orden: "asc" } },
+  usuarios: { select: { id: true, name: true, email: true }, orderBy: { name: "asc" } },
+};
 
 function normalizeEtapas(etapas) {
   if (!Array.isArray(etapas)) return null;
@@ -139,7 +144,58 @@ async function updateOrderTallerEtapa(req, res) {
   return res.json({ order });
 }
 
+async function createTallerUsuario(req, res) {
+  const { id } = req.params;
+  const { name, email, password } = req.body;
+
+  if (!name || !String(name).trim() || !email || !password) {
+    return res.status(400).json({ message: "name, email y password son obligatorios" });
+  }
+
+  const taller = await prisma.taller.findUnique({ where: { id: Number(id) } });
+  if (!taller) {
+    return res.status(404).json({ message: "Taller no encontrado" });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  if (normalizedEmail === SUPER_ADMIN_EMAIL) {
+    return res.status(409).json({ message: "Ese email esta reservado" });
+  }
+  const existing = await prisma.usuario.findUnique({ where: { email: normalizedEmail } });
+  if (existing) {
+    return res.status(409).json({ message: "El email ya esta en uso" });
+  }
+
+  const usuario = await prisma.usuario.create({
+    data: {
+      name: String(name).trim(),
+      email: normalizedEmail,
+      passwordHash: await hashPassword(String(password)),
+      rol: "TALLER",
+      permisos: [],
+      tallerId: taller.id,
+    },
+    select: { id: true, name: true, email: true },
+  });
+
+  return res.status(201).json({ usuario });
+}
+
+async function deleteTallerUsuario(req, res) {
+  const { id, userId } = req.params;
+
+  const usuario = await prisma.usuario.findUnique({ where: { id: Number(userId) } });
+  if (!usuario || usuario.rol !== "TALLER" || usuario.tallerId !== Number(id)) {
+    return res.status(404).json({ message: "Acceso no encontrado en este taller" });
+  }
+
+  await prisma.usuario.delete({ where: { id: usuario.id } });
+  return res.status(204).send();
+}
+
 module.exports = {
+  createTallerUsuario,
+  deleteTallerUsuario,
   listTalleres,
   createTaller,
   updateTaller,

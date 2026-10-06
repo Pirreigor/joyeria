@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import TallerPortal from "./TallerPortal";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
@@ -668,6 +669,7 @@ const STAFF_MENU = [
     label: "Taller",
     items: [
       { key: "pedidosTaller", label: "Pedidos taller", short: "PT" },
+      { key: "pedidosTerminados", label: "Pedidos terminados", short: "PX" },
       { key: "configTaller", label: "Configuracion de taller", short: "CT" },
     ],
   },
@@ -698,7 +700,7 @@ const ORDERS_MENU_KEYS = ["orders", "despacho", "envios"];
 
 const PAID_ORDER_STATES = ["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
 
-const CUSTOM_PANEL_TABS = ["emergencia", "pedidosTaller", "configTaller"];
+const CUSTOM_PANEL_TABS = ["emergencia", "pedidosTaller", "pedidosTerminados", "configTaller"];
 
 const initialTallerForm = { id: null, nombre: "", activo: true, etapas: [] };
 
@@ -1059,6 +1061,7 @@ function TallerHistorial({ historial }) {
 
 function roleLabel(rol) {
   if (rol === "ADMINISTRADOR") return "Admin";
+  if (rol === "TALLER") return "Taller";
   if (rol === "VENDEDOR") return "Vendedor";
   return "Cliente";
 }
@@ -1171,6 +1174,11 @@ export default function App() {
   const [tallerSaving, setTallerSaving] = useState(false);
   const [tallerPendientes, setTallerPendientes] = useState({});
   const [tallerGuardando, setTallerGuardando] = useState(null);
+  const [tallerFiltro, setTallerFiltro] = useState(null);
+  const [tallerEtapaFiltro, setTallerEtapaFiltro] = useState(null);
+  const [tallerAccesoAbierto, setTallerAccesoAbierto] = useState(null);
+  const [tallerAccesoForm, setTallerAccesoForm] = useState({ name: "", email: "", password: "" });
+  const [tallerAccesoSaving, setTallerAccesoSaving] = useState(false);
   const [maintenanceOn, setMaintenanceOn] = useState(false);
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [maintenanceLockout, setMaintenanceLockout] = useState(false);
@@ -1202,7 +1210,7 @@ export default function App() {
             .map((s) => ({
               ...s,
               items: s.items.filter((i) => {
-                if (i.key === "pedidosTaller" || i.key === "configTaller") return perms.includes("taller");
+                if (i.key === "pedidosTaller" || i.key === "pedidosTerminados" || i.key === "configTaller") return perms.includes("taller");
                 if (i.key === "orders") return ORDERS_MENU_KEYS.some((k) => perms.includes(k));
                 if (i.key === "historial") return perms.includes("historial") || ORDERS_MENU_KEYS.some((k) => perms.includes(k));
                 return perms.includes(i.key);
@@ -1231,6 +1239,15 @@ export default function App() {
   const tallerTerminados = orders.filter(
     (o) => o.tallerId && ["LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(o.estado) && o.historialTaller?.length > 0
   );
+
+  const tallerSeleccionado =
+    talleres.find((t) => t.id === tallerFiltro) ||
+    talleres.find((t) => tallerActivos.some((o) => o.tallerId === t.id)) ||
+    talleres[0] ||
+    null;
+  const pedidosDelTallerSel = tallerSeleccionado ? tallerActivos.filter((o) => o.tallerId === tallerSeleccionado.id) : [];
+  const pedidosTallerFiltrados =
+    tallerEtapaFiltro === null ? pedidosDelTallerSel : pedidosDelTallerSel.filter((o) => o.etapaTallerId === tallerEtapaFiltro);
 
   const filteredList = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
@@ -1483,7 +1500,7 @@ export default function App() {
         }),
       });
 
-      if (!["ADMINISTRADOR", "VENDEDOR"].includes(data.user?.rol)) {
+      if (!["ADMINISTRADOR", "VENDEDOR", "TALLER"].includes(data.user?.rol)) {
         throw new Error("Tu usuario no tiene permisos para acceder al panel");
       }
 
@@ -2681,6 +2698,35 @@ export default function App() {
     }
   }
 
+  async function handleCrearAccesoTaller(event, taller) {
+    event.preventDefault();
+    setTallerAccesoSaving(true);
+    setListError("");
+    try {
+      await request(`/api/admin/talleres/${taller.id}/usuarios`, {
+        method: "POST",
+        body: JSON.stringify(tallerAccesoForm),
+      });
+      setTallerAccesoAbierto(null);
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo crear el acceso");
+    } finally {
+      setTallerAccesoSaving(false);
+    }
+  }
+
+  async function handleEliminarAccesoTaller(taller, usuario) {
+    if (!window.confirm(`Quitar el acceso de ${usuario.email}?`)) return;
+    setListError("");
+    try {
+      await request(`/api/admin/talleres/${taller.id}/usuarios/${usuario.id}`, { method: "DELETE" });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo quitar el acceso");
+    }
+  }
+
   async function handlePaymentSubmit(event) {
     event.preventDefault();
     setPaymentSaving(true);
@@ -2968,6 +3014,10 @@ export default function App() {
     );
   }
 
+  if (user?.rol === "TALLER") {
+    return <TallerPortal apiUrl={API_URL} token={token} user={user} onLogout={handleLogout} />;
+  }
+
   if (maintenanceLockout && !isSuperAdmin) {
     return (
       <main className="authPage">
@@ -3170,66 +3220,104 @@ export default function App() {
         {activeTab === "pedidosTaller" && (
           <article className="panel">
             <h2>Pedidos en taller</h2>
-            {tallerActivos.length === 0 && <p className="subtle">No hay pedidos en taller.</p>}
-            {talleres.map((taller) => {
-              const pedidosDelTaller = tallerActivos.filter((o) => o.tallerId === taller.id);
-              if (pedidosDelTaller.length === 0) return null;
+            {talleres.length === 0 && <p className="subtle">No hay talleres configurados.</p>}
+            {talleres.length > 0 && (
+              <div className="orderStageBar">
+                {talleres.map((t) => (
+                  <button
+                    type="button"
+                    key={t.id}
+                    className={tallerSeleccionado?.id === t.id ? "stageChip active" : "stageChip"}
+                    onClick={() => { setTallerFiltro(t.id); setTallerEtapaFiltro(null); }}
+                  >
+                    {t.nombre}
+                    <span className="stageChipCount">{tallerActivos.filter((o) => o.tallerId === t.id).length}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {tallerSeleccionado && (
+              <div className="orderStageBar">
+                <button type="button" className={tallerEtapaFiltro === null ? "stageChip active" : "stageChip"} onClick={() => setTallerEtapaFiltro(null)}>
+                  Todas
+                  <span className="stageChipCount">{pedidosDelTallerSel.length}</span>
+                </button>
+                {tallerSeleccionado.etapas.map((etapa) => (
+                  <button
+                    type="button"
+                    key={etapa.id}
+                    className={tallerEtapaFiltro === etapa.id ? "stageChip active" : "stageChip"}
+                    onClick={() => setTallerEtapaFiltro(etapa.id)}
+                  >
+                    {etapa.nombre}
+                    <span className="stageChipCount">{pedidosDelTallerSel.filter((o) => o.etapaTallerId === etapa.id).length}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {tallerSeleccionado && pedidosTallerFiltrados.length === 0 && <p className="subtle">No hay pedidos en esta fase.</p>}
+            {pedidosTallerFiltrados.map((order) => {
+              const pending = tallerPendientes[order.id] || {};
+              const etapaValue = pending.etapaId ?? order.etapaTallerId ?? "";
+              const files = pending.files || [];
+              const hayCambio = Number(etapaValue) !== order.etapaTallerId || files.length > 0;
               return (
-                <section key={taller.id} className="tallerGrupo">
-                  <h3>{taller.nombre}</h3>
-                  {pedidosDelTaller.map((order) => {
-                    const pending = tallerPendientes[order.id] || {};
-                    const etapaValue = pending.etapaId ?? order.etapaTallerId ?? "";
-                    const files = pending.files || [];
-                    const hayCambio = Number(etapaValue) !== order.etapaTallerId || files.length > 0;
-                    return (
-                      <div key={order.id} className="card tallerPedido">
-                        <div className="card-info">
-                          <strong>Pedido #{order.id}</strong>
-                          <small>{order.clienteNombre || order.usuario?.name || "Cliente"}</small>
-                          <ul className="orderItems">
-                            {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`}</li>)}
-                          </ul>
-                          <TallerHistorial historial={order.historialTaller} />
-                        </div>
-                        <div className="tallerPedidoAcciones">
-                          <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
-                          <label htmlFor={`etapa-${order.id}`}>Etapa actual: {order.etapaTaller?.nombre || "—"}</label>
-                          <select id={`etapa-${order.id}`} value={etapaValue} onChange={(e) => setTallerPendiente(order.id, { etapaId: e.target.value })}>
-                            {taller.etapas.map((etapa) => <option key={etapa.id} value={etapa.id}>{etapa.nombre}</option>)}
-                          </select>
-                          <label htmlFor={`fotos-${order.id}`}>Fotos de la etapa (opcional)</label>
-                          <input
-                            id={`fotos-${order.id}`}
-                            key={`fotos-${order.id}-${files.length}`}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            multiple
-                            onChange={(e) => setTallerPendiente(order.id, { files: Array.from(e.target.files || []) })}
-                          />
-                          <button type="button" disabled={!hayCambio || tallerGuardando === order.id} onClick={() => handleTallerEtapaSave(order)}>
-                            {tallerGuardando === order.id ? "Guardando..." : "Guardar etapa"}
-                          </button>
-                          <button type="button" className="ghost" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar listo para envio</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </section>
+                <article key={order.id} className="card tallerCard">
+                  <div className="card-info">
+                    <div className="orderHeader">
+                      <strong>Pedido #{order.id}</strong>
+                      <span className="orderBadge en_taller">{order.etapaTaller?.nombre || "Sin etapa"}</span>
+                    </div>
+                    <small>{order.clienteNombre || order.usuario?.name || "Cliente"}</small>
+                    <ul className="orderItems">
+                      {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`}</li>)}
+                    </ul>
+                    <TallerHistorial historial={order.historialTaller} />
+                  </div>
+                  <div className="tallerPedidoAcciones">
+                    <label htmlFor={`etapa-${order.id}`}>Cambiar a etapa</label>
+                    <select id={`etapa-${order.id}`} value={etapaValue} onChange={(e) => setTallerPendiente(order.id, { etapaId: e.target.value })}>
+                      {tallerSeleccionado.etapas.map((etapa) => <option key={etapa.id} value={etapa.id}>{etapa.nombre}</option>)}
+                    </select>
+                    <label htmlFor={`fotos-${order.id}`}>Fotos de la etapa (opcional)</label>
+                    <input
+                      id={`fotos-${order.id}`}
+                      key={`fotos-${order.id}-${files.length}`}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      onChange={(e) => setTallerPendiente(order.id, { files: Array.from(e.target.files || []) })}
+                    />
+                    <button type="button" disabled={!hayCambio || tallerGuardando === order.id} onClick={() => handleTallerEtapaSave(order)}>
+                      {tallerGuardando === order.id ? "Guardando..." : "Guardar etapa"}
+                    </button>
+                    <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
+                    <button type="button" className="ghost" onClick={() => handleUpdateOrderStatus(order.id, "LISTO_PARA_ENVIO")}>Marcar listo para envio</button>
+                  </div>
+                </article>
               );
             })}
+          </article>
+        )}
 
-            <h2>Terminados en taller</h2>
+        {activeTab === "pedidosTerminados" && (
+          <article className="panel">
+            <h2>Pedidos terminados en taller</h2>
             {tallerTerminados.length === 0 && <p className="subtle">Todavia no hay pedidos terminados en taller.</p>}
             {tallerTerminados.map((order) => (
-              <div key={order.id} className="card tallerPedido">
+              <article key={order.id} className="card tallerCard">
                 <div className="card-info">
-                  <strong>Pedido #{order.id} — {order.estado}</strong>
-                  <small>{order.taller?.nombre}</small>
+                  <div className="orderHeader">
+                    <strong>Pedido #{order.id}</strong>
+                    <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                  </div>
+                  <small>{order.taller?.nombre} — {order.clienteNombre || order.usuario?.name || "Cliente"}</small>
                   <TallerHistorial historial={order.historialTaller} />
+                </div>
+                <div className="actions">
                   <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
                 </div>
-              </div>
+              </article>
             ))}
           </article>
         )}
@@ -3252,6 +3340,29 @@ export default function App() {
                 <div className="actions">
                   <button type="button" className="ghost" onClick={() => openTallerModal(taller)}>Editar</button>
                   <button type="button" className="danger" onClick={() => handleTallerDelete(taller)}>Eliminar</button>
+                </div>
+                <div className="tallerAccesos">
+                  <strong>Accesos del taller</strong>
+                  {(taller.usuarios || []).length === 0 && <small className="subtle">Este taller todavia no tiene accesos</small>}
+                  {(taller.usuarios || []).map((usuario) => (
+                    <div key={usuario.id} className="tallerAccesoRow">
+                      <small>{usuario.name} — {usuario.email}</small>
+                      <button type="button" className="ghost" onClick={() => handleEliminarAccesoTaller(taller, usuario)}>Quitar acceso</button>
+                    </div>
+                  ))}
+                  {tallerAccesoAbierto === taller.id ? (
+                    <form onSubmit={(e) => handleCrearAccesoTaller(e, taller)} className="tallerAccesoForm">
+                      <input type="text" placeholder="Nombre" value={tallerAccesoForm.name} onChange={(e) => setTallerAccesoForm((p) => ({ ...p, name: e.target.value }))} required />
+                      <input type="email" placeholder="Email de acceso" value={tallerAccesoForm.email} onChange={(e) => setTallerAccesoForm((p) => ({ ...p, email: e.target.value }))} required />
+                      <input type="password" placeholder="Contrasena inicial" value={tallerAccesoForm.password} onChange={(e) => setTallerAccesoForm((p) => ({ ...p, password: e.target.value }))} required />
+                      <div className="actions">
+                        <button type="submit" disabled={tallerAccesoSaving}>{tallerAccesoSaving ? "Creando..." : "Crear acceso"}</button>
+                        <button type="button" className="ghost" onClick={() => setTallerAccesoAbierto(null)}>Cancelar</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button type="button" className="ghost" onClick={() => { setTallerAccesoAbierto(taller.id); setTallerAccesoForm({ name: "", email: "", password: "" }); }}>+ Dar acceso</button>
+                  )}
                 </div>
               </div>
             ))}
