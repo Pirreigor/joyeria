@@ -1254,6 +1254,7 @@ export default function App() {
     tallerData.talleres.find((t) => tallerActivos.some((o) => o.tallerId === t.id)) ||
     tallerData.talleres[0] ||
     null;
+  const paymentOrder = paymentModal !== null ? orders.find((o) => o.id === paymentModal) : null;
   const pedidosDelTallerSel = tallerSeleccionado ? tallerActivos.filter((o) => o.tallerId === tallerSeleccionado.id) : [];
   const pedidosTallerFiltrados =
     tallerEtapaFiltro === null ? pedidosDelTallerSel : pedidosDelTallerSel.filter((o) => o.etapaTallerId === tallerEtapaFiltro);
