@@ -1163,6 +1163,16 @@ export default function App() {
   const [inviteInfo, setInviteInfo] = useState(null);
   const [inviteInfoLoading, setInviteInfoLoading] = useState(Boolean(inviteToken));
   const [inviteInfoError, setInviteInfoError] = useState("");
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get("reset"));
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetError, setResetError] = useState("");
+  const [resetDone, setResetDone] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSaving, setForgotSaving] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
   const [acceptPassword, setAcceptPassword] = useState("");
   const [acceptConfirm, setAcceptConfirm] = useState("");
   const [acceptSaving, setAcceptSaving] = useState(false);
@@ -1548,6 +1558,60 @@ export default function App() {
       setAcceptError(error.message || "No se pudo completar el registro");
     } finally {
       setAcceptSaving(false);
+    }
+  }
+
+  async function handleForgotSubmit(event) {
+    event.preventDefault();
+    setForgotSaving(true);
+    setForgotMessage("");
+    try {
+      const data = await request("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+      setForgotMessage(data.message);
+    } catch (error) {
+      setForgotMessage(error.message || "No se pudo enviar la solicitud");
+    } finally {
+      setForgotSaving(false);
+    }
+  }
+
+  async function handleResetSubmit(event) {
+    event.preventDefault();
+    setResetError("");
+    if (resetPasswordValue.length < 6) {
+      setResetError("La contrasena debe tener al menos 6 caracteres");
+      return;
+    }
+    if (resetPasswordValue !== resetConfirm) {
+      setResetError("Las contrasenas no coinciden");
+      return;
+    }
+    setResetSaving(true);
+    try {
+      await request("/api/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token: resetToken, password: resetPasswordValue }),
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+      setResetDone(true);
+    } catch (error) {
+      setResetError(error.message || "No se pudo cambiar la contrasena");
+    } finally {
+      setResetSaving(false);
+    }
+  }
+
+  async function handleEnviarCambioPassword(usuario) {
+    if (!window.confirm(`Enviar a ${usuario.email} un correo para cambiar su contrasena?`)) return;
+    setListError("");
+    try {
+      const data = await request(`/api/admin/users/${usuario.id}/password-reset`, { method: "POST" });
+      window.alert(data.message);
+    } catch (error) {
+      setListError(error.message || "No se pudo enviar el correo");
     }
   }
 
@@ -2972,6 +3036,51 @@ export default function App() {
     );
   }
 
+  if (!token && resetToken) {
+    return (
+      <main className="authPage">
+        <section className="authCard">
+          <p className="eyebrow">Don Joyero</p>
+          <h1>Nueva contrasena</h1>
+          {resetDone ? (
+            <>
+              <p>Tu contrasena fue actualizada. Ya podes iniciar sesion.</p>
+              <button type="button" onClick={() => setResetToken(null)}>Ir al login</button>
+            </>
+          ) : (
+            <form onSubmit={handleResetSubmit} className="authForm">
+              {resetError && <p className="error">{resetError}</p>}
+              <label htmlFor="reset-password">Nueva contrasena</label>
+              <input id="reset-password" type="password" value={resetPasswordValue} onChange={(e) => setResetPasswordValue(e.target.value)} autoComplete="new-password" required />
+              <label htmlFor="reset-confirm">Confirma la contrasena</label>
+              <input id="reset-confirm" type="password" value={resetConfirm} onChange={(e) => setResetConfirm(e.target.value)} autoComplete="new-password" required />
+              <button type="submit" disabled={resetSaving}>{resetSaving ? "Guardando..." : "Guardar contrasena"}</button>
+            </form>
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  if (!token && forgotMode) {
+    return (
+      <main className="authPage">
+        <section className="authCard">
+          <p className="eyebrow">Don Joyero</p>
+          <h1>Olvide mi contrasena</h1>
+          <p>Te enviamos un correo con un enlace para elegir una nueva.</p>
+          <form onSubmit={handleForgotSubmit} className="authForm">
+            <label htmlFor="forgot-email">Email</label>
+            <input id="forgot-email" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} autoComplete="email" required />
+            <button type="submit" disabled={forgotSaving}>{forgotSaving ? "Enviando..." : "Enviar correo"}</button>
+          </form>
+          {forgotMessage && <p>{forgotMessage}</p>}
+          <button type="button" className="ghost" onClick={() => { setForgotMode(false); setForgotMessage(""); }}>Volver al login</button>
+        </section>
+      </main>
+    );
+  }
+
   if (!token) {
     return (
       <main className="authPage">
@@ -3009,6 +3118,7 @@ export default function App() {
           </form>
 
           {authError && <p className="error">{authError}</p>}
+          <button type="button" className="ghost" onClick={() => setForgotMode(true)}>Olvide mi contrasena</button>
         </section>
       </main>
     );
@@ -3597,6 +3707,9 @@ export default function App() {
                 </div>
                 <div className="card-badges">
                   <span className={`badge ${u.rol === "CLIENTE" ? "off" : "on"}`}>{roleLabel(u.rol)}</span>
+                  {u.rol !== "CLIENTE" && (
+                    <button type="button" className="ghost" onClick={() => handleEnviarCambioPassword(u)}>Enviar cambio de contrasena</button>
+                  )}
                 </div>
                 <div className="actions">
                   <button type="button" className="ghost" onClick={() => startEditUser(u)}>Editar</button>
@@ -3893,8 +4006,12 @@ export default function App() {
               <input id="user-name" type="text" value={userForm.name} onChange={(e) => setUserForm((p) => ({ ...p, name: e.target.value }))} required />
               <label htmlFor="user-email">Email</label>
               <input id="user-email" type="email" value={userForm.email} onChange={(e) => setUserForm((p) => ({ ...p, email: e.target.value }))} required />
-              <label htmlFor="user-password">{isEditingUser ? "Nueva password (opcional)" : "Password"}</label>
-              <input id="user-password" type="password" value={userForm.password} onChange={(e) => setUserForm((p) => ({ ...p, password: e.target.value }))} />
+              {!isEditingUser && (
+                <>
+                  <label htmlFor="user-password">Password</label>
+                  <input id="user-password" type="password" value={userForm.password} onChange={(e) => setUserForm((p) => ({ ...p, password: e.target.value }))} />
+                </>
+              )}
               <label htmlFor="user-role">Rol</label>
               <select id="user-role" value={userForm.rol} onChange={(e) => setUserForm((p) => ({ ...p, rol: e.target.value }))}>
                 <option value="CLIENTE">Cliente</option>

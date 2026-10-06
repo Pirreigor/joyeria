@@ -1,6 +1,6 @@
 const { Router } = require("express");
 
-const { register, login, me, getInvitation, acceptInvitation } = require("../controllers/auth.controller");
+const { register, login, me, getInvitation, acceptInvitation, requestPasswordReset, resetPassword } = require("../controllers/auth.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { blockDuringMaintenance } = require("../middleware/maintenance.middleware");
 
@@ -14,5 +14,7 @@ router.post("/login", login);
 router.get("/me", requireAuth, me);
 router.get("/invitations/:token", getInvitation);
 router.post("/accept-invitation", acceptInvitation);
+router.post("/forgot-password", requestPasswordReset);
+router.post("/reset-password", resetPassword);
 
 module.exports = router;

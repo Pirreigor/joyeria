@@ -4,6 +4,7 @@ const prisma = require("../utils/prisma");
 const { hashPassword } = require("../utils/hash");
 const { buildBaseCode, generateUniqueSku } = require("../utils/sku");
 const { SUPER_ADMIN_EMAIL, isSuperAdmin } = require("../utils/superAdmin");
+const { enviarCorreoCambioPassword } = require("../utils/passwordReset");
 
 const ROLES_VALIDOS = ["ADMINISTRADOR", "VENDEDOR", "CLIENTE"];
 
@@ -752,10 +753,6 @@ async function updateUser(req, res) {
     data.rol = normalizedRole;
   }
 
-  if (password !== undefined && String(password).trim()) {
-    data.passwordHash = await hashPassword(String(password));
-  }
-
   if (permissions !== undefined) {
     data.permisos = Array.isArray(permissions) ? permissions.filter((p) => typeof p === "string") : [];
   }
@@ -775,6 +772,25 @@ async function updateUser(req, res) {
   });
 
   return res.json({ user });
+}
+
+async function sendUserPasswordReset(req, res) {
+  const { id } = req.params;
+
+  const existing = await prisma.usuario.findUnique({ where: { id: Number(id) } });
+  if (!existing) {
+    return res.status(404).json({ message: "Usuario no encontrado" });
+  }
+  if (existing.rol === "CLIENTE") {
+    return res.status(400).json({ message: "Los clientes de la tienda no usan el panel" });
+  }
+
+  try {
+    await enviarCorreoCambioPassword(existing);
+  } catch (error) {
+    return res.status(502).json({ message: `No se pudo enviar el correo: ${error.message}` });
+  }
+  return res.json({ message: `Enviamos un correo a ${existing.email} para cambiar la contrasena` });
 }
 
 async function deleteUser(req, res) {
@@ -1249,6 +1265,7 @@ async function listOrderDedicatorias(req, res) {
 }
 
 module.exports = {
+  sendUserPasswordReset,
   listCategories,
   createCategory,
   updateCategory,

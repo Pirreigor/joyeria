@@ -27,6 +27,7 @@ const {
   createUser,
   updateUser,
   deleteUser,
+  sendUserPasswordReset,
   createManualOrder,
   updateNotaPedido,
   listOrders,
@@ -76,6 +77,7 @@ router.get("/users", requirePermission("users"), listUsers);
 router.post("/users", requirePermission("users"), createUser);
 router.patch("/users/:id", requirePermission("users"), updateUser);
 router.delete("/users/:id", requirePermission("users"), deleteUser);
+router.post("/users/:id/password-reset", requirePermission("users"), sendUserPasswordReset);
 
 router.get("/invitations", requirePermission("users"), listInvitations);
 router.post("/invitations", requirePermission("users"), createInvitation);

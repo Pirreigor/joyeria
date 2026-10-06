@@ -2,6 +2,7 @@ const prisma = require("../utils/prisma");
 const { hashPassword, comparePassword } = require("../utils/hash");
 const { signAccessToken } = require("../utils/jwt");
 const { isSuperAdmin } = require("../utils/superAdmin");
+const { hashToken, enviarCorreoCambioPassword } = require("../utils/passwordReset");
 
 async function getInvitation(req, res) {
   const { token } = req.params;
@@ -154,6 +155,50 @@ async function login(req, res) {
   });
 }
 
+async function requestPasswordReset(req, res) {
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const respuesta = { message: "Si el email corresponde a una cuenta, te enviamos un correo para cambiar la contrasena." };
+
+  if (!email) return res.json(respuesta);
+
+  const usuario = await prisma.usuario.findUnique({ where: { email } });
+  if (usuario && usuario.rol !== "CLIENTE") {
+    try {
+      await enviarCorreoCambioPassword(usuario);
+    } catch (error) {
+      console.error("No se pudo enviar el correo de cambio de contrasena:", error.message);
+    }
+  }
+
+  return res.json(respuesta);
+}
+
+async function resetPassword(req, res) {
+  const { token, password } = req.body;
+
+  if (!token || !password || String(password).length < 6) {
+    return res.status(400).json({ message: "El enlace es invalido o la contrasena tiene menos de 6 caracteres" });
+  }
+
+  const usuario = await prisma.usuario.findFirst({
+    where: { resetTokenHash: hashToken(String(token)), resetTokenExpiresAt: { gt: new Date() } },
+  });
+  if (!usuario) {
+    return res.status(400).json({ message: "El enlace no es valido o ya expiro. Pedi uno nuevo." });
+  }
+
+  await prisma.usuario.update({
+    where: { id: usuario.id },
+    data: {
+      passwordHash: await hashPassword(String(password)),
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+    },
+  });
+
+  return res.json({ message: "Contrasena actualizada. Ya podes iniciar sesion." });
+}
+
 async function me(req, res) {
   const user = await prisma.usuario.findUnique({
     where: { id: req.user.id },
@@ -177,6 +222,8 @@ async function me(req, res) {
 module.exports = {
   register,
   login,
+  requestPasswordReset,
+  resetPassword,
   me,
   getInvitation,
   acceptInvitation,

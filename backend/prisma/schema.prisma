@@ -39,6 +39,8 @@ model Usuario {
   etapasTallerRegistradas PedidoEtapaTaller[] @relation("EtapaRegistradaPor")
   tallerId           Int?
   taller             Taller?   @relation("UsuarioTaller", fields: [tallerId], references: [id], onDelete: SetNull)
+  resetTokenHash     String?
+  resetTokenExpiresAt DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 

@@ -24,6 +24,29 @@ async function sendInvitationEmail({ to, name, inviteUrl }) {
   }
 }
 
+async function sendPasswordResetEmail({ to, name, resetUrl }) {
+  if (!resend) {
+    throw new Error("RESEND_API_KEY no esta configurado");
+  }
+
+  const { error } = await resend.emails.send({
+    from: process.env.MAIL_FROM,
+    to,
+    subject: "Cambio de contrasena - Don Joyero",
+    html: `
+      <p>Hola ${name},</p>
+      <p>Recibimos un pedido para cambiar la contrasena de tu cuenta.</p>
+      <p><a href="${resetUrl}">Elegi una nueva contrasena aca</a>.</p>
+      <p>Este link expira en 1 hora. Si no lo pediste, ignora este correo.</p>
+    `,
+  });
+
+  if (error) {
+    throw new Error(error.message || "No se pudo enviar el correo de cambio de contrasena");
+  }
+}
+
 module.exports = {
   sendInvitationEmail,
+  sendPasswordResetEmail,
 };

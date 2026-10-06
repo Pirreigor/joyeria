@@ -3,11 +3,17 @@ const prisma = require("../utils/prisma");
 const ESTADOS_DEL_TALLER = ["EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
 
 async function requireTallerUser(req, res, next) {
-  const usuario = await prisma.usuario.findUnique({ where: { id: req.user.id }, select: { tallerId: true } });
-  if (!usuario?.tallerId) {
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: req.user.id },
+    select: {
+      taller: { select: { id: true, nombre: true, etapas: { orderBy: { orden: "asc" }, select: { id: true, nombre: true } } } },
+    },
+  });
+  if (!usuario?.taller) {
     return res.status(403).json({ message: "Tu usuario no esta asignado a un taller" });
   }
-  req.tallerId = usuario.tallerId;
+  req.taller = usuario.taller;
+  req.tallerId = usuario.taller.id;
   return next();
 }
 
@@ -18,36 +24,46 @@ async function getPedidoDelTaller(pedidoId, tallerId) {
 }
 
 async function listPedidosTaller(req, res) {
-  const taller = await prisma.taller.findUnique({
-    where: { id: req.tallerId },
-    include: { etapas: { orderBy: { orden: "asc" } } },
-  });
-
   const pedidos = await prisma.pedido.findMany({
-    where: { tallerId: req.tallerId, estado: { in: ESTADOS_DEL_TALLER } },
+    where: { tallerId: req.taller.id, estado: { in: ESTADOS_DEL_TALLER } },
     orderBy: { tallerEnviadoAt: "desc" },
-    include: {
-      etapaTaller: true,
-      items: { include: { producto: { select: { name: true } } } },
-      historialTaller: { orderBy: { createdAt: "asc" }, include: { usuario: { select: { name: true } } } },
-    },
   });
+  const ids = pedidos.map((p) => p.id);
+
+  const [items, historiales] = await Promise.all([
+    prisma.itemPedido.findMany({ where: { pedidoId: { in: ids } }, include: { producto: { select: { name: true } } } }),
+    prisma.pedidoEtapaTaller.findMany({
+      where: { pedidoId: { in: ids } },
+      orderBy: { createdAt: "asc" },
+      include: { usuario: { select: { name: true } } },
+    }),
+  ]);
+
+  const itemsPorPedido = new Map();
+  for (const item of items) {
+    itemsPorPedido.set(item.pedidoId, [...(itemsPorPedido.get(item.pedidoId) || []), item]);
+  }
+  const historialPorPedido = new Map();
+  for (const h of historiales) {
+    historialPorPedido.set(h.pedidoId, [...(historialPorPedido.get(h.pedidoId) || []), h]);
+  }
+  const etapaPorId = new Map(req.taller.etapas.map((e) => [e.id, e]));
 
   return res.json({
-    taller: { id: taller.id, nombre: taller.nombre, etapas: taller.etapas },
+    taller: req.taller,
     pedidos: pedidos.map((p) => ({
       id: p.id,
       estado: p.estado,
       clienteNombre: p.clienteNombre,
       tallerEnviadoAt: p.tallerEnviadoAt,
       etapaTallerId: p.etapaTallerId,
-      etapaTaller: p.etapaTaller ? { id: p.etapaTaller.id, nombre: p.etapaTaller.nombre } : null,
-      items: p.items.map((i) => ({
+      etapaTaller: etapaPorId.get(p.etapaTallerId) || null,
+      items: (itemsPorPedido.get(p.id) || []).map((i) => ({
         id: i.id,
         quantity: i.quantity,
         descripcion: i.producto?.name || i.customNombre || `Producto #${i.productoId}`,
       })),
-      historial: p.historialTaller.map((h) => ({
+      historial: (historialPorPedido.get(p.id) || []).map((h) => ({
         id: h.id,
         etapaNombre: h.etapaNombre,
         fotos: h.fotos,
@@ -73,8 +89,8 @@ async function cambiarEtapaTaller(req, res) {
     return res.status(409).json({ message: "El pedido no esta en taller" });
   }
 
-  const etapa = await prisma.etapaTaller.findUnique({ where: { id: Number(etapaTallerId) } });
-  if (!etapa || etapa.tallerId !== req.tallerId) {
+  const etapa = req.taller.etapas.find((e) => e.id === Number(etapaTallerId));
+  if (!etapa) {
     return res.status(400).json({ message: "La etapa no pertenece a tu taller" });
   }
 
