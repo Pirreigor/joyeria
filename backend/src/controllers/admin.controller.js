@@ -809,11 +809,18 @@ async function deleteUser(req, res) {
   return res.status(204).send();
 }
 
+const MONEDAS_VALIDAS = ["PEN", "USD"];
+
 async function createManualOrder(req, res) {
   const { nombre, email, telefono, items } = req.body;
+  const moneda = req.body.moneda ? String(req.body.moneda).trim().toUpperCase() : "PEN";
 
   if (!nombre || !email || !telefono) {
     return res.status(400).json({ message: "nombre, email y telefono son obligatorios" });
+  }
+
+  if (!MONEDAS_VALIDAS.includes(moneda)) {
+    return res.status(400).json({ message: "Moneda invalida" });
   }
 
   if (!Array.isArray(items) || items.length === 0) {
@@ -833,6 +840,7 @@ async function createManualOrder(req, res) {
           custom: false,
           productId: Number(item.productId),
           quantity: Number(item.quantity),
+          unitPrice: item.unitPrice === undefined || item.unitPrice === null || item.unitPrice === "" ? null : Number(item.unitPrice),
         }
   );
 
@@ -849,6 +857,8 @@ async function createManualOrder(req, res) {
       }
     } else if (!item.productId) {
       return res.status(400).json({ message: "Cada item requiere productId o ser personalizado" });
+    } else if (moneda === "USD" && (item.unitPrice === null || !(item.unitPrice >= 0))) {
+      return res.status(400).json({ message: "En dolares, cada producto del catalogo necesita un precio valido" });
     }
   }
 
@@ -877,12 +887,13 @@ async function createManualOrder(req, res) {
         throw error;
       }
 
-      total += Number(product.price) * item.quantity;
+      const unitPrice = moneda === "USD" ? item.unitPrice : Number(product.price);
+      total += unitPrice * item.quantity;
 
       itemsData.push({
         productoId: product.id,
         quantity: item.quantity,
-        unitPrice: product.price,
+        unitPrice,
       });
 
       await tx.producto.update({
@@ -897,6 +908,7 @@ async function createManualOrder(req, res) {
         clienteEmail: String(email).trim().toLowerCase(),
         clienteTelefono: String(telefono).trim(),
         total,
+        moneda,
         estado: "PREPARAR",
         items: { create: itemsData },
       },
@@ -1015,7 +1027,7 @@ async function exportOrders(req, res) {
   });
 
   const headers = [
-    "ID", "Fecha", "Cliente", "Email", "Telefono", "Estado", "Total (S/)",
+    "ID", "Fecha", "Cliente", "Email", "Telefono", "Estado", "Moneda", "Total",
     "Metodo de pago", "N Comprobante", "Direccion de envio", "Courier", "N Guia",
     "Items", "Dedicatoria De", "Dedicatoria Para",
   ];
@@ -1027,6 +1039,7 @@ async function exportOrders(req, res) {
     o.clienteEmail || o.usuario?.email || "",
     o.clienteTelefono || "",
     o.estado,
+    o.moneda === "USD" ? "USD" : "PEN",
     Number(o.total || 0),
     o.metodoPago || "",
     o.numeroComprobante || "",
@@ -1181,13 +1194,20 @@ const METODOS_PAGO_VALIDOS = ["Transferencia BCP", "YAPE", "Transferencia BN", "
 
 async function registrarPagoAdicional(req, res) {
   const { id } = req.params;
-  const { metodoPago, numeroComprobante } = req.body;
+  const { metodoPago, numeroComprobante, monto } = req.body;
+  const moneda = req.body.moneda ? String(req.body.moneda).trim().toUpperCase() : "PEN";
 
-  if (!metodoPago || !numeroComprobante) {
-    return res.status(400).json({ message: "metodoPago y numeroComprobante son obligatorios" });
+  if (!metodoPago || !numeroComprobante || monto === undefined || monto === null || monto === "") {
+    return res.status(400).json({ message: "metodoPago, numeroComprobante y monto son obligatorios" });
   }
   if (!METODOS_PAGO_VALIDOS.includes(metodoPago)) {
     return res.status(400).json({ message: "Metodo de pago invalido" });
+  }
+  if (!MONEDAS_VALIDAS.includes(moneda)) {
+    return res.status(400).json({ message: "Moneda invalida" });
+  }
+  if (!(Number(monto) > 0)) {
+    return res.status(400).json({ message: "El monto debe ser mayor a 0" });
   }
   if (!req.file) {
     return res.status(400).json({ message: "El comprobante de pago (imagen) es obligatorio" });
@@ -1207,6 +1227,8 @@ async function registrarPagoAdicional(req, res) {
       metodoPago: String(metodoPago).trim(),
       numeroComprobante: String(numeroComprobante).trim(),
       comprobanteUrl: `/uploads/comprobantes/${req.file.filename}`,
+      monto: Number(monto),
+      moneda,
       usuarioId: req.user.id,
     },
   });
@@ -1216,10 +1238,17 @@ async function registrarPagoAdicional(req, res) {
 
 async function confirmPayment(req, res) {
   const { id } = req.params;
-  const { metodoPago, numeroComprobante, direccionEnvio, tallerId } = req.body;
+  const { metodoPago, numeroComprobante, direccionEnvio, tallerId, monto } = req.body;
+  const moneda = req.body.moneda ? String(req.body.moneda).trim().toUpperCase() : "PEN";
 
-  if (!metodoPago || !numeroComprobante || !direccionEnvio || !tallerId) {
-    return res.status(400).json({ message: "metodoPago, numeroComprobante, direccionEnvio y tallerId son obligatorios" });
+  if (!metodoPago || !numeroComprobante || !direccionEnvio || !tallerId || monto === undefined || monto === null || monto === "") {
+    return res.status(400).json({ message: "metodoPago, numeroComprobante, direccionEnvio, tallerId y monto son obligatorios" });
+  }
+  if (!MONEDAS_VALIDAS.includes(moneda)) {
+    return res.status(400).json({ message: "Moneda invalida" });
+  }
+  if (!(Number(monto) > 0)) {
+    return res.status(400).json({ message: "El monto debe ser mayor a 0" });
   }
 
   const taller = await prisma.taller.findUnique({
@@ -1265,7 +1294,7 @@ async function confirmPayment(req, res) {
       comprobanteUrl,
       direccionEnvio: String(direccionEnvio).trim(),
       confirmedByUserId: req.user.id,
-      pagos: { create: { metodoPago: String(metodoPago).trim(), numeroComprobante: String(numeroComprobante).trim(), comprobanteUrl, usuarioId: req.user.id } },
+      pagos: { create: { metodoPago: String(metodoPago).trim(), numeroComprobante: String(numeroComprobante).trim(), comprobanteUrl, monto: Number(monto), moneda, usuarioId: req.user.id } },
       tallerId: taller.id,
       etapaTallerId: taller.etapas[0].id,
       tallerEnviadoAt: new Date(),

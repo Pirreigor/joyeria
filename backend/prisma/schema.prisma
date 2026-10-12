@@ -14,6 +14,11 @@ enum Rol {
   TALLER
 }
 
+enum Moneda {
+  PEN
+  USD
+}
+
 enum EstadoPedido {
   PREPARAR
   NUEVO
@@ -216,6 +221,7 @@ model Pedido {
   clienteEmail     String?
   clienteTelefono  String?
   total            Float
+  moneda             Moneda       @default(PEN)
   estado             EstadoPedido @default(PREPARAR)
   metodoPago         String?
   numeroComprobante  String?
@@ -334,6 +340,8 @@ model PedidoPago {
   metodoPago        String?
   numeroComprobante String?
   comprobanteUrl    String?
+  monto             Float?
+  moneda            Moneda   @default(PEN)
   usuarioId         Int?
   usuario           Usuario? @relation("PagoRegistradoPor", fields: [usuarioId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())

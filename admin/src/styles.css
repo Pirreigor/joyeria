@@ -1251,6 +1251,25 @@ button:disabled {
   padding: 4px 8px;
 }
 
+.manualOrderCatalogItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.manualOrderCatalogItem input {
+  width: 110px;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+}
+
+.montoMonedaRow {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 8px;
+}
+
 .productPicker {
   display: grid;
   gap: 6px;

@@ -860,7 +860,8 @@ function DateRangeBar({ idPrefix, from, to, onFrom, onTo, onClear }) {
   );
 }
 
-function RevenueChart({ data }) {
+function RevenueChart({ data, moneda = "PEN" }) {
+  const simbolo = moneda === "USD" ? "$" : "S/";
   const width = 600;
   const height = 220;
   const padding = { top: 16, right: 16, bottom: 24, left: 60 };
@@ -902,16 +903,16 @@ function RevenueChart({ data }) {
 
   return (
     <div className="chartCard">
-      <div className="chartTitle">Ingresos — ultimos 30 dias</div>
+      <div className="chartTitle">Ingresos ({moneda === "USD" ? "USD" : "soles"}) — ultimos 30 dias</div>
       {points.length === 0 ? (
-        <p className="subtle">Sin pedidos pagados todavia.</p>
+        <p className="subtle">Sin pedidos pagados en {moneda === "USD" ? "dolares" : "soles"} todavia.</p>
       ) : (
         <>
           <svg viewBox={`0 0 ${width} ${height}`} className="chartSvg" onMouseMove={handleMove} onMouseLeave={() => setHoverIdx(null)}>
             {gridLines.map((g, i) => (
               <g key={i}>
                 <line x1={padding.left} x2={width - padding.right} y1={g.y} y2={g.y} className="chartGrid" />
-                <text x={padding.left - 8} y={g.y + 3} textAnchor="end" className="chartAxisLabel">S/ {Math.round(g.v)}</text>
+                <text x={padding.left - 8} y={g.y + 3} textAnchor="end" className="chartAxisLabel">{simbolo} {Math.round(g.v)}</text>
               </g>
             ))}
             <path d={areaPath} className="chartArea" />
@@ -931,7 +932,7 @@ function RevenueChart({ data }) {
           {hovered && (
             <div className="chartTooltip" style={{ left: `${(hovered.x / width) * 100}%` }}>
               <strong>{formatChartDate(hovered.date)}</strong>
-              <span>S/ {hovered.total.toFixed(2)}</span>
+              <span>{simbolo} {hovered.total.toFixed(2)}</span>
             </div>
           )}
         </>
@@ -1103,7 +1104,7 @@ function PagosLista({ pagos }) {
       {pagos.map((p) => (
         <li key={p.id}>
           <small>
-            Pago: {p.metodoPago || "—"} — #{p.numeroComprobante || "—"}
+            Pago: {p.moneda === "USD" ? "$" : "S/"} {Number(p.monto || 0).toFixed(2)} — {p.metodoPago || "—"} — #{p.numeroComprobante || "—"}
             {p.usuario?.name ? " — " + p.usuario.name : ""} — {new Date(p.createdAt).toLocaleDateString()}
             {p.comprobanteUrl && <> — <a href={`${API_URL}${p.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a></>}
           </small>
@@ -1189,12 +1190,12 @@ export default function App() {
   const [historialDateTo, setHistorialDateTo] = useState(() => daysAgoISO(0));
   const [clientesMotivoFilter, setClientesMotivoFilter] = useState("todos");
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
-  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [] });
+  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [productSearchCat, setProductSearchCat] = useState("todas");
   const [paymentModal, setPaymentModal] = useState(null);
-  const [paymentForm, setPaymentForm] = useState({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null, tallerId: "" });
+  const [paymentForm, setPaymentForm] = useState({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null, tallerId: "", monto: "", moneda: "PEN" });
   const [paymentSaving, setPaymentSaving] = useState(false);
 
   const [cotizacionModal, setCotizacionModal] = useState(null);
@@ -1207,7 +1208,7 @@ export default function App() {
   const [notaPedidoReadOnly, setNotaPedidoReadOnly] = useState(false);
   const [notaPedidoTaller, setNotaPedidoTaller] = useState(false);
   const [pagoAdicional, setPagoAdicional] = useState(null);
-  const [pagoAdicionalForm, setPagoAdicionalForm] = useState({ metodoPago: "", numeroComprobante: "", comprobante: null });
+  const [pagoAdicionalForm, setPagoAdicionalForm] = useState({ metodoPago: "", numeroComprobante: "", comprobante: null, monto: "", moneda: "PEN" });
   const [pagoAdicionalSaving, setPagoAdicionalSaving] = useState(false);
 
   const [shippingModal, setShippingModal] = useState(null);
@@ -1436,17 +1437,23 @@ export default function App() {
     const since = new Date();
     since.setHours(0, 0, 0, 0);
     since.setDate(since.getDate() - 29);
-    const dayMap = new Map();
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(since);
-      d.setDate(d.getDate() + i);
-      dayMap.set(d.toISOString().slice(0, 10), 0);
+
+    function buildRevenueByDay(subset) {
+      const dayMap = new Map();
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(since);
+        d.setDate(d.getDate() + i);
+        dayMap.set(d.toISOString().slice(0, 10), 0);
+      }
+      subset.forEach((o) => {
+        const key = new Date(o.createdAt).toISOString().slice(0, 10);
+        if (dayMap.has(key)) dayMap.set(key, dayMap.get(key) + Number(o.total || 0));
+      });
+      return Array.from(dayMap.entries()).map(([date, total]) => ({ date, total }));
     }
-    paidOrders.forEach((o) => {
-      const key = new Date(o.createdAt).toISOString().slice(0, 10);
-      if (dayMap.has(key)) dayMap.set(key, dayMap.get(key) + Number(o.total || 0));
-    });
-    const revenueByDay = Array.from(dayMap.entries()).map(([date, total]) => ({ date, total }));
+
+    const revenueByDayPEN = buildRevenueByDay(paidOrders.filter((o) => o.moneda !== "USD"));
+    const revenueByDayUSD = buildRevenueByDay(paidOrders.filter((o) => o.moneda === "USD"));
 
     const stageCounts = ORDER_STAGES.map((stage) => ({
       ...stage,
@@ -1474,7 +1481,7 @@ export default function App() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
 
-    return { revenueByDay, stageCounts, paymentMethods, topProducts };
+    return { revenueByDayPEN, revenueByDayUSD, stageCounts, paymentMethods, topProducts };
   }, [orders]);
 
   useEffect(() => {
@@ -2533,9 +2540,17 @@ export default function App() {
     }
   }
 
-  function openPaymentModal(orderId) {
-    setPaymentModal(orderId);
-    setPaymentForm({ metodoPago: "", numeroComprobante: "", direccionEnvio: "", comprobante: null, tallerId: "" });
+  function openPaymentModal(order) {
+    setPaymentModal(order.id);
+    setPaymentForm({
+      metodoPago: "",
+      numeroComprobante: "",
+      direccionEnvio: "",
+      comprobante: null,
+      tallerId: "",
+      monto: order.total != null ? Number(order.total).toFixed(2) : "",
+      moneda: order.moneda === "USD" ? "USD" : "PEN",
+    });
   }
 
   function cotizacionItemsFromOrder(order) {
@@ -2906,6 +2921,8 @@ export default function App() {
       fd.append("numeroComprobante", paymentForm.numeroComprobante);
       fd.append("direccionEnvio", paymentForm.direccionEnvio);
       fd.append("tallerId", paymentForm.tallerId);
+      fd.append("monto", paymentForm.monto);
+      fd.append("moneda", paymentForm.moneda);
       fd.append("comprobante", paymentForm.comprobante);
 
       const response = await fetch(`${API_URL}/api/admin/orders/${paymentModal}/confirm-payment`, {
@@ -2979,9 +2996,9 @@ export default function App() {
     setNotaPedidoTaller(taller);
   }
 
-  function openPagoAdicional(orderId) {
-    setPagoAdicional(orderId);
-    setPagoAdicionalForm({ metodoPago: "", numeroComprobante: "", comprobante: null });
+  function openPagoAdicional(order) {
+    setPagoAdicional(order.id);
+    setPagoAdicionalForm({ metodoPago: "", numeroComprobante: "", comprobante: null, monto: "", moneda: order.moneda === "USD" ? "USD" : "PEN" });
   }
 
   async function handlePagoAdicionalSubmit(event) {
@@ -2992,6 +3009,8 @@ export default function App() {
       const fd = new FormData();
       fd.append("metodoPago", pagoAdicionalForm.metodoPago);
       fd.append("numeroComprobante", pagoAdicionalForm.numeroComprobante);
+      fd.append("monto", pagoAdicionalForm.monto);
+      fd.append("moneda", pagoAdicionalForm.moneda);
       fd.append("comprobante", pagoAdicionalForm.comprobante);
       const response = await fetch(`${API_URL}/api/admin/orders/${pagoAdicional}/pagos`, {
         method: "POST",
@@ -3051,8 +3070,22 @@ export default function App() {
       if (existing) {
         return { ...prev, items: prev.items.map((i) => (!i.custom && i.productId === product.id) ? { ...i, quantity: i.quantity + 1 } : i) };
       }
-      return { ...prev, items: [...prev.items, { key: `p-${product.id}`, custom: false, productId: product.id, name: product.name, price: product.price, quantity: 1 }] };
+      const price = prev.moneda === "USD" ? "" : product.price;
+      return { ...prev, items: [...prev.items, { key: `p-${product.id}`, custom: false, productId: product.id, name: product.name, price, quantity: 1 }] };
     });
+  }
+
+  function handleManualOrderMonedaChange(nextMoneda) {
+    setManualOrderForm((prev) => ({
+      ...prev,
+      moneda: nextMoneda,
+      items: prev.items.map((i) => {
+        if (i.custom) return i;
+        if (nextMoneda === "USD") return { ...i, price: "" };
+        const product = products.find((p) => p.id === i.productId);
+        return { ...i, price: product ? product.price : i.price };
+      }),
+    }));
   }
 
   function addCustomManualOrderItem() {
@@ -3086,16 +3119,17 @@ export default function App() {
           nombre: manualOrderForm.nombre.trim(),
           email: manualOrderForm.email.trim(),
           telefono: manualOrderForm.telefono.trim(),
+          moneda: manualOrderForm.moneda,
           items: manualOrderForm.items.map((i) =>
             i.custom
               ? { custom: true, customNombre: i.name.trim(), customFotoUrl: i.fotoUrl, quantity: i.quantity, unitPrice: i.price }
-              : { productId: i.productId, quantity: i.quantity }
+              : { productId: i.productId, quantity: i.quantity, unitPrice: manualOrderForm.moneda === "USD" ? i.price : undefined }
           ),
         }),
       });
 
       setFormModal("");
-      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] });
+      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" });
       await loadData();
     } catch (error) {
       setListError(error.message || "Error al crear pedido manual");
@@ -3393,7 +3427,8 @@ export default function App() {
             </div>
 
             <div className="chartsGrid">
-              <RevenueChart data={dashboardCharts.revenueByDay} />
+              <RevenueChart data={dashboardCharts.revenueByDayPEN} moneda="PEN" />
+              <RevenueChart data={dashboardCharts.revenueByDayUSD} moneda="USD" />
               <StageBarChart stages={dashboardCharts.stageCounts} />
               <div className="chartCard">
                 <div className="chartTitle">Metodos de pago</div>
@@ -3415,7 +3450,7 @@ export default function App() {
                     <div key={order.id} className="miniRow">
                       <strong>Pedido #{order.id}</strong>
                       <small>
-                        {order.user?.name || order.user?.email || "Cliente"} | {order.status} | S/ {Number(order.total || 0).toFixed(2)}
+                        {order.user?.name || order.user?.email || "Cliente"} | {order.status} | {order.moneda === "USD" ? "$" : "S/"} {Number(order.total || 0).toFixed(2)}
                       </small>
                     </div>
                   ))
@@ -3677,7 +3712,7 @@ export default function App() {
               )}
               {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}
               {activeTab === "flyers" && <button onClick={() => { resetFlyerForm(); setFormModal("flyer"); }}>+ Nuevo flyer</button>}
-              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
+              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
               {activeTab === "historial" && <button className="ghost" onClick={handleExportOrders} disabled={exportingOrders}>{exportingOrders ? "Descargando..." : "Descargar Excel"}</button>}
               <button className="ghost" onClick={loadData} disabled={listLoading}>{listLoading ? "Actualizando..." : "Recargar"}</button>
             </div>
@@ -3986,7 +4021,7 @@ export default function App() {
                     <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
                   </div>
                   <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
-                  <small>Total: S/ {Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
+                  <small>Total: {order.moneda === "USD" ? "$" : "S/"} {Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
                   {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
                   <PagosLista pagos={order.pagos} />
                   {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
@@ -4003,7 +4038,7 @@ export default function App() {
                 )}
                 <div className="actions">
                   {["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
-                    <button type="button" className="ghost" onClick={() => openPagoAdicional(order.id)}>Agregar pago</button>
+                    <button type="button" className="ghost" onClick={() => openPagoAdicional(order)}>Agregar pago</button>
                   )}
                   {["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openDedicationView(order)}>Dedicatorias</button>
@@ -4028,7 +4063,7 @@ export default function App() {
                       type="button"
                       disabled={!order.notaGuardadaAt}
                       title={order.notaGuardadaAt ? "" : "Guarda primero la nota de pedido"}
-                      onClick={() => openPaymentModal(order.id)}
+                      onClick={() => openPaymentModal(order)}
                     >
                       Pagar
                     </button>
@@ -4048,7 +4083,7 @@ export default function App() {
                       <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {new Date(order.createdAt).toLocaleDateString()}</small>
                     </span>
                     <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
-                    <span className="historialRowTotal">S/ {Number(order.total || 0).toFixed(2)}</span>
+                    <span className="historialRowTotal">{order.moneda === "USD" ? "$" : "S/"} {Number(order.total || 0).toFixed(2)}</span>
                   </button>
                   {isExpanded && (
                     <div className="card-info historialRowDetail">
@@ -4663,7 +4698,7 @@ export default function App() {
       )}
 
       {formModal === "manualOrder" && (
-        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>
+        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" }); }}>
           <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
             <h2>Nuevo pedido manual</h2>
             {listError && <p className="error">{listError}</p>}
@@ -4674,6 +4709,16 @@ export default function App() {
               <input id="mo-email" type="email" value={manualOrderForm.email} onChange={(e) => setManualOrderForm((p) => ({ ...p, email: e.target.value }))} required />
               <label htmlFor="mo-telefono">Telefono</label>
               <input id="mo-telefono" type="tel" value={manualOrderForm.telefono} onChange={(e) => setManualOrderForm((p) => ({ ...p, telefono: e.target.value }))} required />
+
+              <label>Moneda</label>
+              <div className="orderStageBar">
+                <button type="button" className={manualOrderForm.moneda === "PEN" ? "stageChip active" : "stageChip"} onClick={() => handleManualOrderMonedaChange("PEN")}>Soles (S/)</button>
+                <button type="button" className={manualOrderForm.moneda === "USD" ? "stageChip active" : "stageChip"} onClick={() => handleManualOrderMonedaChange("USD")}>Dolares ($)</button>
+              </div>
+              {manualOrderForm.moneda === "USD" && (
+                <p className="subtle">Los productos del catalogo estan en soles. Escribe a mano el precio en dolares de cada uno.</p>
+              )}
+
               <label>Buscar producto</label>
               <div className="productPicker">
                 <div className="productPickerFilters">
@@ -4744,19 +4789,47 @@ export default function App() {
                         </div>
                       </li>
                     ) : (
-                      <li key={item.key}>
-                        <span>{item.quantity}x {item.name} — S/ {(item.price * item.quantity).toFixed(2)}</span>
+                      <li key={item.key} className="manualOrderCatalogItem">
+                        <span>{item.quantity}x {item.name}</span>
+                        {manualOrderForm.moneda === "USD" ? (
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="Precio en $"
+                            value={item.price}
+                            onChange={(e) => updateCustomManualOrderItem(item.key, "price", e.target.value === "" ? "" : Number(e.target.value))}
+                            aria-label="Precio en dolares"
+                          />
+                        ) : (
+                          <span>S/ {(Number(item.price || 0) * item.quantity).toFixed(2)}</span>
+                        )}
                         <button type="button" className="ghost" onClick={() => removeManualOrderItem(item.key)}>x</button>
                       </li>
                     )
                   )}
-                  <li className="manualOrderTotal"><strong>Total: S/ {manualOrderForm.items.reduce((t, i) => t + i.price * i.quantity, 0).toFixed(2)}</strong></li>
+                  <li className="manualOrderTotal">
+                    <strong>
+                      Total: {manualOrderForm.moneda === "USD" ? "$" : "S/"}{" "}
+                      {manualOrderForm.items.reduce((t, i) => t + Number(i.price || 0) * i.quantity, 0).toFixed(2)}
+                    </strong>
+                  </li>
                 </ul>
               )}
 
               <div className="actions">
-                <button type="submit" disabled={manualOrderSaving || manualOrderForm.items.length === 0 || manualOrderForm.items.some((i) => i.custom && (!i.name.trim() || !(i.price >= 0) || !i.fotoUrl))}>{manualOrderSaving ? "Creando..." : "Crear pedido"}</button>
-                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [] }); }}>Cancelar</button>
+                <button
+                  type="submit"
+                  disabled={
+                    manualOrderSaving ||
+                    manualOrderForm.items.length === 0 ||
+                    manualOrderForm.items.some((i) => i.custom && (!i.name.trim() || !(i.price >= 0) || !i.fotoUrl)) ||
+                    (manualOrderForm.moneda === "USD" && manualOrderForm.items.some((i) => !i.custom && !(i.price >= 0)))
+                  }
+                >
+                  {manualOrderSaving ? "Creando..." : "Crear pedido"}
+                </button>
+                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" }); }}>Cancelar</button>
               </div>
             </form>
           </div>
@@ -4780,6 +4853,26 @@ export default function App() {
               </select>
               <label htmlFor="pa-numero">Numero de comprobante</label>
               <input id="pa-numero" type="text" value={pagoAdicionalForm.numeroComprobante} onChange={(e) => setPagoAdicionalForm((p) => ({ ...p, numeroComprobante: e.target.value }))} required />
+              <label htmlFor="pa-monto">Monto pagado</label>
+              <div className="montoMonedaRow">
+                <input
+                  id="pa-monto"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={pagoAdicionalForm.monto}
+                  onChange={(e) => setPagoAdicionalForm((p) => ({ ...p, monto: e.target.value }))}
+                  required
+                />
+                <select
+                  value={pagoAdicionalForm.moneda}
+                  onChange={(e) => setPagoAdicionalForm((p) => ({ ...p, moneda: e.target.value }))}
+                  aria-label="Moneda del pago"
+                >
+                  <option value="PEN">Soles (S/)</option>
+                  <option value="USD">Dolares ($)</option>
+                </select>
+              </div>
               <label htmlFor="pa-comprobante">Comprobante de pago (imagen)</label>
               <input id="pa-comprobante" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setPagoAdicionalForm((p) => ({ ...p, comprobante: e.target.files[0] || null }))} required />
               <div className="actions">
@@ -4864,6 +4957,27 @@ export default function App() {
                 onChange={(e) => setPaymentForm((p) => ({ ...p, comprobante: e.target.files[0] || null }))}
                 required
               />
+
+              <label htmlFor="pm-monto">Monto pagado</label>
+              <div className="montoMonedaRow">
+                <input
+                  id="pm-monto"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={paymentForm.monto}
+                  onChange={(e) => setPaymentForm((p) => ({ ...p, monto: e.target.value }))}
+                  required
+                />
+                <select
+                  value={paymentForm.moneda}
+                  onChange={(e) => setPaymentForm((p) => ({ ...p, moneda: e.target.value }))}
+                  aria-label="Moneda del pago"
+                >
+                  <option value="PEN">Soles (S/)</option>
+                  <option value="USD">Dolares ($)</option>
+                </select>
+              </div>
 
               <label htmlFor="pm-taller">Taller de produccion</label>
               <select
