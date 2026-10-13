@@ -1575,6 +1575,11 @@ export default function App() {
       if (response.status === 503 && data.maintenance && token) {
         setMaintenanceLockout(true);
       }
+      if (response.status === 401 && token) {
+        handleLogout();
+        setAuthError("Tu sesion expiro. Volve a iniciar sesion.");
+        throw new Error("Tu sesion expiro. Volve a iniciar sesion.");
+      }
       throw new Error(data.message || "Ocurrio un error inesperado");
     }
 
