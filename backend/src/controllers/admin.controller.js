@@ -810,10 +810,12 @@ async function deleteUser(req, res) {
 }
 
 const MONEDAS_VALIDAS = ["PEN", "USD"];
+const ORIGENES_MANUALES_VALIDOS = ["MANUAL", "LIVE"];
 
 async function createManualOrder(req, res) {
   const { nombre, email, telefono, items } = req.body;
   const moneda = req.body.moneda ? String(req.body.moneda).trim().toUpperCase() : "PEN";
+  const origen = req.body.origen ? String(req.body.origen).trim().toUpperCase() : "MANUAL";
 
   if (!nombre || !email || !telefono) {
     return res.status(400).json({ message: "nombre, email y telefono son obligatorios" });
@@ -821,6 +823,10 @@ async function createManualOrder(req, res) {
 
   if (!MONEDAS_VALIDAS.includes(moneda)) {
     return res.status(400).json({ message: "Moneda invalida" });
+  }
+
+  if (!ORIGENES_MANUALES_VALIDOS.includes(origen)) {
+    return res.status(400).json({ message: "Origen invalido" });
   }
 
   if (!Array.isArray(items) || items.length === 0) {
@@ -909,6 +915,7 @@ async function createManualOrder(req, res) {
         clienteTelefono: String(telefono).trim(),
         total,
         moneda,
+        origen,
         estado: "PREPARAR",
         items: { create: itemsData },
       },
@@ -1026,8 +1033,10 @@ async function exportOrders(req, res) {
     },
   });
 
+  const ORIGEN_LABELS = { TIENDA: "Tienda", MANUAL: "Pedido manual", LIVE: "Live" };
+
   const headers = [
-    "ID", "Fecha", "Cliente", "Email", "Telefono", "Estado", "Moneda", "Total",
+    "ID", "Fecha", "Cliente", "Email", "Telefono", "Estado", "Origen", "Moneda", "Total",
     "Metodo de pago", "N Comprobante", "Direccion de envio", "Courier", "N Guia",
     "Items", "Dedicatoria De", "Dedicatoria Para",
   ];
@@ -1039,6 +1048,7 @@ async function exportOrders(req, res) {
     o.clienteEmail || o.usuario?.email || "",
     o.clienteTelefono || "",
     o.estado,
+    ORIGEN_LABELS[o.origen] || "Tienda",
     o.moneda === "USD" ? "USD" : "PEN",
     Number(o.total || 0),
     o.metodoPago || "",

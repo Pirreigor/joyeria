@@ -1602,6 +1602,22 @@ button:disabled {
   background: #3182ce;
 }
 
+.orderBadge.origen_tienda {
+  background: var(--muted, #8a8a8a);
+}
+
+.orderBadge.origen_manual {
+  background: #6b46c1;
+}
+
+.orderBadge.origen_live {
+  background: #d53f8c;
+}
+
+.orderCardActions {
+  padding: 0 18px 16px 44px;
+}
+
 .checkboxLabel {
   display: flex;
   align-items: center;

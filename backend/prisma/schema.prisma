@@ -19,6 +19,12 @@ enum Moneda {
   USD
 }
 
+enum OrigenPedido {
+  TIENDA
+  MANUAL
+  LIVE
+}
+
 enum EstadoPedido {
   PREPARAR
   NUEVO
@@ -222,6 +228,7 @@ model Pedido {
   clienteTelefono  String?
   total            Float
   moneda             Moneda       @default(PEN)
+  origen             OrigenPedido @default(TIENDA)
   estado             EstadoPedido @default(PREPARAR)
   metodoPago         String?
   numeroComprobante  String?

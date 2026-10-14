@@ -726,6 +726,8 @@ const ORDER_STAGES = [
   { key: "entregado", label: "Entregado", estados: ["ENTREGADO"], color: "#2f855a" },
 ];
 
+const ORIGEN_BADGE_LABELS = { TIENDA: "Tienda", MANUAL: "Pedido manual", LIVE: "Live" };
+
 const ORDERS_MENU_KEYS = ["orders", "despacho", "envios"];
 
 const PAID_ORDER_STATES = ["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"];
@@ -1190,7 +1192,7 @@ export default function App() {
   const [historialDateTo, setHistorialDateTo] = useState(() => daysAgoISO(0));
   const [clientesMotivoFilter, setClientesMotivoFilter] = useState("todos");
   const [manualOrderOpen, setManualOrderOpen] = useState(false);
-  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" });
+  const [manualOrderForm, setManualOrderForm] = useState({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN", origen: "MANUAL" });
   const [manualOrderSaving, setManualOrderSaving] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [productSearchCat, setProductSearchCat] = useState("todas");
@@ -1481,7 +1483,17 @@ export default function App() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
 
-    return { revenueByDayPEN, revenueByDayUSD, stageCounts, paymentMethods, topProducts };
+    const origenMap = new Map();
+    orders.forEach((o) => {
+      const key = ORIGEN_BADGE_LABELS[o.origen] || "Tienda";
+      origenMap.set(key, (origenMap.get(key) || 0) + 1);
+    });
+    const ORIGEN_COLORS = { Tienda: "#8a8a8a", "Pedido manual": "#6b46c1", Live: "#d53f8c" };
+    const origenCounts = Array.from(origenMap.entries())
+      .map(([label, value]) => ({ label, value, color: ORIGEN_COLORS[label] }))
+      .sort((a, b) => b.value - a.value);
+
+    return { revenueByDayPEN, revenueByDayUSD, stageCounts, paymentMethods, topProducts, origenCounts };
   }, [orders]);
 
   useEffect(() => {
@@ -3125,6 +3137,7 @@ export default function App() {
           email: manualOrderForm.email.trim(),
           telefono: manualOrderForm.telefono.trim(),
           moneda: manualOrderForm.moneda,
+          origen: manualOrderForm.origen,
           items: manualOrderForm.items.map((i) =>
             i.custom
               ? { custom: true, customNombre: i.name.trim(), customFotoUrl: i.fotoUrl, quantity: i.quantity, unitPrice: i.price }
@@ -3134,7 +3147,7 @@ export default function App() {
       });
 
       setFormModal("");
-      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" });
+      setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN", origen: "MANUAL" });
       await loadData();
     } catch (error) {
       setListError(error.message || "Error al crear pedido manual");
@@ -3443,6 +3456,10 @@ export default function App() {
                 <div className="chartTitle">Productos mas vendidos</div>
                 <HorizontalBarChart items={dashboardCharts.topProducts} />
               </div>
+              <div className="chartCard">
+                <div className="chartTitle">Pedidos por origen</div>
+                <HorizontalBarChart items={dashboardCharts.origenCounts} />
+              </div>
             </div>
 
             <div className="dashboardBlocks">
@@ -3554,19 +3571,28 @@ export default function App() {
               const files = pending.files || [];
               const etapas = tallerSeleccionado.etapas;
               const siguiente = etapas[etapas.findIndex((e) => e.id === order.etapaTallerId) + 1];
+              const isExpanded = expandedOrders.has(order.id);
               return (
                 <article key={order.id} className="card tallerCard">
                   <div className="card-info">
-                    <div className="orderHeader">
-                      <strong>Pedido #{order.id}</strong>
+                    <button type="button" className="historialRowHeader" onClick={() => toggleOrderExpanded(order.id)}>
+                      <span className={`historialChevron ${isExpanded ? "open" : ""}`} aria-hidden="true">›</span>
+                      <span className="historialRowMain">
+                        <strong>Pedido #{order.id}</strong>
+                        <small>{order.clienteNombre || order.usuario?.name || "Cliente"}</small>
+                      </span>
+                      <span className={`orderBadge origen_${(order.origen || "TIENDA").toLowerCase()}`}>{ORIGEN_BADGE_LABELS[order.origen] || "Tienda"}</span>
                       <span className="orderBadge en_taller">{order.etapaTaller?.nombre || "Sin etapa"}</span>
-                    </div>
-                    <small>{order.clienteNombre || order.usuario?.name || "Cliente"}</small>
-                    <ul className="orderItems">
-                      {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`}</li>)}
-                    </ul>
-                    <TallerHistorial historial={order.historialTaller} />
-                      <NotaCambios cambios={order.notaCambios} />
+                    </button>
+                    {isExpanded && (
+                      <div className="historialRowDetail">
+                        <ul className="orderItems">
+                          {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`}</li>)}
+                        </ul>
+                        <TallerHistorial historial={order.historialTaller} />
+                        <NotaCambios cambios={order.notaCambios} />
+                      </div>
+                    )}
                   </div>
                   <div className="tallerPedidoAcciones">
                     <small className="subtle">Etapa actual: {order.etapaTaller?.nombre || "—"}</small>
@@ -3579,6 +3605,11 @@ export default function App() {
                       multiple
                       onChange={(e) => setTallerPendiente(order.id, { files: Array.from(e.target.files || []) })}
                     />
+                    {files.length > 0 && (
+                      <button type="button" className="ghost" disabled={tallerGuardando === order.id} onClick={() => handleTallerEtapaSave(order, order.etapaTallerId)}>
+                        {tallerGuardando === order.id ? "Guardando..." : "Guardar fotos (sin cambiar etapa)"}
+                      </button>
+                    )}
                     {siguiente ? (
                       <button type="button" disabled={tallerGuardando === order.id} onClick={() => handleTallerEtapaSave(order, siguiente.id)}>
                         {tallerGuardando === order.id ? "Guardando..." : `Pasar a ${siguiente.nombre}`}
@@ -3599,22 +3630,33 @@ export default function App() {
           <article className="panel">
             <h2>Pedidos terminados en taller</h2>
             {tallerTerminados.length === 0 && <p className="subtle">Todavia no hay pedidos terminados en taller.</p>}
-            {tallerTerminados.map((order) => (
+            {tallerTerminados.map((order) => {
+              const isExpanded = expandedOrders.has(order.id);
+              return (
               <article key={order.id} className="card tallerCard">
                 <div className="card-info">
-                  <div className="orderHeader">
-                    <strong>Pedido #{order.id}</strong>
+                  <button type="button" className="historialRowHeader" onClick={() => toggleOrderExpanded(order.id)}>
+                    <span className={`historialChevron ${isExpanded ? "open" : ""}`} aria-hidden="true">›</span>
+                    <span className="historialRowMain">
+                      <strong>Pedido #{order.id}</strong>
+                      <small>{order.taller?.nombre} — {order.clienteNombre || order.usuario?.name || "Cliente"}</small>
+                    </span>
+                    <span className={`orderBadge origen_${(order.origen || "TIENDA").toLowerCase()}`}>{ORIGEN_BADGE_LABELS[order.origen] || "Tienda"}</span>
                     <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
-                  </div>
-                  <small>{order.taller?.nombre} — {order.clienteNombre || order.usuario?.name || "Cliente"}</small>
-                  <TallerHistorial historial={order.historialTaller} />
+                  </button>
+                  {isExpanded && (
+                    <div className="historialRowDetail">
+                      <TallerHistorial historial={order.historialTaller} />
                       <NotaCambios cambios={order.notaCambios} />
+                    </div>
+                  )}
                 </div>
                 <div className="actions">
                   <button type="button" className="ghost" onClick={() => openNotaPedidoModal(order, { readOnly: true })}>Ver nota de pedido</button>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </article>
         )}
 
@@ -3717,7 +3759,7 @@ export default function App() {
               )}
               {activeTab === "slides" && <button onClick={() => { resetSlideForm(); setFormModal("slide"); }}>+ Nuevo slide</button>}
               {activeTab === "flyers" && <button onClick={() => { resetFlyerForm(); setFormModal("flyer"); }}>+ Nuevo flyer</button>}
-              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
+              {activeTab === "orders" && <button onClick={() => { setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN", origen: "MANUAL" }); setFormModal("manualOrder"); }}>+ Pedido manual</button>}
               {activeTab === "historial" && <button className="ghost" onClick={handleExportOrders} disabled={exportingOrders}>{exportingOrders ? "Descargando..." : "Descargar Excel"}</button>}
               <button className="ghost" onClick={loadData} disabled={listLoading}>{listLoading ? "Actualizando..." : "Recargar"}</button>
             </div>
@@ -4018,30 +4060,39 @@ export default function App() {
               </article>
             ))}
 
-            {activeTab === "orders" && pagedList.map((order) => (
-              <article className="card card-vertical" key={order.id}>
-                <div className="card-info">
-                  <div className="orderHeader">
+            {activeTab === "orders" && pagedList.map((order) => {
+              const isExpanded = expandedOrders.has(order.id);
+              return (
+              <article className="card card-vertical historialRow" key={order.id}>
+                <button type="button" className="historialRowHeader" onClick={() => toggleOrderExpanded(order.id)}>
+                  <span className={`historialChevron ${isExpanded ? "open" : ""}`} aria-hidden="true">›</span>
+                  <span className="historialRowMain">
                     <strong>Pedido #{order.id}</strong>
-                    <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                    <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {new Date(order.createdAt).toLocaleString()}</small>
+                  </span>
+                  <span className={`orderBadge origen_${(order.origen || "TIENDA").toLowerCase()}`}>{ORIGEN_BADGE_LABELS[order.origen] || "Tienda"}</span>
+                  <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
+                  <span className="historialRowTotal">{order.moneda === "USD" ? "$" : "S/"} {Number(order.total || 0).toFixed(2)}</span>
+                </button>
+                {isExpanded && (
+                  <div className="card-info historialRowDetail">
+                    <small>{order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
+                    {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
+                    <PagosLista pagos={order.pagos} />
+                    {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
+                    {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
+                    {order.taller && <small>Taller: {order.taller.nombre}{order.etapaTaller ? ` — Etapa: ${order.etapaTaller.nombre}` : ""}</small>}
+                    {order.confirmedBy && <small>Pago confirmado por: {order.confirmedBy.name}</small>}
+                    {order.dispatchedBy && <small>Despachado por: {order.dispatchedBy.name}</small>}
+                    {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
+                    {order.items?.length > 0 && (
+                      <ul className="orderItems">
+                        {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
+                      </ul>
+                    )}
                   </div>
-                  <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {order.clienteEmail || order.usuario?.email || ""}{order.clienteTelefono ? ` — Tel: ${order.clienteTelefono}` : ""}</small>
-                  <small>Total: {order.moneda === "USD" ? "$" : "S/"} {Number(order.total || 0).toFixed(2)} — {new Date(order.createdAt).toLocaleString()}</small>
-                  {order.metodoPago && <small>Pago: {order.metodoPago}{order.numeroComprobante ? ` — #${order.numeroComprobante}` : ""}</small>}
-                  <PagosLista pagos={order.pagos} />
-                  {order.direccionEnvio && <small>Direccion: {order.direccionEnvio}</small>}
-                  {order.courierEnvio && <small>Courier: {order.courierEnvio}{order.numeroGuia ? ` — Guia #${order.numeroGuia}` : ""}</small>}
-                  {order.taller && <small>Taller: {order.taller.nombre}{order.etapaTaller ? ` — Etapa: ${order.etapaTaller.nombre}` : ""}</small>}
-                  {order.confirmedBy && <small>Pago confirmado por: {order.confirmedBy.name}</small>}
-                  {order.dispatchedBy && <small>Despachado por: {order.dispatchedBy.name}</small>}
-                  {order.comprobanteUrl && <a href={`${API_URL}${order.comprobanteUrl}`} target="_blank" rel="noreferrer" className="imageLink">Ver comprobante</a>}
-                </div>
-                {order.items?.length > 0 && (
-                  <ul className="orderItems">
-                    {order.items.map((item) => <li key={item.id}>{item.quantity}x {item.producto?.name || item.customNombre || `Producto #${item.productoId}`} — S/ {Number(item.unitPrice).toFixed(2)}</li>)}
-                  </ul>
                 )}
-                <div className="actions">
+                <div className="actions orderCardActions">
                   {["PAGADO", "EN_TALLER", "LISTO_PARA_ENVIO", "ENVIADO", "ENTREGADO"].includes(order.estado) && (
                     <button type="button" className="ghost" onClick={() => openPagoAdicional(order)}>Agregar pago</button>
                   )}
@@ -4075,7 +4126,8 @@ export default function App() {
                   ) : null}
                 </div>
               </article>
-            ))}
+              );
+            })}
 
             {activeTab === "historial" && pagedList.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
@@ -4087,6 +4139,7 @@ export default function App() {
                       <strong>Pedido #{order.id}</strong>
                       <small>{order.clienteNombre || order.usuario?.name || "Cliente"} — {new Date(order.createdAt).toLocaleDateString()}</small>
                     </span>
+                    <span className={`orderBadge origen_${(order.origen || "TIENDA").toLowerCase()}`}>{ORIGEN_BADGE_LABELS[order.origen] || "Tienda"}</span>
                     <span className={`orderBadge ${order.estado.toLowerCase()}`}>{order.estado}</span>
                     <span className="historialRowTotal">{order.moneda === "USD" ? "$" : "S/"} {Number(order.total || 0).toFixed(2)}</span>
                   </button>
@@ -4703,7 +4756,7 @@ export default function App() {
       )}
 
       {formModal === "manualOrder" && (
-        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" }); }}>
+        <div className="modalOverlay" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN", origen: "MANUAL" }); }}>
           <div className="modalContent modalContentWide" onClick={(e) => e.stopPropagation()}>
             <h2>Nuevo pedido manual</h2>
             {listError && <p className="error">{listError}</p>}
@@ -4723,6 +4776,12 @@ export default function App() {
               {manualOrderForm.moneda === "USD" && (
                 <p className="subtle">Los productos del catalogo estan en soles. Escribe a mano el precio en dolares de cada uno.</p>
               )}
+
+              <label>Tipo de pedido</label>
+              <div className="orderStageBar">
+                <button type="button" className={manualOrderForm.origen === "MANUAL" ? "stageChip active" : "stageChip"} onClick={() => setManualOrderForm((p) => ({ ...p, origen: "MANUAL" }))}>Pedido manual</button>
+                <button type="button" className={manualOrderForm.origen === "LIVE" ? "stageChip active" : "stageChip"} onClick={() => setManualOrderForm((p) => ({ ...p, origen: "LIVE" }))}>Live</button>
+              </div>
 
               <label>Buscar producto</label>
               <div className="productPicker">
@@ -4834,7 +4893,7 @@ export default function App() {
                 >
                   {manualOrderSaving ? "Creando..." : "Crear pedido"}
                 </button>
-                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN" }); }}>Cancelar</button>
+                <button type="button" className="ghost" onClick={() => { setFormModal(""); setManualOrderForm({ nombre: "", email: "", telefono: "", items: [], moneda: "PEN", origen: "MANUAL" }); }}>Cancelar</button>
               </div>
             </form>
           </div>
