@@ -42,6 +42,7 @@ model Usuario {
   email              String     @unique
   passwordHash       String
   rol                Rol        @default(CLIENTE)
+  activo             Boolean    @default(true)
   permisos           String[]   @default([])
   pedidos            Pedido[]   @relation("PedidoCliente")
   productosCreados   Producto[] @relation("ProductoCreadoPor")

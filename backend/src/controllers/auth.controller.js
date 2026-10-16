@@ -134,6 +134,10 @@ async function login(req, res) {
     return res.status(401).json({ message: "Credenciales invalidas" });
   }
 
+  if (!user.activo) {
+    return res.status(403).json({ message: "Tu cuenta esta desactivada. Contacta a un administrador." });
+  }
+
   if (!isSuperAdmin(user)) {
     const config = await prisma.configTienda.findUnique({ where: { id: 1 }, select: { mantenimiento: true } });
     if (config?.mantenimiento) {

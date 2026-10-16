@@ -641,6 +641,7 @@ async function listUsers(req, res) {
       name: true,
       email: true,
       rol: true,
+      activo: true,
       permisos: true,
       createdAt: true,
       updatedAt: true,
@@ -684,6 +685,7 @@ async function createUser(req, res) {
       name: true,
       email: true,
       rol: true,
+      activo: true,
       permisos: true,
       createdAt: true,
       updatedAt: true,
@@ -695,7 +697,7 @@ async function createUser(req, res) {
 
 async function updateUser(req, res) {
   const { id } = req.params;
-  const { name, email, password, role, permissions } = req.body;
+  const { name, email, password, role, permissions, activo } = req.body;
 
   const existing = await prisma.usuario.findUnique({ where: { id: Number(id) } });
   if (!existing) {
@@ -753,6 +755,18 @@ async function updateUser(req, res) {
     data.permisos = Array.isArray(permissions) ? permissions.filter((p) => typeof p === "string") : [];
   }
 
+  if (activo !== undefined) {
+    if (!activo) {
+      if (req.user?.id === Number(id)) {
+        return res.status(400).json({ message: "No puedes desactivar tu propio usuario" });
+      }
+      if (existingIsSuperAdmin) {
+        return res.status(400).json({ message: "No se puede desactivar la cuenta admin principal" });
+      }
+    }
+    data.activo = Boolean(activo);
+  }
+
   const user = await prisma.usuario.update({
     where: { id: Number(id) },
     data,
@@ -761,6 +775,7 @@ async function updateUser(req, res) {
       name: true,
       email: true,
       rol: true,
+      activo: true,
       permisos: true,
       createdAt: true,
       updatedAt: true,

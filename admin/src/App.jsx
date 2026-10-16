@@ -1588,9 +1588,10 @@ export default function App() {
         setMaintenanceLockout(true);
       }
       if (response.status === 401 && token) {
+        const sessionMsg = data.message || "Tu sesion expiro. Volve a iniciar sesion.";
         handleLogout();
-        setAuthError("Tu sesion expiro. Volve a iniciar sesion.");
-        throw new Error("Tu sesion expiro. Volve a iniciar sesion.");
+        setAuthError(sessionMsg);
+        throw new Error(sessionMsg);
       }
       throw new Error(data.message || "Ocurrio un error inesperado");
     }
@@ -3182,6 +3183,33 @@ export default function App() {
     }
   }
 
+  async function handleToggleUserActivo(nextUser) {
+    const activar = !nextUser.activo;
+    const confirmed = window.confirm(
+      activar
+        ? `Reactivar el acceso de "${nextUser.email}"?`
+        : `Desactivar el acceso de "${nextUser.email}"? No va a poder iniciar sesion ni seguir usando una sesion abierta.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(nextUser.id);
+    setListError("");
+
+    try {
+      await request(`/api/admin/users/${nextUser.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ activo: activar }),
+      });
+      await loadData();
+    } catch (error) {
+      setListError(error.message || "No se pudo actualizar el acceso del usuario");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (inviteToken) {
     return (
       <main className="authPage">
@@ -3970,12 +3998,18 @@ export default function App() {
                 </div>
                 <div className="card-badges">
                   <span className={`badge ${u.rol === "CLIENTE" ? "off" : "on"}`}>{roleLabel(u.rol)}</span>
+                  <span className={`badge ${u.activo === false ? "off" : "on"}`}>{u.activo === false ? "Inactivo" : "Activo"}</span>
                   {u.rol !== "CLIENTE" && (
                     <button type="button" className="ghost" onClick={() => handleEnviarCambioPassword(u)}>Enviar cambio de contrasena</button>
                   )}
                 </div>
                 <div className="actions">
                   <button type="button" className="ghost" onClick={() => startEditUser(u)}>Editar</button>
+                  {u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase() && u.id !== user?.id && (
+                    <button type="button" className="ghost" onClick={() => handleToggleUserActivo(u)} disabled={deletingId === u.id}>
+                      {deletingId === u.id ? "..." : u.activo === false ? "Reactivar" : "Desactivar"}
+                    </button>
+                  )}
                   <button type="button" className="danger" onClick={() => handleDeleteUser(u)} disabled={deletingId === u.id}>{deletingId === u.id ? "..." : "Eliminar"}</button>
                 </div>
               </article>
